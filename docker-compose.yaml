@@ -55,7 +55,7 @@ services:
       dockerfile: Dockerfile
     container_name: api_container
     ports:
-      - "5000:5000"
+      - "5001:5001"
     environment:
       - NODE_ENV=development
       - DB_HOST=db-mysql          # ชื่อเดียวกับ service ของ mysql ด้านล่าง
