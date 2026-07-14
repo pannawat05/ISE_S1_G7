@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import signupRouter from './route/signup.js';
+import authRouter from './route/auth.js';
 
 const app = express();
 const port: number = 5001;
@@ -8,7 +8,7 @@ const port: number = 5001;
 app.use(express.json());
 
 app.use(cors());
-app.use(signupRouter);
+app.use(authRouter);
 
 app.get('/', (_req, res) => {
   res.send('Hello World!');
