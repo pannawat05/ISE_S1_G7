@@ -10,6 +10,8 @@ export default function SignUp() {
     confirmPassword: ''
   })
 
+
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
@@ -25,15 +27,20 @@ export default function SignUp() {
       return
     }
 
-    fetch('http://localhost:5001/signup', {
+
+    fetch('http://localhost:5001/email/sendotp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(formData)
-    }).then(response => response.json())
-      .then(data => {
+      body: JSON.stringify({ email: formData.email,otp: Math.floor(100000 + Math.random() * 900000) }) // ส่ง OTP ไปยังเซิร์ฟเวอร์
+    })
+      .then(response => response.json())
+      .then(data => {   
         console.log('Success:', data)
+        localStorage.setItem('signupData', JSON.stringify(formData)) // บันทึกข้อมูลผู้ใช้ชั่วคราว
+        // หลังจากส่ง OTP สำเร็จ ให้เปลี่ยนเส้นทางไปยังหน้า OTP
+        window.location.href = '/otp'
       })
       .catch((error) => {
         console.error('Error:', error)

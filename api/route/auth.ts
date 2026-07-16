@@ -8,7 +8,7 @@ const authRouter = express.Router();
 authRouter.post("/auth/signup", (req, res) => {
     console.log("Body:", req.body);
 
-    const { fname, lname, email, password } = req.body;
+    const { fname, lname, email, password} = req.body;
 
     db.query(
         "INSERT INTO users (f_name, l_name, email, password) VALUES (?, ?, ?, ?)",

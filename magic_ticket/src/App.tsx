@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Home from './page/home'
 import SignUp from './page/signup'
 import Signin from './page/signin'
+import OTP from './page/otp'
 
 // --- Component หลักแอปพลิเคชัน ---
 function App() {
@@ -81,6 +82,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<Signin />} />
+          <Route path="/otp" element={<OTP />} />
         </Routes>
         
       </div>
