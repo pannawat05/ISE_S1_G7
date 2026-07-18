@@ -1,5 +1,7 @@
 import React from 'react'
 
+
+
 function Home() {
   return (
     /* ปรับ min-h-screen และสีพื้นหลังหลักให้สลับโหมดได้สมบูรณ์ */
@@ -21,6 +23,11 @@ function Home() {
           <button className="mt-8 px-8 py-3 font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-600 dark:to-indigo-600 rounded-full shadow-lg shadow-purple-500/30 dark:shadow-[0_4px_20px_rgba(168,85,247,0.4)] hover:shadow-xl dark:hover:shadow-[0_6px_25px_rgba(168,85,247,0.6)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200">
             สำรวจตั๋วเวทมนตร์
           </button>
+          <a href="/organize_regis">
+          <button className="mt-8 ml-4 px-8 py-3 font-semibold text-purple-600 dark:text-purple-400 bg-white/80 dark:bg-[#1e1b4b]/60 border border-purple-300 dark:border-purple-500/50 rounded-full shadow-lg shadow-purple-500/10 dark:shadow-[0_4px_20px_rgba(168,85,247,0.2)] hover:shadow-xl dark:hover:shadow-[0_6px_25px_rgba(168,85,247,0.4)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 hover:bg-purple-600 hover:text-white dark:hover:bg-purple-600 dark:hover:text-white">
+            สมัครเป็น Organizer
+          </button>
+          </a>
         </div>
       </header>
 

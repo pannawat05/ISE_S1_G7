@@ -5,6 +5,7 @@ import Home from './page/home'
 import SignUp from './page/signup'
 import Signin from './page/signin'
 import OTP from './page/otp'
+import OrganizeRegis from './page/organize_regis'
 
 // --- Component หลักแอปพลิเคชัน ---
 function App() {
@@ -83,6 +84,7 @@ function App() {
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<Signin />} />
           <Route path="/otp" element={<OTP />} />
+          <Route path="/organize-regis" element={<OrganizeRegis />} />
         </Routes>
         
       </div>
