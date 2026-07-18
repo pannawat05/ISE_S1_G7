@@ -5,6 +5,10 @@ import Home from './page/home'
 import SignUp from './page/signup'
 import Signin from './page/signin'
 import OTP from './page/otp'
+import OrganizeRegis from './page/organize_regis'
+import Dashboards from './page/dashboard'
+import Cookies from 'js-cookie'
+import Event from './page/event'
 
 // --- Component หลักแอปพลิเคชัน ---
 function App() {
@@ -19,6 +23,14 @@ function App() {
       root.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  const token = Cookies.get('authToken'); // ตรวจสอบว่ามี Token อยู่ใน Cookie หรือไม่
+
+  const handleLogout = () => {
+    Cookies.remove('authToken');
+    // reload to update UI / routing state
+    window.location.reload();
+  }
 
   return (
     <Router>
@@ -55,23 +67,41 @@ function App() {
               </button>
             </div>
 
-            {/* AUTH BUTTONS (Right Side) */}
+            {/* AUTH BUTTONS (Right Side) - แก้ไขจุดผิดพลาดตรงนี้เรียบร้อยแล้ว */}
             <div className="flex items-center gap-4">
-              {/* Sign In - Outline Button */}
-              <Link 
-                to="/signin" 
-                className="text-purple-900 dark:text-[#e0d9f6] hover:text-purple-600 dark:hover:text-white border border-purple-300 dark:border-purple-500/30 hover:border-purple-600 dark:hover:border-purple-500 bg-purple-500/5 hover:bg-purple-500/10 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300"
-              >
-                เข้าสู่ระบบ
-              </Link>
-              
-              {/* Sign Up - Solid Gradient Button */}
-              <Link 
-                to="/signup" 
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-md dark:shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:shadow-lg dark:hover:shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:-translate-y-0.5 transition-all duration-300"
-              >
-                สมัครสมาชิก
-              </Link>
+              {token ? (
+                // กรณีล็อกอินแล้ว (มี Token)
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="text-purple-900 dark:text-[#e0d9f6] hover:text-purple-600 dark:hover:text-white border border-purple-300 dark:border-purple-500/30 hover:border-purple-600 dark:hover:border-purple-500 bg-purple-500/5 hover:bg-purple-500/10 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300"
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="bg-red-500/90 text-white px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition-all duration-200"
+                  >
+                    ออกจากระบบ
+                  </button>
+                </>
+              ) : (
+                // กรณีไม่ได้ล็อกอิน (ไม่มี Token)
+                <>
+                  <Link
+                    to="/signin"
+                    className="text-purple-900 dark:text-[#e0d9f6] hover:text-purple-600 dark:hover:text-white border border-purple-300 dark:border-purple-500/30 hover:border-purple-600 dark:hover:border-purple-500 bg-purple-500/5 hover:bg-purple-500/10 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300"
+                  >
+                    เข้าสู่ระบบ
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-md dark:shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:shadow-lg dark:hover:shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:-translate-y-0.5 transition-all duration-300"
+                  >
+                    สมัครสมาชิก
+                  </Link>
+                </>
+              )}
             </div>
 
           </div>
@@ -83,6 +113,9 @@ function App() {
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<Signin />} />
           <Route path="/otp" element={<OTP />} />
+          <Route path="/organize-regis" element={<OrganizeRegis />} />
+          <Route path="/dashboard" element={<Dashboards />} />
+          <Route path="/dashboard/events" element={<Event />} />
         </Routes>
         
       </div>

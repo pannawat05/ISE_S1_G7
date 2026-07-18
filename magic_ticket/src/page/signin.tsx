@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import Cookies from 'js-cookie'
 
 function Signin() {
   const [formData, setFormData] = useState({
@@ -26,6 +27,14 @@ function Signin() {
       .then(response => response.json())
       .then(data => {
         alert(data.message)
+        if (data.token) {
+          Cookies.set('authToken', data.token, { path: '/' }) // เก็บ Token ไว้ใน Cookie
+           if (data.role === 'organizer') {
+            window.location.href = '/dashboard' // เปลี่ยนเส้นทางไปยังหน้า Dashboard สำหรับ Organizer
+          } else {
+            window.location.href = '/' // เปลี่ยนเส้นทางไปยังหน้า Home สำหรับผู้ใช้ทั่วไป
+          }
+        }
       })
       .catch((error) => {
         console.error('Error:', error)
