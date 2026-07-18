@@ -29,7 +29,11 @@ function Signin() {
         alert(data.message)
         if (data.token) {
           Cookies.set('authToken', data.token, { path: '/' }) // เก็บ Token ไว้ใน Cookie
-          window.location.href = '/' // เปลี่ยนเส้นทางไปหน้า Home หลังจากเข้าสู่ระบบสำเร็จ
+           if (data.role === 'organizer') {
+            window.location.href = '/dashboard' // เปลี่ยนเส้นทางไปยังหน้า Dashboard สำหรับ Organizer
+          } else {
+            window.location.href = '/' // เปลี่ยนเส้นทางไปยังหน้า Home สำหรับผู้ใช้ทั่วไป
+          }
         }
       })
       .catch((error) => {
