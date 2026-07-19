@@ -7,7 +7,7 @@ interface EventCardProps {
 
 export default function EventCard({ event }: EventCardProps) {
   return (
-    <article className="group bg-[#111111] border border-white/5 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-1">
+    <article className="group bg-surface border border-white/5 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-1">
       <div className="relative aspect-[16/10] overflow-hidden">
         <img
           src={event.image}
@@ -27,11 +27,11 @@ export default function EventCard({ event }: EventCardProps) {
 
         <div className="space-y-2 text-xs text-gray-500">
           <div className="flex items-center gap-2">
-            <Calendar size={14} className="shrink-0 text-purple-400" />
+            <Calendar size={14} className="mt-icon-accent" />
             <span>{event.date}</span>
           </div>
           <div className="flex items-center gap-2">
-            <MapPin size={14} className="shrink-0 text-purple-400" />
+            <MapPin size={14} className="mt-icon-accent" />
             <span>{event.location}</span>
           </div>
         </div>

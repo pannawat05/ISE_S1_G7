@@ -10,7 +10,7 @@ export default function TicketCard({ ticket }: TicketCardProps) {
   const isPaid = ticket.status === "paid";
 
   return (
-    <article className="flex flex-col md:flex-row bg-[#121212] border border-white/5 rounded-2xl overflow-hidden">
+    <article className="flex flex-col md:flex-row bg-surface border border-white/5 rounded-2xl overflow-hidden">
       <div className="md:w-48 lg:w-56 shrink-0">
         <img
           src={ticket.image}
@@ -28,17 +28,17 @@ export default function TicketCard({ ticket }: TicketCardProps) {
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-400 mb-2">
             <span className="flex items-center gap-1.5">
-              <Calendar size={14} className="text-purple-400 shrink-0" />
+              <Calendar size={14} className="mt-icon-accent" />
               {ticket.date}
             </span>
             <span className="flex items-center gap-1.5">
-              <Clock size={14} className="text-purple-400 shrink-0" />
+              <Clock size={14} className="mt-icon-accent" />
               {ticket.time}
             </span>
           </div>
 
           <div className="flex items-start gap-1.5 text-sm text-gray-400 mb-3">
-            <MapPin size={14} className="text-purple-400 shrink-0 mt-0.5" />
+            <MapPin size={14} className="mt-icon-accent mt-0.5" />
             <span>{ticket.location}</span>
           </div>
 
@@ -51,12 +51,12 @@ export default function TicketCard({ ticket }: TicketCardProps) {
           <StatusBadge status={ticket.status} />
 
           {isPaid ? (
-            <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-colors w-full sm:w-auto justify-center">
+            <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white mt-btn-primary w-full sm:w-auto justify-center">
               <QrCode size={18} />
               แสดงตั๋วเข้างาน QR
             </button>
           ) : (
-            <p className="text-xs text-gray-600">ทำรายการไม่สำเร็จ</p>
+            <p className="text-xs text-gray-500">ทำรายการไม่สำเร็จ</p>
           )}
         </div>
       </div>

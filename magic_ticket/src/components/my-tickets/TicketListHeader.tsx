@@ -16,7 +16,7 @@ export default function TicketListHeader() {
       <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer shrink-0">
         <input
           type="checkbox"
-          className="w-4 h-4 rounded border-white/20 bg-transparent accent-purple-500"
+          className="w-4 h-4 rounded border-white/10 bg-transparent accent-violet-600"
         />
         รับใบเสร็จรับเงิน
       </label>

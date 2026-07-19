@@ -15,13 +15,13 @@ export default function NavbarActions() {
       <div className="flex items-center gap-2 sm:gap-3">
         <Link
           to="/signin"
-          className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-300 bg-[#1a1a1a] border border-white/10 rounded-full hover:border-purple-500/40 hover:text-white transition-all"
+          className="mt-btn-outline px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-full"
         >
           เข้าสู่ระบบ
         </Link>
         <Link
           to="/signup"
-          className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-purple-600 rounded-full hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-purple-900/30"
+          className="px-3 sm:px-4 py-2 text-xs sm:text-sm mt-btn-primary rounded-full"
         >
           สมัครสมาชิก
         </Link>
@@ -31,7 +31,7 @@ export default function NavbarActions() {
 
   return (
     <div className="flex items-center gap-3">
-      <button className="hidden lg:flex items-center gap-2 px-3 py-2 text-xs font-medium text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-full hover:bg-amber-400/20 transition-all">
+      <button className="hidden lg:flex items-center gap-2 px-3 py-2 text-xs font-medium text-violet-400 bg-violet-400/10 border border-violet-400/20 rounded-full hover:bg-violet-400/20 transition-all">
         <Zap size={14} />
         สลับบทบาทจำลอง
       </button>

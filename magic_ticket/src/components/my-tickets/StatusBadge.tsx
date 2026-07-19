@@ -7,11 +7,11 @@ interface StatusBadgeProps {
 const statusConfig = {
   paid: {
     label: "ชำระเงินแล้ว (สำเร็จ)",
-    className: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+    className: "mt-badge mt-badge-success",
   },
   expired: {
     label: "หมดเวลาชำระเงิน",
-    className: "text-rose-400 bg-rose-400/10 border-rose-400/20",
+    className: "mt-badge mt-badge-muted",
   },
 } as const;
 
@@ -20,7 +20,7 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
 
   return (
     <span
-      className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${config.className}`}
+      className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${config.className}`}
     >
       {config.label}
     </span>

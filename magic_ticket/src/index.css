@@ -1,17 +1,115 @@
 @import "tailwindcss";
+
 @theme {
   --animate-*: initial;
+  --color-surface: #111111;
+  --color-elevated: #1a1a1a;
+  --color-accent: #a78bfa;
+  --color-accent-strong: #7c3aed;
+  --color-accent-mid: #a855f7;
+  --color-accent-deep: #9333ea;
+  --color-logo: #7c3aed;
 }
-@variant dark (&:where(.dark, .dark *));
 
 :root {
   --logo-color: #7c3aed;
+  --mt-bg: #000000;
+  --mt-surface: #111111;
+  --mt-elevated: #1a1a1a;
+  --mt-text: #ffffff;
+  --mt-text-secondary: #9ca3af;
+  --mt-text-muted: #6b7280;
+  --mt-text-label: #d1d5db;
+  --mt-border-subtle: rgb(255 255 255 / 0.05);
+  --mt-border: rgb(255 255 255 / 0.1);
+  --mt-accent: #a78bfa;
+  --mt-accent-strong: #7c3aed;
+  --mt-accent-mid: #a855f7;
+  --mt-accent-deep: #9333ea;
 }
 
-.dark {
-  --logo-color: #7c3aed;
-  --primary-color: #1e1e2f;
-  --secondary-color: #31255c;
-  --primary-border-color: #34323b;
-  --secondary-border-color: #4c4174;
+@layer components {
+  .mt-page {
+    @apply min-h-screen bg-black text-white font-sans;
+  }
+
+  .mt-surface {
+    @apply bg-surface border border-white/5 rounded-2xl;
+  }
+
+  .mt-elevated {
+    @apply bg-elevated border border-white/10;
+  }
+
+  .mt-input {
+    @apply w-full px-4 py-2.5 bg-elevated border border-white/10 focus:border-purple-500/40 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all text-sm;
+  }
+
+  .mt-label {
+    @apply block text-xs font-medium text-gray-300 mb-1;
+  }
+
+  .mt-heading {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-purple-500;
+  }
+
+  .mt-btn-primary {
+    @apply bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold rounded-xl shadow-lg shadow-purple-900/40 transition-all duration-300;
+  }
+
+  .mt-btn-outline {
+    @apply px-4 py-2 text-sm font-medium text-gray-300 bg-elevated border border-white/10 rounded-full hover:border-purple-500/40 hover:text-white transition-all;
+  }
+
+  .mt-link {
+    @apply text-violet-400 hover:text-purple-400 transition-colors;
+  }
+
+  .mt-auth-card {
+    @apply w-full max-w-md bg-surface border border-white/5 rounded-2xl p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative z-10;
+  }
+
+  .mt-auth-page {
+    @apply min-h-[calc(100vh-69px)] flex items-center justify-center bg-black px-4 py-12 relative overflow-hidden;
+  }
+
+  .mt-dashboard-shell {
+    @apply flex h-screen bg-black text-white font-sans overflow-hidden;
+  }
+
+  .mt-dashboard-header {
+    @apply flex items-center justify-between bg-surface px-6 py-4 border-b border-white/5;
+  }
+
+  .mt-dashboard-main {
+    @apply flex-1 overflow-x-hidden overflow-y-auto bg-black p-6;
+  }
+
+  .mt-stat-card {
+    @apply bg-surface p-6 rounded-xl border border-white/5;
+  }
+
+  .mt-sidebar {
+    @apply fixed inset-y-0 left-0 z-50 w-64 bg-elevated text-white transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 border-r border-white/5;
+  }
+
+  .mt-badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border;
+  }
+
+  .mt-badge-success {
+    @apply text-violet-400 bg-violet-400/10 border-violet-400/20;
+  }
+
+  .mt-badge-warning {
+    @apply text-purple-400 bg-purple-400/10 border-purple-400/20;
+  }
+
+  .mt-badge-muted {
+    @apply text-gray-400 bg-gray-400/10 border-gray-400/20;
+  }
+
+  .mt-icon-accent {
+    @apply text-violet-400 shrink-0;
+  }
 }
