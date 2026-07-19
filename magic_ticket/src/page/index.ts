@@ -1,0 +1,7 @@
+export { default as Home } from './home'
+export { default as SignUp } from './signup'
+export { default as Signin } from './signin'
+export { default as OTP } from './otp'
+export { default as OrganizeRegis } from './organize_regis'
+export { default as Dashboards } from './dashboard'
+export { default as Event } from './event'

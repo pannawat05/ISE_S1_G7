@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Sidebar from '../components/sidebar';
+import Sidebar from '../components/navigater/sidebar';
 import { Menu } from 'lucide-react'; // แก้ไข: นำเข้า Menu icon เพื่อป้องกัน Error
 
 type SidebarProps = {

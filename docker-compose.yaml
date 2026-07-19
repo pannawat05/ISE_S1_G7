@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # --- 1. Node.js Service ---
@@ -11,13 +11,13 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - DB_HOST=db-mysql          # ชื่อเดียวกับ service ของ mysql ด้านล่าง
+      - DB_HOST=db-mysql
       - DB_USER=root
       - DB_PASSWORD=secretpassword
       - DB_NAME=mydatabase
     volumes:
-      - ./magic_ticket:/usr/src/app
-      - /usr/src/app/node_modules
+      - ./magic_ticket:/app
+      - /app/node_modules
     depends_on:
       - db-mysql
     restart: always
@@ -42,13 +42,13 @@ services:
     ports:
       - "8080:80"
     environment:
-      - PMA_HOST=db-mysql          # เชื่อมต่อไปยัง service mysql
+      - PMA_HOST=db-mysql
       - PMA_PORT=3306
     depends_on:
       - db-mysql
     restart: always
- 
 
+  # --- 4. API Service ---
   api:
     build:
       context: ./api
@@ -58,7 +58,7 @@ services:
       - "5001:5001"
     environment:
       - NODE_ENV=development
-      - DB_HOST=db-mysql          # ชื่อเดียวกับ service ของ mysql ด้านล่าง
+      - DB_HOST=db-mysql
       - DB_USER=root
       - DB_PASSWORD=secretpassword
       - DB_NAME=mydatabase
@@ -68,8 +68,6 @@ services:
     depends_on:
       - db-mysql
     restart: always
-  
 
-# ตั้งค่า Volume ถาวรสำหรับเก็บข้อมูล MySQL ไม่ให้หายเวลาปิด Container
 volumes:
   mysql_data:

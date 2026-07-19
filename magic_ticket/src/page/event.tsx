@@ -1,6 +1,6 @@
 // src/page/dashboard.tsx
 import { useState, useEffect } from 'react';
-import Sidebar from '../components/sidebar';
+import Sidebar from '../components/navigater/sidebar';
 import { Menu } from 'lucide-react';
 import cookie from 'js-cookie';
 
