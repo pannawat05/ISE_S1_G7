@@ -1,66 +1,66 @@
-// src/page/dashboard.jsx
-import React, { useState, useEffect } from 'react';
+// src/page/dashboard.tsx
+import { useState, useEffect } from 'react';
 import Sidebar from '../components/sidebar';
-import { Menu } from 'lucide-react'; // นำเข้าสำหรับปุ่มแฮมเบอร์เกอร์บน Mobile
+import { Menu } from 'lucide-react';
+import cookie from 'js-cookie';
 
-// ข้อมูลเริ่มต้นสำหรับทดสอบ (Dummy Data)
-const INITIAL_EVENTS = [
-  { 
-    id: '1', 
-    name: '🔮 Magic Gathering 2026', 
-    date: '2026-08-15', 
-    time: '18:00', 
-    location: 'Royal Paragon Hall', 
-    ticketsSold: 450, 
-    ticketsTotal: 500, 
-    price: 1200, 
-    status: 'Published', 
+// ---------- Types ----------
+type EventStatus = 'Draft' | 'Published' | 'Completed';
+
+interface EventItem {
+  id: string;
+  name: string;
+  date: string;
+  time: string;
+  location: string;
+  ticketsSold: number;
+  ticketsTotal: number;
+  price: number;
+  status: EventStatus;
+  category: string;
+  description: string;
+}
+
+type EventFormData = Omit<EventItem, 'id' | 'ticketsSold'> & {
+  id?: string;
+  ticketsSold?: number;
+};
+
+interface ToastState {
+  message: string;
+  type: 'success' | 'error' | 'warning';
+}
+
+const INITIAL_EVENTS: EventItem[] = [
+  {
+    id: '1',
+    name: '🔮 Magic Gathering 2026',
+    date: '2026-08-15',
+    time: '18:00',
+    location: 'Royal Paragon Hall',
+    ticketsSold: 450,
+    ticketsTotal: 500,
+    price: 1200,
+    status: 'Published',
     category: 'Concert',
     description: 'งานรวมตัวผู้คลั่งไคล้เวทมนตร์และดนตรีแนวฟิวชั่นครั้งยิ่งใหญ่ที่สุดในเอเชียตะวันออกเฉียงใต้'
   },
-  { 
-    id: '2', 
-    name: '🎨 NFT Creator Showcase', 
-    date: '2026-09-01', 
-    time: '13:00', 
-    location: 'Bitkub M-Tower', 
-    ticketsSold: 120, 
-    ticketsTotal: 150, 
-    price: 350, 
-    status: 'Draft', 
+  {
+    id: '2',
+    name: '🎨 NFT Creator Showcase',
+    date: '2026-09-01',
+    time: '13:00',
+    location: 'Bitkub M-Tower',
+    ticketsSold: 120,
+    ticketsTotal: 150,
+    price: 350,
+    status: 'Draft',
     category: 'Exhibition',
     description: 'นิทรรศการแสดงผลงานศิลปะดิจิทัลที่คัดสรรจากศิลปินแถวหน้าของเมืองไทย'
-  },
-  { 
-    id: '3', 
-    name: '💻 Web3 Developer Summit', 
-    date: '2026-10-10', 
-    time: '09:00', 
-    location: 'True Digital Park', 
-    ticketsSold: 300, 
-    ticketsTotal: 300, 
-    price: 0, 
-    status: 'Completed', 
-    category: 'Conference',
-    description: 'งานสัมมนาเทคโนโลยีบล็อกเชนและสัญญาอัจฉริยะสำหรับนักพัฒนายุคใหม่'
-  },
-  { 
-    id: '4', 
-    name: '🎵 EDM Neon Night Night', 
-    date: '2026-11-05', 
-    time: '21:00', 
-    location: 'Bitec Bangna', 
-    ticketsSold: 850, 
-    ticketsTotal: 1000, 
-    price: 2500, 
-    status: 'Published', 
-    category: 'Concert',
-    description: 'เทศกาลดนตรีแนวตื๊ดสะท้อนแสงไฟนีออนที่จะปลุกวิญญาณปาร์ตี้ในตัวคุณ'
-  },
+  }
 ];
 
-// โครงสร้างว่างสำหรับสร้างกิจกรรมใหม่
-const EMPTY_EVENT = {
+const EMPTY_EVENT: EventFormData = {
   name: '',
   category: 'Concert',
   date: '',
@@ -73,31 +73,25 @@ const EMPTY_EVENT = {
 };
 
 export default function Event() {
-  const [events, setEvents] = useState(INITIAL_EVENTS);
+  const token = cookie.get('authToken');
+  const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  
-  // ควบคุม Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('add'); // 'add' หรือ 'edit'
-  type FormEventType = typeof EMPTY_EVENT & Partial<{ id: string; ticketsSold: number }>;
-  const [formEvent, setFormEvent] = useState<FormEventType>(EMPTY_EVENT);
-  
-  // แจ้งเตือน (Toast Notification)
-  type ToastType = { message: string; type: 'success' | 'error' | string } | null;
-  const [toast, setToast] = useState<ToastType>(null);
-  
-  // การเปิดปิด Sidebar บนอุปกรณ์เคลื่อนที่
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<EventStatus | 'All'>('All');
 
-  type SidebarProps = {
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [formEvent, setFormEvent] = useState<EventFormData>(EMPTY_EVENT);
+
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+
+  const SidebarComponent = Sidebar as React.ComponentType<{
     isOpen: boolean;
     setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  };
-  const SidebarComponent = Sidebar as React.ComponentType<SidebarProps>;
+  }>;
 
-  const showToast = (message: string, type: 'success' | 'error' | string = 'success') => {
+  const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ message, type });
   };
 
@@ -108,18 +102,17 @@ export default function Event() {
     }
   }, [toast]);
 
-  // การกรองข้อมูล
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = event.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          event.location.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredEvents = events.filter((event) => {
+    const matchesSearch =
+      event.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      event.location.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'All' || event.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  // จัดการกับการเลือกแถว (Selection)
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      const allFilteredIds = filteredEvents.map(event => event.id);
+      const allFilteredIds = filteredEvents.map((event) => event.id);
       setSelectedIds(allFilteredIds);
     } else {
       setSelectedIds([]);
@@ -128,42 +121,41 @@ export default function Event() {
 
   const handleSelectRow = (id: string) => {
     if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(selectedId => selectedId !== id));
+      setSelectedIds(selectedIds.filter((selectedId) => selectedId !== id));
     } else {
       setSelectedIds([...selectedIds, id]);
     }
   };
 
-  // Bulk Actions
   const handleBulkDelete = () => {
     if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบกิจกรรมที่เลือกทั้ง ${selectedIds.length} รายการ?`)) {
-      setEvents(events.filter(event => !selectedIds.includes(event.id)));
+      setEvents(events.filter((event) => !selectedIds.includes(event.id)));
       setSelectedIds([]);
       showToast('ลบรายการที่เลือกเรียบร้อยแล้ว', 'error');
     }
   };
 
-  const handleBulkStatusChange = (newStatus: string) => {
-    setEvents(events.map(event => {
-      if (selectedIds.includes(event.id)) {
-        return { ...event, status: newStatus };
-      }
-      return event;
-    }));
+  const handleBulkStatusChange = (newStatus: EventStatus) => {
+    setEvents(
+      events.map((event) => {
+        if (selectedIds.includes(event.id)) {
+          return { ...event, status: newStatus };
+        }
+        return event;
+      })
+    );
     setSelectedIds([]);
     showToast(`เปลี่ยนสถานะเป็น ${newStatus} แล้ว`, 'success');
   };
 
-  // การลบรายแถว (Single Delete)
   const handleDeleteRow = (id: string, name: string) => {
     if (window.confirm(`คุณต้องการลบกิจกรรม "${name}" ใช่หรือไม่?`)) {
-      setEvents(events.filter(event => event.id !== id));
-      setSelectedIds(selectedIds.filter(selectedId => selectedId !== id));
+      setEvents(events.filter((event) => event.id !== id));
+      setSelectedIds(selectedIds.filter((selectedId) => selectedId !== id));
       showToast('ลบกิจกรรมสำเร็จ', 'error');
     }
   };
 
-  // การเปิด Modal สำหรับเพิ่ม/แก้ไข
   const openAddModal = () => {
     setModalMode('add');
     setFormEvent({
@@ -174,52 +166,89 @@ export default function Event() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (event: typeof EMPTY_EVENT & { id: string; ticketsSold: number }) => {
+  const openEditModal = (event: EventItem) => {
     setModalMode('edit');
     setFormEvent(event);
     setIsModalOpen(true);
   };
 
-  // จัดการการส่งฟอร์ม (Form Submission)
+  // จัดการการส่งฟอร์ม (ปรับปรุงระบบเชื่อมต่อ API)
   const handleSaveEvent = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     if (!formEvent.name?.trim() || !formEvent.location?.trim()) {
       showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'warning');
       return;
     }
 
     if (modalMode === 'add') {
-      const newEvent = {
+      const newEvent: EventItem = {
         ...EMPTY_EVENT,
         ...formEvent,
         id: Date.now().toString(),
         ticketsSold: 0
       };
-      setEvents([newEvent, ...events]);
-      showToast('สร้างกิจกรรมใหม่สำเร็จแล้ว!', 'success');
+
+      // 💡 แก้ไขจุดที่ 1: แปลง Key ของ Object ให้ตรงกับความต้องการของ SQL ใน Express Backend
+      const apiBody = {
+        name: newEvent.name,
+        place: newEvent.location,
+        type: newEvent.category,
+        start_date: `${newEvent.date} ${newEvent.time}:00`, // รวมเป็น DATETIME string
+        description: newEvent.description,
+        theme: '', // ปล่อยว่างไว้ตามโครงตารางเดิม หรือใส่ข้อมูลเพิ่มได้
+        status: newEvent.status,
+        max_seat: newEvent.ticketsTotal,
+        is_active: newEvent.status === 'Published' ? 1 : 0
+      };
+
+      fetch('http://localhost:5001/organizer/add_event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` // ✅ แนบ Token ไปในรูปแบบ Bearer ที่ถูกต้อง
+        },
+        body: JSON.stringify(apiBody)
+      })
+        .then(async (response) => {
+          // 💡 แก้ไขจุดที่ 2: ดักจับ Error status code จาก Backend เช่น 401 หรือ 500
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(errText || `Server responded with status ${response.status}`);
+          }
+          return response.text(); // เปลี่ยนเป็น .text() เนื่องจาก Express ใช้ .send() ส่งข้อความกลับ
+        })
+        .then(() => {
+          // อัปเดต State หน้า UI เมื่อฝั่ง Backend บันทึกสำเร็จแล้ว
+          setEvents([newEvent, ...events]);
+          showToast('สร้างกิจกรรมใหม่และบันทึกลงระบบสำเร็จแล้ว!', 'success');
+          setIsModalOpen(false);
+        })
+        .catch((error: Error) => {
+          console.error('Fetch Error:', error);
+          showToast(error.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์', 'error');
+        });
     } else {
-      setEvents(events.map(ev => ev.id === formEvent.id ? { ...ev, ...formEvent, ticketsSold: ev.ticketsSold } as typeof INITIAL_EVENTS[0] : ev));
+      // สำหรับ Mode Edit (ทำแบบเดียวกันหากต้องการต่อ API ในอนาคต)
+      setEvents(
+        events.map((ev) =>
+          ev.id === formEvent.id ? { ...ev, ...formEvent, ticketsSold: ev.ticketsSold } : ev
+        )
+      );
       showToast('แก้ไขข้อมูลกิจกรรมเรียบร้อย!', 'success');
+      setIsModalOpen(false);
     }
-    setIsModalOpen(false);
   };
 
   return (
-    // 💡 ปรับปรุง: เพิ่มครอบ Wrapper นอกสุดเพื่อให้จัดวางคู่ขนานไปกับ Sidebar ได้ถูกต้อง
     <div className="flex h-screen bg-[#f5f3ff] text-purple-950 dark:bg-[#0f0c1b] dark:text-[#e0d9f6] font-sans overflow-hidden">
-      
-      {/* เรียกใช้ Sidebar ภายนอกและเชื่อม State */}
       <SidebarComponent isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
-      {/* 💡 ปรับปรุง: ส่วนพื้นที่หน้าจอคอนเทนต์หลักที่อยู่ถัดจาก Sidebar */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        
-        {/* Top Navbar สำหรับเรียกเปิด Sidebar บนหน้าจอมือถือ */}
         <header className="flex items-center justify-between bg-white dark:bg-[#16122b] px-6 py-4 shadow-sm border-b border-purple-100 dark:border-[#31255c]/30">
           <div className="flex items-center space-x-4">
-            <button 
-              onClick={() => setIsSidebarOpen(true)} 
+            <button
+              onClick={() => setIsSidebarOpen(true)}
               className="md:hidden text-purple-700 dark:text-[#bcb1ea] hover:text-purple-900 focus:outline-none cursor-pointer"
             >
               <Menu size={24} />
@@ -228,11 +257,10 @@ export default function Event() {
           </div>
         </header>
 
-        {/* ส่วนคอนเทนต์แสดงตารางงานกิจกรรม */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto px-6 py-8">
-          {/* Toast Alert */}
           {toast && (
-            <div className={`fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-0 text-white font-medium
+            <div
+              className={`fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-0 text-white font-medium
               ${toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-rose-600' : 'bg-amber-500'}`}
             >
               <span>{toast.type === 'success' ? '✨' : toast.type === 'error' ? '🗑️' : '⚠️'}</span>
@@ -240,7 +268,6 @@ export default function Event() {
             </div>
           )}
 
-          {/* Header Section */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
             <div>
               <h2 className="text-3xl font-extrabold tracking-tight text-purple-950 dark:text-purple-100">
@@ -250,8 +277,7 @@ export default function Event() {
                 สร้าง, แก้ไข และวิเคราะห์ความคืบหน้ากิจกรรมของคุณทั้งหมดได้ในหน้าเดียว
               </p>
             </div>
-            
-            {/* Create Button */}
+
             <button
               onClick={openAddModal}
               className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold px-5 py-3 rounded-xl shadow-lg hover:shadow-purple-500/30 dark:shadow-[0_0_20px_rgba(168,85,247,0.3)] transform hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
@@ -263,10 +289,7 @@ export default function Event() {
             </button>
           </div>
 
-          {/* Control panel: Search, Filters & Bulk Actions */}
           <div className="bg-white dark:bg-[#16122b] p-5 rounded-2xl border border-purple-100 dark:border-[#31255c]/40 shadow-sm transition-all duration-500 mb-6">
-            
-            {/* ส่วนที่ 1: ค้นหาและฟิลเตอร์สถานะ */}
             <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
               <div className="relative flex-1">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-purple-400 dark:text-[#a89fc9]/60">
@@ -287,7 +310,7 @@ export default function Event() {
                 <span className="text-sm font-semibold text-purple-800 dark:text-[#a89fc9]">สถานะ:</span>
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={(e) => setStatusFilter(e.target.value as EventStatus | 'All')}
                   className="px-4 py-2.5 bg-[#fcfbfe] dark:bg-[#0c0918] text-purple-950 dark:text-[#e0d9f6] rounded-xl border border-purple-100 dark:border-[#31255c]/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors cursor-pointer"
                 >
                   <option value="All">ทั้งหมด</option>
@@ -298,7 +321,6 @@ export default function Event() {
               </div>
             </div>
 
-            {/* ส่วนที่ 2: Bulk Actions */}
             {selectedIds.length > 0 && (
               <div className="mt-4 pt-4 border-t border-purple-50 dark:border-[#31255c]/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-purple-500/5 dark:bg-purple-500/10 p-3 rounded-xl transition-all duration-300">
                 <div className="flex items-center gap-2">
@@ -307,7 +329,7 @@ export default function Event() {
                     เลือกอยู่ <strong className="text-purple-600 dark:text-purple-400 font-extrabold">{selectedIds.length}</strong> รายการ
                   </p>
                 </div>
-                
+
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => handleBulkStatusChange('Published')}
@@ -332,7 +354,6 @@ export default function Event() {
             )}
           </div>
 
-          {/* ตารางแสดงข้อมูลกิจกรรม (Responsive Table) */}
           <div className="bg-white dark:bg-[#16122b] border border-purple-100 dark:border-[#31255c]/40 rounded-2xl shadow-sm overflow-hidden transition-all duration-500">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-purple-100 dark:divide-[#31255c]/40">
@@ -363,7 +384,7 @@ export default function Event() {
                       const isChecked = selectedIds.includes(event.id);
                       const ticketProgress = (event.ticketsSold / event.ticketsTotal) * 100;
                       return (
-                        <tr 
+                        <tr
                           key={event.id}
                           className={`hover:bg-purple-50/20 dark:hover:bg-purple-500/5 transition-colors duration-150 ${isChecked ? 'bg-purple-500/5 dark:bg-purple-500/10' : ''}`}
                         >
@@ -441,7 +462,6 @@ export default function Event() {
         </main>
       </div>
 
-      {/* --- ADD & EDIT MODAL FORM --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white dark:bg-[#16122b] w-full max-w-2xl rounded-2xl border border-purple-100 dark:border-[#31255c]/60 shadow-2xl overflow-hidden">
@@ -473,7 +493,7 @@ export default function Event() {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-purple-900 dark:text-[#bcb1ea] mb-1">สถานะเริ่มแรก</label>
-                    <select value={formEvent.status || 'Draft'} onChange={(e) => setFormEvent({ ...formEvent, status: e.target.value })} className="w-full px-4 py-2.5 bg-[#fcfbfe] dark:bg-[#0c0918] text-purple-950 dark:text-[#e0d9f6] rounded-xl border border-purple-100 dark:border-[#31255c]/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors cursor-pointer">
+                    <select value={formEvent.status || 'Draft'} onChange={(e) => setFormEvent({ ...formEvent, status: e.target.value as EventStatus })} className="w-full px-4 py-2.5 bg-[#fcfbfe] dark:bg-[#0c0918] text-purple-950 dark:text-[#e0d9f6] rounded-xl border border-purple-100 dark:border-[#31255c]/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors cursor-pointer">
                       <option value="Draft">ฉบับร่าง (Draft)</option>
                       <option value="Published">เปิดเผยแพร่ (Published)</option>
                     </select>
