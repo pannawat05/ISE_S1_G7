@@ -3,3 +3,15 @@
   --animate-*: initial;
 }
 @variant dark (&:where(.dark, .dark *));
+
+:root {
+  --logo-color: #7c3aed;
+}
+
+.dark {
+  --logo-color: #7c3aed;
+  --primary-color: #1e1e2f;
+  --secondary-color: #31255c;
+  --primary-border-color: #34323b;
+  --secondary-border-color: #4c4174;
+}

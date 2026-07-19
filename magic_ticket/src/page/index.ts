@@ -1,4 +1,5 @@
 export { default as Home } from './home'
+export { default as MyTickets } from './my_tickets'
 export { default as SignUp } from './signup'
 export { default as Signin } from './signin'
 export { default as OTP } from './otp'

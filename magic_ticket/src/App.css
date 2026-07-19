@@ -1,16 +1,1 @@
 @import "tailwindcss";
-
-:root {
-}
-
-.dark {
-    --primary-color: #1e1e2f;
-    --secondary-color: #31255c;
-    --primary-border-color: #34323b;
-    --secondary-border-color: #4c4174;
-}
-
-.primary-card {
-  background-color: #1e1e2f;
-  border-color: #31255c;
-}
