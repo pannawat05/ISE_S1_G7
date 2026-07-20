@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # --- 1. Node.js Service ---
@@ -11,16 +11,19 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - DB_HOST=db-mysql          # ชื่อเดียวกับ service ของ mysql ด้านล่าง
+      - CHOKIDAR_USEPOLLING=true
+      - DB_HOST=db-mysql
       - DB_USER=root
       - DB_PASSWORD=secretpassword
       - DB_NAME=mydatabase
     volumes:
-      - ./magic_ticket:/usr/src/app
-      - /usr/src/app/node_modules
+      # Bind mount: edit files locally, changes sync into the container
+      - ./magic_ticket:/app
+      # Keep container node_modules (don't overwrite with host)
+      - web_app_node_modules:/app/node_modules
     depends_on:
       - db-mysql
-    restart: always
+    restart: unless-stopped
 
   # --- 2. MySQL Database Service ---
   db-mysql:
@@ -42,34 +45,36 @@ services:
     ports:
       - "8080:80"
     environment:
-      - PMA_HOST=db-mysql          # เชื่อมต่อไปยัง service mysql
+      - PMA_HOST=db-mysql
       - PMA_PORT=3306
     depends_on:
       - db-mysql
     restart: always
- 
 
+  # --- 4. API Service ---
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
     container_name: api_container
+    command: npm run dev
     ports:
       - "5001:5001"
     environment:
       - NODE_ENV=development
-      - DB_HOST=db-mysql          # ชื่อเดียวกับ service ของ mysql ด้านล่าง
+      - DB_HOST=db-mysql
       - DB_USER=root
       - DB_PASSWORD=secretpassword
       - DB_NAME=mydatabase
     volumes:
-      - ./api:/usr/src/app
-      - /usr/src/app/node_modules
+      # Bind mount: edit files locally, changes sync into the container
+      - ./api:/app
+      - api_node_modules:/app/node_modules
     depends_on:
       - db-mysql
-    restart: always
-  
+    restart: unless-stopped
 
-# ตั้งค่า Volume ถาวรสำหรับเก็บข้อมูล MySQL ไม่ให้หายเวลาปิด Container
 volumes:
   mysql_data:
+  web_app_node_modules:
+  api_node_modules:
