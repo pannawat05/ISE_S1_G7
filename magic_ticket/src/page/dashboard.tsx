@@ -13,15 +13,22 @@ function Dashboards() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="mt-dashboard-shell">
+    // 1. เพิ่ม flex และ min-h-screen เพื่อให้ Sidebar กับ Content จัดเรียงซ้าย-ขวาได้อย่างถูกต้อง
+    <div className="flex min-h-screen bg-neutral-900 overflow-hidden">
+      
+      {/* ส่วนของ Sidebar */}
       <SidebarComponent isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="mt-dashboard-header">
+      
+      {/* 2. ส่วนของเนื้อหาหลัก (Header + Main Content) */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        
+        {/* Header */}
+        <header className="mt-dashboard-header flex items-center justify-between p-4 bg-neutral-800 border-b border-white/5">
           <div className="flex items-center space-x-4">
+            {/* ปุ่มสำหรับเปิด Sidebar บน Mobile */}
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden text-gray-400 hover:text-white focus:outline-none cursor-pointer"
+              className="md:hidden text-gray-400 hover:text-white focus:outline-none cursor-pointer p-1"
             >
               <Menu size={24} />
             </button>
@@ -41,7 +48,8 @@ function Dashboards() {
           </div>
         </header>
 
-        <main className="mt-dashboard-main">
+        {/* Main Content */}
+        <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="mt-stat-card">
               <p className="text-sm text-gray-500 font-medium">Total Events</p>
@@ -61,7 +69,7 @@ function Dashboards() {
             </div>
           </div>
 
-          <div className="mt-surface p-6 h-96 flex items-center justify-center text-gray-500 border-dashed">
+          <div className="mt-surface p-6 h-96 flex items-center justify-center text-gray-500 border-dashed border-2 border-neutral-700 rounded-xl">
             [ Area สำหรับใส่กราฟสถิติ หรือตารางรายชื่อกิจกรรมล่าสุด ]
           </div>
         </main>
