@@ -1,5 +1,5 @@
 // src/page/dashboard.tsx
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/navigater/sidebar';
 import { Menu } from 'lucide-react';
 import cookie from 'js-cookie';
@@ -7,69 +7,43 @@ import cookie from 'js-cookie';
 // ---------- Types ----------
 type EventStatus = 'Draft' | 'Published' | 'Completed';
 
-interface EventItem {
-  id: string;
+interface EventFormData {
+  id?: string;
   name: string;
+  category: string;
   date: string;
   time: string;
   location: string;
-  ticketsSold: number;
-  ticketsTotal: number;
   price: number;
-  status: EventStatus;
-  category: string;
+  ticketsTotal: number;
+  status: "Draft" | "Published" | "Completed";
   description: string;
+  theme: string;
 }
 
-type EventFormData = Omit<EventItem, 'id' | 'ticketsSold'> & {
-  id?: string;
-  ticketsSold?: number;
-};
+interface EventItem extends Omit<EventFormData, 'id'> {
+  id: string;
+  ticketsSold: number;
+}
 
 interface ToastState {
   message: string;
   type: 'success' | 'error' | 'warning';
 }
 
-const INITIAL_EVENTS: EventItem[] = [
-  {
-    id: '1',
-    name: '🔮 Magic Gathering 2026',
-    date: '2026-08-15',
-    time: '18:00',
-    location: 'Royal Paragon Hall',
-    ticketsSold: 450,
-    ticketsTotal: 500,
-    price: 1200,
-    status: 'Published',
-    category: 'Concert',
-    description: 'งานรวมตัวผู้คลั่งไคล้เวทมนตร์และดนตรีแนวฟิวชั่นครั้งยิ่งใหญ่ที่สุดในเอเชียตะวันออกเฉียงใต้'
-  },
-  {
-    id: '2',
-    name: '🎨 NFT Creator Showcase',
-    date: '2026-09-01',
-    time: '13:00',
-    location: 'Bitkub M-Tower',
-    ticketsSold: 120,
-    ticketsTotal: 150,
-    price: 350,
-    status: 'Draft',
-    category: 'Exhibition',
-    description: 'นิทรรศการแสดงผลงานศิลปะดิจิทัลที่คัดสรรจากศิลปินแถวหน้าของเมืองไทย'
-  }
-];
+const INITIAL_EVENTS: EventItem[] = [];
 
 const EMPTY_EVENT: EventFormData = {
-  name: '',
-  category: 'Concert',
-  date: '',
-  time: '',
-  location: '',
+  name: "",
+  category: "Concert",
+  date: "",
+  time: "",
+  location: "",
   price: 0,
   ticketsTotal: 100,
-  status: 'Draft',
-  description: ''
+  status: "Draft",
+  description: "",
+  theme: "",
 };
 
 export default function Event() {
@@ -94,6 +68,105 @@ export default function Event() {
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ message, type });
   };
+
+  const delEvent = (id: string) => {
+    fetch(`http://localhost:5001/organizer/delete_event/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      }
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(errText || `Server responded with status ${response.status}`);
+        }
+        return response.text();
+      })
+      .then(() => {
+        fetchEvents();
+        showToast('ลบกิจกรรมสำเร็จ', 'success');
+      })
+      .catch((error: Error) => {
+        console.error('Delete Event Error:', error);
+        showToast(error.message || 'ไม่สามารถลบกิจกรรมได้', 'error');
+      });
+  };
+
+  const fetchEvents = () => {
+    fetch('http://localhost:5001/organizer/get_events', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      }
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(errText || `Server responded with status ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) {
+          // ✅ บันทึก: ทำการ Map ข้อมูลจากรูปแบบของ Database/API กลับมาเป็น Frontend Interface Type (EventItem)
+          const mappedEvents: EventItem[] = data.map((item: Record<string, unknown>) => {
+            let itemDate = '';
+            let itemTime = '';
+
+            const startDate = typeof item['start_date'] === 'string' ? item['start_date'] as string : '';
+            if (startDate) {
+              const parts = startDate.split(' ');
+              itemDate = parts[0] || '';
+              itemTime = parts[1] ? parts[1].substring(0, 5) : '';
+            }
+
+            // use top-level delEvent for deletions
+
+            const idVal = item['id'] ?? Date.now().toString();
+            const nameVal = typeof item['name'] === 'string' ? item['name'] as string : '';
+            const typeVal = typeof item['type'] === 'string' ? item['type'] as string : 'Concert';
+            const placeVal = typeof item['place'] === 'string' ? item['place'] as string : '';
+            const priceVal = typeof item['price'] === 'number' ? item['price'] as number : (typeof item['price'] === 'string' ? Number(item['price']) || 0 : 0);
+            const maxSeatVal = typeof item['max_seat'] === 'number' ? item['max_seat'] as number : (typeof item['max_seat'] === 'string' ? Number(item['max_seat']) || 100 : 100);
+            const ticketsSoldVal = typeof item['ticketsSold'] === 'number' ? item['ticketsSold'] as number : 0;
+            const statusVal = typeof item['status'] === 'string' ? item['status'] as string : 'Draft';
+            const descriptionVal = typeof item['description'] === 'string' ? item['description'] as string : '';
+            const themeVal = typeof item['theme'] === 'string' ? item['theme'] as string : '';
+
+            return {
+              id: idVal?.toString() || Date.now().toString(),
+              name: nameVal,
+              category: typeVal,
+              date: itemDate,
+              time: itemTime,
+              location: placeVal,
+              price: priceVal,
+              ticketsTotal: maxSeatVal,
+              ticketsSold: ticketsSoldVal,
+              status: statusVal as EventStatus,
+              description: descriptionVal,
+              theme: themeVal
+            };
+          });
+          setEvents(mappedEvents);
+        } else {
+          console.error('Unexpected /organizer/get_events response shape:', data);
+          showToast('รูปแบบข้อมูลที่ได้จากเซิร์ฟเวอร์ไม่ถูกต้อง', 'error');
+        }
+      })
+      .catch((error: Error) => {
+        console.error('Fetch Events Error:', error);
+        showToast(error.message || 'ไม่สามารถโหลดข้อมูลกิจกรรมได้', 'error');
+      });
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    fetchEvents();
+  }, [token]);
 
   useEffect(() => {
     if (toast) {
@@ -150,8 +223,7 @@ export default function Event() {
 
   const handleDeleteRow = (id: string, name: string) => {
     if (window.confirm(`คุณต้องการลบกิจกรรม "${name}" ใช่หรือไม่?`)) {
-      setEvents(events.filter((event) => event.id !== id));
-      setSelectedIds(selectedIds.filter((selectedId) => selectedId !== id));
+     delEvent(id);
       showToast('ลบกิจกรรมสำเร็จ', 'error');
     }
   };
@@ -172,7 +244,6 @@ export default function Event() {
     setIsModalOpen(true);
   };
 
-  // จัดการการส่งฟอร์ม (ปรับปรุงระบบเชื่อมต่อ API)
   const handleSaveEvent = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -189,15 +260,15 @@ export default function Event() {
         ticketsSold: 0
       };
 
-      // 💡 แก้ไขจุดที่ 1: แปลง Key ของ Object ให้ตรงกับความต้องการของ SQL ใน Express Backend
       const apiBody = {
         name: newEvent.name,
         place: newEvent.location,
         type: newEvent.category,
-        start_date: `${newEvent.date} ${newEvent.time}:00`, // รวมเป็น DATETIME string
+        start_date: `${newEvent.date} ${newEvent.time}:00`,
         description: newEvent.description,
-        theme: '', // ปล่อยว่างไว้ตามโครงตารางเดิม หรือใส่ข้อมูลเพิ่มได้
+        theme: '',
         status: newEvent.status,
+        price: newEvent.price, 
         max_seat: newEvent.ticketsTotal,
         is_active: newEvent.status === 'Published' ? 1 : 0
       };
@@ -206,20 +277,18 @@ export default function Event() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` // ✅ แนบ Token ไปในรูปแบบ Bearer ที่ถูกต้อง
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(apiBody)
       })
         .then(async (response) => {
-          // 💡 แก้ไขจุดที่ 2: ดักจับ Error status code จาก Backend เช่น 401 หรือ 500
           if (!response.ok) {
             const errText = await response.text();
             throw new Error(errText || `Server responded with status ${response.status}`);
           }
-          return response.text(); // เปลี่ยนเป็น .text() เนื่องจาก Express ใช้ .send() ส่งข้อความกลับ
+          return response.text();
         })
         .then(() => {
-          // อัปเดต State หน้า UI เมื่อฝั่ง Backend บันทึกสำเร็จแล้ว
           setEvents([newEvent, ...events]);
           showToast('สร้างกิจกรรมใหม่และบันทึกลงระบบสำเร็จแล้ว!', 'success');
           setIsModalOpen(false);
@@ -229,7 +298,6 @@ export default function Event() {
           showToast(error.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์', 'error');
         });
     } else {
-      // สำหรับ Mode Edit (ทำแบบเดียวกันหากต้องการต่อ API ในอนาคต)
       setEvents(
         events.map((ev) =>
           ev.id === formEvent.id ? { ...ev, ...formEvent, ticketsSold: ev.ticketsSold } : ev
@@ -244,15 +312,16 @@ export default function Event() {
   const labelClassName = "block text-sm font-bold text-gray-300 mb-1";
 
   return (
-    <div className="mt-dashboard-shell">
+    <div className="flex min-h-screen bg-neutral-900 overflow-hidden">
       <SidebarComponent isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="mt-dashboard-header">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+        <header className="mt-dashboard-header flex items-center justify-between p-4 bg-neutral-800/50 backdrop-blur-md border-b border-white/5">
           <div className="flex items-center space-x-4">
             <button
+              type="button"
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden text-gray-400 hover:text-white focus:outline-none cursor-pointer"
+              className="md:hidden text-gray-400 hover:text-white focus:outline-none cursor-pointer p-1 rounded-lg hover:bg-white/5"
             >
               <Menu size={24} />
             </button>
@@ -260,7 +329,7 @@ export default function Event() {
           </div>
         </header>
 
-        <main className="mt-dashboard-main">
+        <main className="mt-dashboard-main flex-1 p-6 w-full max-w-7xl mx-auto">
           {toast && (
             <div
               className={`fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 text-white font-medium border ${
@@ -392,7 +461,8 @@ export default function Event() {
                   {filteredEvents.length > 0 ? (
                     filteredEvents.map((event) => {
                       const isChecked = selectedIds.includes(event.id);
-                      const ticketProgress = (event.ticketsSold / event.ticketsTotal) * 100;
+                      const ticketsSold = event.ticketsSold ?? 0;
+                      const ticketProgress = event.ticketsTotal ? (ticketsSold / event.ticketsTotal) * 100 : 0;
                       return (
                         <tr
                           key={event.id}
@@ -417,12 +487,14 @@ export default function Event() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
+                            {/* ✅ แก้ไข: เรียกใช้ event.date และ event.time ที่มีใน Interface แทนฟิลด์ของ API */}
                             <div className="text-sm text-white font-medium">{event.date}</div>
                             <div className="text-xs text-violet-400">⏱️ {event.time} น.</div>
                           </td>
+                          {/* ✅ แก้ไข: เปลี่ยนจาก event.place เป็น event.location */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">📍 {event.location}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
-                            {event.price === 0 ? (
+                            {!event.price ? (
                               <span className="mt-badge mt-badge-success px-2 py-1 rounded-md">ฟรี</span>
                             ) : (
                               `฿${event.price.toLocaleString()}`
@@ -431,7 +503,7 @@ export default function Event() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col w-36">
                               <div className="flex justify-between items-center text-xs font-medium text-gray-400 mb-1">
-                                <span>{event.ticketsSold} / {event.ticketsTotal} ใบ</span>
+                                <span>{ticketsSold} / {event.ticketsTotal} ใบ</span>
                                 <span>{Math.round(ticketProgress)}%</span>
                               </div>
                               <div className="w-full bg-elevated rounded-full h-1.5 overflow-hidden">
@@ -496,13 +568,13 @@ export default function Event() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="mt-surface w-full max-w-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-elevated border-b border-white/5 flex justify-between items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="mt-surface w-full max-w-2xl overflow-hidden bg-neutral-800 rounded-2xl border border-white/5 shadow-2xl">
+            <div className="px-6 py-4 bg-neutral-800/80 border-b border-white/5 flex justify-between items-center">
               <h3 className="text-xl font-extrabold text-white">
                 {modalMode === "add" ? "🔮 สร้างกิจกรรมเวทมนตร์ใหม่" : "✏️ แก้ไขข้อมูลกิจกรรม"}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -566,8 +638,8 @@ export default function Event() {
                 </div>
               </div>
 
-              <div className="px-6 py-4 bg-elevated border-t border-white/5 flex justify-end items-center gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-elevated hover:bg-surface text-gray-300 border border-white/10 font-medium rounded-xl transition-all duration-200 cursor-pointer">
+              <div className="px-6 py-4 bg-neutral-800 border-t border-white/5 flex justify-end items-center gap-3">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-neutral-700 hover:bg-neutral-600 text-gray-300 border border-white/10 font-medium rounded-xl transition-all duration-200 cursor-pointer">
                   ยกเลิก
                 </button>
                 <button type="submit" className="px-6 py-2.5 mt-btn-primary cursor-pointer">
