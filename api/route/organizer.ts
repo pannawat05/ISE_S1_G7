@@ -27,6 +27,22 @@ interface AddEventBody {
   is_active: 0 | 1;
 }
 
+interface UpdateEventBody {
+  name?: string;
+  place?: string;
+  type?: string;
+  start_date?: string;
+  description?: string;
+  theme?: string;
+  status?: "Draft" | "Published" | "Completed";
+  max_seat?: number;
+  is_active?: 0 | 1;
+}
+
+interface BulkUpdateItem extends UpdateEventBody {
+  id: number;
+}
+
 Organizer_router.post(
   "/organizer/add_event",
   authenticateOrganizer,
@@ -156,6 +172,132 @@ Organizer_router.get(
         }
       }
     });
+  }
+);
+
+Organizer_router.put(
+  "/organizer/update_event/:id",
+  authenticateOrganizer,
+  uploadthumbnail.single("thumbnail"),
+  (req: Request<{ id: string }, {}, UpdateEventBody>, res: Response) => {
+    const { id } = req.params;
+    const o_id = req.user?.organizerId;
+
+    if (!o_id) {
+      return res.status(401).send("Unauthorized: Missing organizer ID");
+    }
+
+    const {
+      name,
+      place,
+      type,
+      start_date,
+      description,
+      theme,
+      status,
+      max_seat,
+      is_active,
+    } = req.body;
+
+    // สร้าง Dynamic Query เพื่ออัปเดตเฉพาะ Field ที่ส่งมาจริง
+    const fieldsToUpdate: string[] = [];
+    const queryParams: any[] = [];
+
+    if (name !== undefined) { fieldsToUpdate.push("`name` = ?"); queryParams.push(name); }
+    if (place !== undefined) { fieldsToUpdate.push("`place` = ?"); queryParams.push(place); }
+    if (type !== undefined) { fieldsToUpdate.push("`type` = ?"); queryParams.push(type); }
+    if (start_date !== undefined) { fieldsToUpdate.push("`start_date` = ?"); queryParams.push(start_date); }
+    if (description !== undefined) { fieldsToUpdate.push("`description` = ?"); queryParams.push(description); }
+    if (theme !== undefined) { fieldsToUpdate.push("`theme` = ?"); queryParams.push(theme); }
+    if (status !== undefined) { fieldsToUpdate.push("`status` = ?"); queryParams.push(status); }
+    if (max_seat !== undefined) { fieldsToUpdate.push("`max_seat` = ?"); queryParams.push(Number(max_seat)); }
+    if (is_active !== undefined) { fieldsToUpdate.push("`is_active` = ?"); queryParams.push(Number(is_active)); }
+
+    // ถ้ามีการอัปโหลดรูปภาพใหม่เข้ามา
+    if (req.file) {
+      fieldsToUpdate.push("`thumbnail` = ?");
+      queryParams.push(req.file.filename);
+    }
+
+    if (fieldsToUpdate.length === 0) {
+      return res.status(400).send("No fields provided to update");
+    }
+
+    // เพิ่มเงื่อนไข WHERE เพื่อตรวจสอบ id และ organizer_id
+    const sql = `UPDATE \`event\` SET ${fieldsToUpdate.join(", ")} WHERE \`id\` = ? AND \`organizer_id\` = ?`;
+    queryParams.push(id, o_id);
+
+    db.query(sql, queryParams, (err: any, result: any) => {
+      if (err) {
+        console.error("Database Error:", err);
+        return res.status(500).send("Error updating event");
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).send("Event not found or unauthorized");
+      }
+
+      return res.status(200).send("Event updated successfully");
+    });
+  }
+);
+
+// ====================================================
+// 2. อัปเดตหลายกิจกรรมพร้อมกัน (Multiple / Bulk Update)
+// ====================================================
+Organizer_router.put(
+  "/organizer/update_events_bulk",
+  authenticateOrganizer,
+  (req: Request<{}, {}, { events: BulkUpdateItem[] }>, res: Response) => {
+    const o_id = req.user?.organizerId;
+    const { events } = req.body;
+
+    if (!o_id) {
+      return res.status(401).send("Unauthorized: Missing organizer ID");
+    }
+
+    if (!Array.isArray(events) || events.length === 0) {
+      return res.status(400).send("Invalid or empty events list");
+    }
+
+    // วนลูปสร้าง Query สำหรับแต่ละ Event
+    const updatePromises = events.map((item) => {
+      return new Promise((resolve, reject) => {
+        const fieldsToUpdate: string[] = [];
+        const queryParams: any[] = [];
+
+        if (item.name !== undefined) { fieldsToUpdate.push("`name` = ?"); queryParams.push(item.name); }
+        if (item.place !== undefined) { fieldsToUpdate.push("`place` = ?"); queryParams.push(item.place); }
+        if (item.type !== undefined) { fieldsToUpdate.push("`type` = ?"); queryParams.push(item.type); }
+        if (item.start_date !== undefined) { fieldsToUpdate.push("`start_date` = ?"); queryParams.push(item.start_date); }
+        if (item.description !== undefined) { fieldsToUpdate.push("`description` = ?"); queryParams.push(item.description); }
+        if (item.theme !== undefined) { fieldsToUpdate.push("`theme` = ?"); queryParams.push(item.theme); }
+        if (item.status !== undefined) { fieldsToUpdate.push("`status` = ?"); queryParams.push(item.status); }
+        if (item.max_seat !== undefined) { fieldsToUpdate.push("`max_seat` = ?"); queryParams.push(item.max_seat); }
+        if (item.is_active !== undefined) { fieldsToUpdate.push("`is_active` = ?"); queryParams.push(item.is_active); }
+
+        if (fieldsToUpdate.length === 0) {
+          return resolve(true); // ไม่มีฟิลด์เปลี่ยน ให้ข้าม
+        }
+
+        const sql = `UPDATE \`event\` SET ${fieldsToUpdate.join(", ")} WHERE \`id\` = ? AND \`organizer_id\` = ?`;
+        queryParams.push(item.id, o_id);
+
+        db.query(sql, queryParams, (err: any) => {
+          if (err) return reject(err);
+          resolve(true);
+        });
+      });
+    });
+
+    Promise.all(updatePromises)
+      .then(() => {
+        return res.status(200).send("Bulk events updated successfully");
+      })
+      .catch((err) => {
+        console.error("Bulk Update Error:", err);
+        return res.status(500).send("Error updating multiple events");
+      });
   }
 );
 
