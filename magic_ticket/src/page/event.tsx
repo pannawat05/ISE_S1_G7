@@ -1,7 +1,6 @@
-// src/page/dashboard.tsx
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/navigater/sidebar';
-import { Menu } from 'lucide-react';
+import { Menu, Upload, X } from 'lucide-react';
 import cookie from 'js-cookie';
 
 // ---------- Types ----------
@@ -16,7 +15,7 @@ interface EventFormData {
   location: string;
   price: number;
   ticketsTotal: number;
-  status: "Draft" | "Published" | "Completed";
+  status: EventStatus;
   description: string;
   theme: string;
 }
@@ -24,6 +23,7 @@ interface EventFormData {
 interface EventItem extends Omit<EventFormData, 'id'> {
   id: string;
   ticketsSold: number;
+  thumbnail?: string;
 }
 
 interface ToastState {
@@ -57,6 +57,10 @@ export default function Event() {
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [formEvent, setFormEvent] = useState<EventFormData>(EMPTY_EVENT);
 
+  // 🖼️ State สำหรับจัดการรูปภาพ
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
@@ -69,36 +73,33 @@ export default function Event() {
     setToast({ message, type });
   };
 
-  const delEvent = (id: string) => {
-    fetch(`http://localhost:5001/organizer/delete_event/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      }
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(errText || `Server responded with status ${response.status}`);
+  const delEvent = async (id: string) => {
+    try {
+      const response = await fetch(`http://localhost:5001/organizer/delete_event/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
         }
-        return response.text();
-      })
-      .then(() => {
-        fetchEvents();
-        showToast('ลบกิจกรรมสำเร็จ', 'success');
-      })
-      .catch((error: Error) => {
-        console.error('Delete Event Error:', error);
-        showToast(error.message || 'ไม่สามารถลบกิจกรรมได้', 'error');
       });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || `Server responded with status ${response.status}`);
+      }
+
+      fetchEvents();
+      showToast('ลบกิจกรรมสำเร็จ', 'success');
+    } catch (error: unknown) {
+      console.error('Delete Event Error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      showToast(errorMessage || 'ไม่สามารถลบกิจกรรมได้', 'error');
+    }
   };
 
   const fetchEvents = () => {
     fetch('http://localhost:5001/organizer/get_events', {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       }
     })
@@ -111,33 +112,31 @@ export default function Event() {
       })
       .then((data) => {
         if (Array.isArray(data)) {
-          // ✅ บันทึก: ทำการ Map ข้อมูลจากรูปแบบของ Database/API กลับมาเป็น Frontend Interface Type (EventItem)
           const mappedEvents: EventItem[] = data.map((item: Record<string, unknown>) => {
             let itemDate = '';
             let itemTime = '';
 
-            const startDate = typeof item['start_date'] === 'string' ? item['start_date'] as string : '';
+            const startDate = typeof item['start_date'] === 'string' ? (item['start_date'] as string) : '';
             if (startDate) {
               const parts = startDate.split(' ');
               itemDate = parts[0] || '';
               itemTime = parts[1] ? parts[1].substring(0, 5) : '';
             }
 
-            // use top-level delEvent for deletions
-
             const idVal = item['id'] ?? Date.now().toString();
-            const nameVal = typeof item['name'] === 'string' ? item['name'] as string : '';
-            const typeVal = typeof item['type'] === 'string' ? item['type'] as string : 'Concert';
-            const placeVal = typeof item['place'] === 'string' ? item['place'] as string : '';
-            const priceVal = typeof item['price'] === 'number' ? item['price'] as number : (typeof item['price'] === 'string' ? Number(item['price']) || 0 : 0);
-            const maxSeatVal = typeof item['max_seat'] === 'number' ? item['max_seat'] as number : (typeof item['max_seat'] === 'string' ? Number(item['max_seat']) || 100 : 100);
-            const ticketsSoldVal = typeof item['ticketsSold'] === 'number' ? item['ticketsSold'] as number : 0;
-            const statusVal = typeof item['status'] === 'string' ? item['status'] as string : 'Draft';
-            const descriptionVal = typeof item['description'] === 'string' ? item['description'] as string : '';
-            const themeVal = typeof item['theme'] === 'string' ? item['theme'] as string : '';
+            const nameVal = typeof item['name'] === 'string' ? (item['name'] as string) : '';
+            const typeVal = typeof item['type'] === 'string' ? (item['type'] as string) : 'Concert';
+            const placeVal = typeof item['place'] === 'string' ? (item['place'] as string) : '';
+            const priceVal = typeof item['price'] === 'number' ? (item['price'] as number) : (typeof item['price'] === 'string' ? Number(item['price']) || 0 : 0);
+            const maxSeatVal = typeof item['max_seat'] === 'number' ? (item['max_seat'] as number) : (typeof item['max_seat'] === 'string' ? Number(item['max_seat']) || 100 : 100);
+            const ticketsSoldVal = typeof item['ticketsSold'] === 'number' ? (item['ticketsSold'] as number) : 0;
+            const statusVal = typeof item['status'] === 'string' ? (item['status'] as string) : 'Draft';
+            const descriptionVal = typeof item['description'] === 'string' ? (item['description'] as string) : '';
+            const themeVal = typeof item['theme'] === 'string' ? (item['theme'] as string) : '';
+            const thumbnailVal = typeof item['thumbnail'] === 'string' ? (item['thumbnail'] as string) : '';
 
             return {
-              id: idVal?.toString() || Date.now().toString(),
+              id: idVal.toString(),
               name: nameVal,
               category: typeVal,
               date: itemDate,
@@ -148,7 +147,8 @@ export default function Event() {
               ticketsSold: ticketsSoldVal,
               status: statusVal as EventStatus,
               description: descriptionVal,
-              theme: themeVal
+              theme: themeVal,
+              thumbnail: thumbnailVal
             };
           });
           setEvents(mappedEvents);
@@ -200,11 +200,24 @@ export default function Event() {
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบกิจกรรมที่เลือกทั้ง ${selectedIds.length} รายการ?`)) {
-      setEvents(events.filter((event) => !selectedIds.includes(event.id)));
-      setSelectedIds([]);
-      showToast('ลบรายการที่เลือกเรียบร้อยแล้ว', 'error');
+      try {
+        await Promise.all(
+          selectedIds.map((id) =>
+            fetch(`http://localhost:5001/organizer/delete_event/${id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` }
+            })
+          )
+        );
+        setSelectedIds([]);
+        fetchEvents();
+        showToast('ลบรายการที่เลือกเรียบร้อยแล้ว', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('เกิดข้อผิดพลาดในการลบหลายรายการ', 'error');
+      }
     }
   };
 
@@ -223,9 +236,22 @@ export default function Event() {
 
   const handleDeleteRow = (id: string, name: string) => {
     if (window.confirm(`คุณต้องการลบกิจกรรม "${name}" ใช่หรือไม่?`)) {
-     delEvent(id);
-      showToast('ลบกิจกรรมสำเร็จ', 'error');
+      delEvent(id);
     }
+  };
+
+  // 🖼️ จัดการไฟล์เมื่อยูสเซอร์เลือกรูปภาพ
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setThumbnailFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setThumbnailFile(null);
+    setPreviewUrl(null);
   };
 
   const openAddModal = () => {
@@ -235,51 +261,51 @@ export default function Event() {
       date: new Date().toISOString().split('T')[0],
       time: '18:00'
     });
+    setThumbnailFile(null);
+    setPreviewUrl(null);
     setIsModalOpen(true);
   };
 
   const openEditModal = (event: EventItem) => {
     setModalMode('edit');
     setFormEvent(event);
+    setThumbnailFile(null);
+    // ✅ เรียกใช้ Route /organizer/image/:filename ให้ตรงกับ Backend Express
+    setPreviewUrl(event.thumbnail ? `http://localhost:5001/organizer/image/${event.thumbnail}` : null);
     setIsModalOpen(true);
   };
 
   const handleSaveEvent = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!formEvent.name?.trim() || !formEvent.location?.trim()) {
+    if (!formEvent.name?.trim() || !formEvent.location?.trim() || !formEvent.date) {
       showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'warning');
       return;
     }
 
+    const formData = new FormData();
+    formData.append('name', formEvent.name);
+    formData.append('place', formEvent.location);
+    formData.append('type', formEvent.category);
+    formData.append('start_date', `${formEvent.date} ${formEvent.time}:00`);
+    formData.append('description', formEvent.description || '');
+    formData.append('theme', formEvent.theme || '');
+    formData.append('status', formEvent.status);
+    formData.append('price', String(formEvent.price));
+    formData.append('max_seat', String(formEvent.ticketsTotal));
+    formData.append('is_active', String(formEvent.status === 'Published' ? 1 : 0));
+
+    if (thumbnailFile) {
+      formData.append('thumbnail', thumbnailFile);
+    }
+
     if (modalMode === 'add') {
-      const newEvent: EventItem = {
-        ...EMPTY_EVENT,
-        ...formEvent,
-        id: Date.now().toString(),
-        ticketsSold: 0
-      };
-
-      const apiBody = {
-        name: newEvent.name,
-        place: newEvent.location,
-        type: newEvent.category,
-        start_date: `${newEvent.date} ${newEvent.time}:00`,
-        description: newEvent.description,
-        theme: '',
-        status: newEvent.status,
-        price: newEvent.price, 
-        max_seat: newEvent.ticketsTotal,
-        is_active: newEvent.status === 'Published' ? 1 : 0
-      };
-
       fetch('http://localhost:5001/organizer/add_event', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(apiBody)
+        body: formData
       })
         .then(async (response) => {
           if (!response.ok) {
@@ -289,7 +315,7 @@ export default function Event() {
           return response.text();
         })
         .then(() => {
-          setEvents([newEvent, ...events]);
+          fetchEvents();
           showToast('สร้างกิจกรรมใหม่และบันทึกลงระบบสำเร็จแล้ว!', 'success');
           setIsModalOpen(false);
         })
@@ -298,13 +324,30 @@ export default function Event() {
           showToast(error.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์', 'error');
         });
     } else {
-      setEvents(
-        events.map((ev) =>
-          ev.id === formEvent.id ? { ...ev, ...formEvent, ticketsSold: ev.ticketsSold } : ev
-        )
-      );
-      showToast('แก้ไขข้อมูลกิจกรรมเรียบร้อย!', 'success');
-      setIsModalOpen(false);
+      // 💾 โหมดแก้ไข (Edit Event Mode)
+      fetch(`http://localhost:5001/organizer/edit_event/${formEvent.id}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(errText || `Server responded with status ${response.status}`);
+          }
+          return response.text();
+        })
+        .then(() => {
+          fetchEvents();
+          showToast('แก้ไขข้อมูลกิจกรรมเรียบร้อย!', 'success');
+          setIsModalOpen(false);
+        })
+        .catch((error: Error) => {
+          console.error('Edit Error:', error);
+          showToast(error.message || 'เกิดข้อผิดพลาดในการแก้ไขกิจกรรม', 'error');
+        });
     }
   };
 
@@ -336,7 +379,7 @@ export default function Event() {
                 toast.type === "success"
                   ? "mt-btn-primary border-transparent"
                   : toast.type === "error"
-                    ? "bg-elevated border-white/10 text-gray-300"
+                    ? "bg-red-600/20 border-red-500/40 text-red-400"
                     : "bg-purple-600/20 border-purple-500/40 text-purple-400"
               }`}
             >
@@ -424,7 +467,7 @@ export default function Event() {
                   </button>
                   <button
                     onClick={handleBulkDelete}
-                    className="mt-badge mt-badge-muted px-3 py-1.5 cursor-pointer hover:bg-gray-400/20"
+                    className="mt-badge mt-badge-muted px-3 py-1.5 cursor-pointer hover:bg-red-500/20 hover:text-red-400"
                   >
                     🗑️ ลบทั้งหมดที่เลือก
                   </button>
@@ -479,19 +522,30 @@ export default function Event() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-white text-[15px]">{event.name}</span>
-                              <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded text-xs font-medium bg-violet-600/20 text-violet-400 border border-violet-400/20 w-max">
-                                {event.category}
-                              </span>
+                            <div className="flex items-center gap-3">
+                              {event.thumbnail ? (
+                                <img
+                                  src={`http://localhost:5001/organizer/image/${event.thumbnail}`}
+                                  alt={event.name}
+                                  className="w-10 h-10 rounded-lg object-cover border border-white/10"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-neutral-700 flex items-center justify-center text-xs text-gray-400 border border-white/5">
+                                  🖼️
+                                </div>
+                              )}
+                              <div className="flex flex-col">
+                                <span className="font-bold text-white text-[15px]">{event.name}</span>
+                                <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded text-xs font-medium bg-violet-600/20 text-violet-400 border border-violet-400/20 w-max">
+                                  {event.category}
+                                </span>
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {/* ✅ แก้ไข: เรียกใช้ event.date และ event.time ที่มีใน Interface แทนฟิลด์ของ API */}
                             <div className="text-sm text-white font-medium">{event.date}</div>
                             <div className="text-xs text-violet-400">⏱️ {event.time} น.</div>
                           </td>
-                          {/* ✅ แก้ไข: เปลี่ยนจาก event.place เป็น event.location */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">📍 {event.location}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
                             {!event.price ? (
@@ -540,7 +594,7 @@ export default function Event() {
                               </button>
                               <button
                                 onClick={() => handleDeleteRow(event.id, event.name)}
-                                className="p-1.5 text-gray-400 hover:bg-gray-400/10 hover:text-gray-300 rounded-lg transition-colors cursor-pointer"
+                                className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors cursor-pointer"
                                 title="ลบกิจกรรม"
                               >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -572,7 +626,7 @@ export default function Event() {
           <div className="mt-surface w-full max-w-2xl overflow-hidden bg-neutral-800 rounded-2xl border border-white/5 shadow-2xl">
             <div className="px-6 py-4 bg-neutral-800/80 border-b border-white/5 flex justify-between items-center">
               <h3 className="text-xl font-extrabold text-white">
-                {modalMode === "add" ? "🔮 สร้างกิจกรรมเวทมนตร์ใหม่" : "✏️ แก้ไขข้อมูลกิจกรรม"}
+                {modalMode === "add" ? "🔮 สร้างกิจกรรมใหม่" : "✏️ แก้ไขข้อมูลกิจกรรม"}
               </h3>
               <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -581,9 +635,43 @@ export default function Event() {
 
             <form onSubmit={handleSaveEvent}>
               <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                {/* 🖼️ ส่วนอัปโหลดรูปภาพกิจกรรม (Thumbnail Upload) */}
+                <div>
+                  <label className={labelClassName}>รูปภาพปกกิจกรรม (Thumbnail)</label>
+                  {previewUrl ? (
+                    <div className="relative w-full h-44 rounded-xl overflow-hidden border border-white/10 group">
+                      <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute top-2 right-2 p-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-full transition-all duration-200 cursor-pointer shadow-lg"
+                        title="ลบรูปภาพ"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-white/10 hover:border-violet-500/50 rounded-xl cursor-pointer bg-neutral-900/50 hover:bg-neutral-900/80 transition-all">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Upload className="w-8 h-8 mb-2 text-violet-400 animate-bounce" />
+                        <p className="mb-1 text-sm text-gray-300 font-medium">
+                          คลิกเพื่ออัปโหลด หรือลากไฟล์มาวางที่นี่
+                        </p>
+                        <p className="text-xs text-gray-500">PNG, JPG, WEBP (ไม่เกิน 5MB)</p>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+
                 <div>
                   <label className={labelClassName}>ชื่อกิจกรรม <span className="text-violet-400">*</span></label>
-                  <input type="text" required value={formEvent.name || ""} onChange={(e) => setFormEvent({ ...formEvent, name: e.target.value })} placeholder="ใส่ชื่อชื่องานกิจกรรมให้น่าสนใจ..." className={inputClassName} />
+                  <input type="text" required value={formEvent.name || ""} onChange={(e) => setFormEvent({ ...formEvent, name: e.target.value })} placeholder="ใส่ชื่อกิจกรรมให้น่าสนใจ..." className={inputClassName} />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -634,7 +722,7 @@ export default function Event() {
 
                 <div>
                   <label className={labelClassName}>รายละเอียดกิจกรรมเพิ่มเติม</label>
-                  <textarea rows={3} value={formEvent.description || ""} onChange={(e) => setFormEvent({ ...formEvent, description: e.target.value })} placeholder="เขียนอธิบายความน่าสนใจของกิจกรรมเพื่อดึงดูดใจผู้คน..." className={`${inputClassName} resize-none`}></textarea>
+                  <textarea rows={3} value={formEvent.description || ""} onChange={(e) => setFormEvent({ ...formEvent, description: e.target.value })} placeholder="เขียนอธิบายความน่าสนใจของกิจกรรม..." className={`${inputClassName} resize-none`}></textarea>
                 </div>
               </div>
 
