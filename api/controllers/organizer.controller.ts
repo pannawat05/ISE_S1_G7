@@ -4,7 +4,13 @@ import type { EventStatus } from "../model/types.js";
 import {
   createEvent,
   findEventsByOrganizerId,
+  findEventById,
+  updateEvent,
   findOrCreateEventType,
+  insertEventImage,
+  deleteEventImage,
+  getMaxDisplayOrder,
+  updateEventImageOrder,
 } from "../model/event.model.js";
 import {
   createOrganizer,
@@ -298,6 +304,11 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
     return res.status(400).json({ message: "name, place_name, type, start_date, end_date are required" });
   }
 
+  // Extract uploaded files from multer .fields()
+  const files = (req as AuthRequest & { files?: Record<string, Express.Multer.File[]> }).files ?? {};
+  const coverFile = files["cover_image"]?.[0];
+  const coverImageUrl = coverFile ? `/uploads/event/${coverFile.filename}` : "";
+
   try {
     const organizer = await findOrganizerById(organizerId);
     if (!organizer) return res.status(404).json({ message: "Organizer not found" });
@@ -310,7 +321,7 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
       address: address ?? null,
       latitude: Number(latitude) || 0,
       longitude: Number(longitude) || 0,
-      cover_image: "",
+      cover_image: coverImageUrl,
       description: description ?? null,
       theme: theme ?? null,
       status: "pending",
@@ -321,9 +332,120 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
       type_id: typeId,
     });
 
-    return res.status(201).json({ message: "Event created successfully", eventId });
+    // Insert event_images
+    const extraImageFiles = files["event_images"] ?? [];
+    for (let i = 0; i < extraImageFiles.length; i++) {
+      const imgUrl = `/uploads/event/${extraImageFiles[i].filename}`;
+      await insertEventImage(eventId, imgUrl, i + 1);
+    }
+
+    return res.status(201).json({
+      message: "Event created successfully",
+      eventId,
+      cover_image: coverImageUrl || null,
+    });
   } catch (err) {
     console.error("CREATE EVENT FOR ORGANIZER ERROR:", err);
     return res.status(500).json({ message: "Error creating event" });
+  }
+}
+
+export async function getEventById(req: AuthRequest, res: Response) {
+  const userId = req.user?.id;
+  const organizerId = Number(req.params.id);
+  const eventId = Number(req.params.eventId);
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId)) return res.status(400).json({ message: "Invalid ID" });
+  try {
+    const organizer = await findOrganizerById(organizerId);
+    if (!organizer) return res.status(404).json({ message: "Organizer not found" });
+    if (organizer.owner_id !== userId) return res.status(403).json({ message: "Forbidden" });
+    const event = await findEventById(eventId);
+    if (!event || event.organizer_id !== organizerId) return res.status(404).json({ message: "Event not found" });
+    // event.images is already included by findEventById
+    return res.json({ event });
+  } catch (err) {
+    console.error("GET EVENT ERROR:", err);
+    return res.status(500).json({ message: "Error fetching event" });
+  }
+}
+
+export async function updateEventHandler(req: AuthRequest, res: Response) {
+  const userId = req.user?.id;
+  const organizerId = Number(req.params.id);
+  const eventId = Number(req.params.eventId);
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId)) return res.status(400).json({ message: "Invalid ID" });
+
+  const { name, place_name, address, latitude, longitude, description, theme, type, start_date, end_date, is_active } = req.body;
+  const files = (req as AuthRequest & { files?: Record<string, Express.Multer.File[]> }).files ?? {};
+  const coverFile = files["cover_image"]?.[0];
+
+  try {
+    const organizer = await findOrganizerById(organizerId);
+    if (!organizer) return res.status(404).json({ message: "Organizer not found" });
+    if (organizer.owner_id !== userId) return res.status(403).json({ message: "Forbidden" });
+    const existing = await findEventById(eventId);
+    if (!existing || existing.organizer_id !== organizerId) return res.status(404).json({ message: "Event not found" });
+
+    const updates: Record<string, unknown> = {};
+    if (name?.trim())        updates.name = name.trim();
+    if (place_name?.trim())  updates.place_name = place_name.trim();
+    if (address !== undefined) updates.address = address ?? null;
+    if (latitude !== undefined) updates.latitude = Number(latitude);
+    if (longitude !== undefined) updates.longitude = Number(longitude);
+    if (description !== undefined) updates.description = description ?? null;
+    if (theme !== undefined) updates.theme = theme ?? null;
+    if (start_date) updates.start_date = start_date;
+    if (end_date)   updates.end_date = end_date;
+    if (is_active !== undefined) updates.is_active = is_active !== false && is_active !== "false";
+    if (coverFile)  updates.cover_image = `/uploads/event/${coverFile.filename}`;
+    if (type?.trim()) {
+      updates.type_id = await findOrCreateEventType(type.trim());
+    }
+
+    await updateEvent(eventId, updates as Parameters<typeof updateEvent>[1]);
+
+    // Handle event images: remove deleted ones
+    const bodyRaw = req.body as Record<string, string | string[]>;
+    const removeRaw = bodyRaw["remove_image_ids[]"];
+    if (removeRaw) {
+      const ids = Array.isArray(removeRaw) ? removeRaw : [removeRaw];
+      for (const id of ids) {
+        const numId = Number(id);
+        if (!isNaN(numId)) await deleteEventImage(numId);
+      }
+    }
+
+    // Handle display_order updates for existing images
+    // Format: reorder_images[id]=order  e.g. reorder_images[12]=1&reorder_images[13]=2
+    const reorderRaw = bodyRaw as Record<string, string>;
+    const reorderKeys = Object.keys(reorderRaw).filter((k) => k.startsWith("reorder_images["));
+    for (const key of reorderKeys) {
+      const match = key.match(/^reorder_images\[(\d+)\]$/);
+      if (!match) continue;
+      const imgId = Number(match[1]);
+      const order = Number(reorderRaw[key]);
+      if (!isNaN(imgId) && !isNaN(order)) {
+        await updateEventImageOrder(imgId, order);
+      }
+    }
+
+    // Handle event images: insert new ones
+    const newImageFiles = files["event_images"] ?? [];
+    if (newImageFiles.length > 0) {
+      let maxOrder = await getMaxDisplayOrder(eventId);
+      for (const imgFile of newImageFiles) {
+        maxOrder += 1;
+        const url = `/uploads/event/${imgFile.filename}`;
+        await insertEventImage(eventId, url, maxOrder);
+      }
+    }
+
+    const updated = await findEventById(eventId);
+    return res.json({ message: "Event updated successfully", event: updated });
+  } catch (err) {
+    console.error("UPDATE EVENT ERROR:", err);
+    return res.status(500).json({ message: "Error updating event" });
   }
 }

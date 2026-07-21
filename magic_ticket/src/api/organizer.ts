@@ -102,6 +102,12 @@ export async function deleteOrganizer(token: string, id: number): Promise<void> 
   });
 }
 
+export interface EventImage {
+  id: number;
+  url: string;
+  display_order: number;
+}
+
 export interface OrganizerEvent {
   id: number;
   name: string;
@@ -118,6 +124,7 @@ export interface OrganizerEvent {
   end_date: string;
   type_name: string;
   organizer_id: number;
+  images?: EventImage[];
 }
 
 export async function fetchOrganizerEventsList(
@@ -134,23 +141,39 @@ export async function fetchOrganizerEventsList(
 export async function createOrganizerEvent(
   token: string,
   organizerId: number,
-  body: {
-    name: string;
-    place_name: string;
-    address?: string;
-    latitude: number;
-    longitude: number;
-    description?: string;
-    theme?: string;
-    type: string;
-    start_date: string;
-    end_date: string;
-    is_active?: boolean;
+  body: FormData | {
+    name: string; place_name: string; address?: string;
+    latitude: number; longitude: number;
+    description?: string; theme?: string; type: string;
+    start_date: string; end_date: string; is_active?: boolean;
   },
 ): Promise<{ eventId: number }> {
+  const isFormData = body instanceof FormData;
   return apiFetch(`/organizer/${organizerId}/events`, {
-    method: "POST",
-    token,
-    body: JSON.stringify(body),
+    method: "POST", token,
+    body: isFormData ? body : JSON.stringify(body),
+  });
+}
+
+export async function fetchSingleEvent(
+  token: string,
+  organizerId: number,
+  eventId: number,
+): Promise<OrganizerEvent> {
+  const data = await apiFetch<{ event: OrganizerEvent }>(
+    `/organizer/${organizerId}/events/${eventId}`,
+    { token },
+  );
+  return data.event;
+}
+
+export async function updateOrganizerEvent(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  body: FormData,
+): Promise<{ event: OrganizerEvent }> {
+  return apiFetch(`/organizer/${organizerId}/events/${eventId}`, {
+    method: "PUT", token, body,
   });
 }

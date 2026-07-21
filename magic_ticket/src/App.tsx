@@ -70,6 +70,8 @@ function App() {
 
               <Route path="events/:id" element={<pages.Event />} />
 
+              <Route path="events/:id/edit/:eventId" element={<pages.EventEdit />} />
+
               <Route path="organizer/:id" element={<pages.OrganizerSettings />} />
 
             </Route>

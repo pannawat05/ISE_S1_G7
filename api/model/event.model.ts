@@ -57,3 +57,71 @@ export async function findEventsByOrganizerId(
     [organizerId],
   );
 }
+
+export async function findEventById(
+  eventId: number,
+): Promise<(EventRow & { type_name: string; images: { id: number; url: string; display_order: number }[] }) | null> {
+  const rows = await query<(EventRow & { type_name: string })[]>(
+    `SELECT e.*, et.name AS type_name
+     FROM events e
+     JOIN event_types et ON et.id = e.type_id
+     WHERE e.id = ? LIMIT 1`,
+    [eventId],
+  );
+  if (!rows[0]) return null;
+
+  const images = await query<{ id: number; url: string; display_order: number }[]>(
+    `SELECT id, url, display_order FROM event_images WHERE event_id = ? ORDER BY display_order ASC`,
+    [eventId],
+  );
+
+  return { ...rows[0], images };
+}
+
+export async function updateEvent(
+  eventId: number,
+  fields: Partial<Omit<CreateEventInput, "organizer_id" | "type_id">> & { type_id?: number },
+): Promise<void> {
+  const entries = Object.entries(fields).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) return;
+  const setClauses = entries.map(([k]) => `${k} = ?`).join(", ");
+  const values = entries.map(([, v]) => v);
+  await execute(
+    `UPDATE events SET ${setClauses}, updated_at = NOW() WHERE id = ?`,
+    [...values, eventId],
+  );
+}
+
+export async function insertEventImage(
+  eventId: number,
+  url: string,
+  displayOrder: number,
+): Promise<number> {
+  const result = await execute(
+    "INSERT INTO event_images (event_id, name, url, display_order) VALUES (?, ?, ?, ?)",
+    [eventId, url.split("/").pop() ?? "image", url, displayOrder],
+  );
+  return result.insertId;
+}
+
+export async function deleteEventImage(imageId: number): Promise<void> {
+  await execute("DELETE FROM event_images WHERE id = ?", [imageId]);
+}
+
+export async function getMaxDisplayOrder(eventId: number): Promise<number> {
+  const rows = await query<{ max_order: number | null }[]>(
+    "SELECT MAX(display_order) AS max_order FROM event_images WHERE event_id = ?",
+    [eventId],
+  );
+  return rows[0]?.max_order ?? 0;
+}
+
+export async function updateEventImageOrder(
+  imageId: number,
+  displayOrder: number,
+): Promise<void> {
+  await execute(
+    "UPDATE event_images SET display_order = ? WHERE id = ?",
+    [displayOrder, imageId],
+  );
+}

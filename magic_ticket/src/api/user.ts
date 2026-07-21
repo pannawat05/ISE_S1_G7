@@ -32,7 +32,8 @@ export const updateProfile = async (
     token,
     body: JSON.stringify(fields),
   });
-  // Sync localStorage cache
   localStorage.setItem("user", JSON.stringify(updated));
+  // Notify NavbarActions (and any other listener) that user data changed
+  window.dispatchEvent(new Event("user-updated"));
   return updated;
 };

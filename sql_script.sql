@@ -123,7 +123,7 @@ CREATE TABLE seats (
 -- Staff
 CREATE TABLE staff (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    role ENUM("checkin_staff", "general_staff", "manager") NOT NULL,
+    role ENUM("general_staff", "manager") NOT NULL,
     join_date DATETIME NOT NULL,
     users_id INT NOT NULL,
     organizer_id INT NOT NULL,
@@ -140,6 +140,37 @@ CREATE TABLE staff (
 
     CONSTRAINT uq_staff
         UNIQUE (users_id, organizer_id)
+);
+
+-- Event Staff
+CREATE TABLE event_staff (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    event_id INT NOT NULL,
+    staff_id INT NOT NULL,
+
+    role ENUM(
+        'checkin',
+        'security',
+        'registration',
+        'backstage',
+        'manager'
+    ) NOT NULL,
+
+    assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_event_staff_event
+        FOREIGN KEY (event_id)
+        REFERENCES events(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_event_staff_staff
+        FOREIGN KEY (staff_id)
+        REFERENCES staff(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_event_staff
+        UNIQUE(event_id, staff_id)
 );
 
 -- payment
