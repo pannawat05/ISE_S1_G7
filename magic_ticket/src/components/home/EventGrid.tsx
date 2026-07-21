@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import cookie from "js-cookie";
 import EventCard from "./EventCard";
+import { featuredEvents } from "../../data/events";
 
 export default function EventGrid() {
   const [events, setEvents] = useState<any[]>([]);
@@ -9,7 +10,6 @@ export default function EventGrid() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        // เช็กคีย์ Token ให้ครอบคลุมหลายชื่อ
         const token = cookie.get("token") || localStorage.getItem("token") || cookie.get("access_token");
 
         const response = await fetch("http://localhost:5001/get_events", {
@@ -22,17 +22,16 @@ export default function EventGrid() {
 
         if (response.ok) {
           const data = await response.json();
-          console.log("👉 Data from API:", data); // ปริ้นท์เช็กโครงสร้างข้อมูลใน Console (F12)
-
-          if (Array.isArray(data)) {
-            // เอาข้อมูลทั้งหมดมาเซ็ตโดยไม่ filter ก่อน เพื่อเทสว่าการ์ดเด้งขึ้นไหม
+          if (Array.isArray(data) && data.length > 0) {
             setEvents(data);
+            return; // ถ้าได้ข้อมูลจากเซิร์ฟเวอร์ ให้จบการทำงานตรงนี้
           }
-        } else {
-          console.error("Fetch failed with status:", response.status);
         }
+        // ถ้าเซิร์ฟเวอร์ตอบกลับมาแต่ไม่มีข้อมูล ให้โยน error เพื่อไปใช้ mock data
+        throw new Error("No data from server"); 
       } catch (error) {
-        console.error("Error fetching events:", error);
+        console.log("ไม่พบ Backend จึงสลับไปใช้ข้อมูลจำลอง (Mock Data) แทน");
+        setEvents(featuredEvents); // 👈 ถ้าเซิร์ฟเวอร์พัง ให้ดึง Mock Data มาใช้
       } finally {
         setLoading(false);
       }

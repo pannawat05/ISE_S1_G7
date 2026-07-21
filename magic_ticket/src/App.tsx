@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Navbar } from "./components/navigater";
 import { Home, MyTickets, SignUp, Signin, OTP, OrganizeRegis, Dashboards, Event } from "./page";
+import BookingPage from "./page/booking";
+import PaymentPage from "./page/payment";
 
 function App() {
   return (
@@ -17,6 +19,8 @@ function App() {
           <Route path="/organize-regis" element={<OrganizeRegis />} />
           <Route path="/dashboard" element={<Dashboards />} />
           <Route path="/dashboard/events" element={<Event />} />
+          <Route path="/booking/:eventId" element={<BookingPage />} /> 
+          <Route path="/payment" element={<PaymentPage />} />
         </Routes>
       </div>
     </Router>
