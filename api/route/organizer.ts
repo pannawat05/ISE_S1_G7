@@ -1,12 +1,11 @@
 import express, { type Request, type Response } from "express";
-import path from "path"; // ✅ นำเข้า path module สำหรับจัดการ Absolute Path
+import path from "path";
 import db from "../model/db.js";
 import { authenticateOrganizer } from "../middleware/auth.js";
 import uploadthumbnail from "../middleware/upload.js";
 
 const Organizer_router = express.Router();
 
-// ✅ ขยาย Type ของ Express Request เพื่อให้ TypeScript รู้อิทธิพลของ req.user
 declare global {
   namespace Express {
     interface Request {
@@ -43,6 +42,21 @@ interface BulkUpdateItem extends UpdateEventBody {
   id: number;
 }
 
+// 🟢 PUBLIC ROUTE: สำหรับหน้าแรก (ไม่ต้องล็อกอิน)
+Organizer_router.get("/events/public", (_req: Request, res: Response) => {
+  db.query(
+    "SELECT * FROM `event` WHERE `status` = 'Published' AND `is_active` = 1",
+    (err: any, results: any) => {
+      if (err) {
+        console.error("Database Error:", err);
+        return res.status(500).send("Error fetching public events");
+      }
+      return res.status(200).json(results || []);
+    }
+  );
+});
+
+// 🔒 ORGANIZER ROUTE: เพิ่มกิจกรรมใหม่
 Organizer_router.post(
   "/organizer/add_event",
   authenticateOrganizer,
@@ -60,7 +74,6 @@ Organizer_router.post(
       is_active,
     } = req.body;
 
-    // ตรวจสอบข้อมูลที่จำเป็น
     if (!name?.trim() || !place?.trim() || !start_date) {
       return res
         .status(400)
@@ -89,7 +102,7 @@ Organizer_router.post(
         o_id,
         thumbnailPath,
       ],
-      (err: any, result: any) => {
+      (err: any) => {
         if (err) {
           console.error("Database Error:", err);
           return res.status(500).send("Error adding event");
@@ -100,6 +113,7 @@ Organizer_router.post(
   }
 );
 
+// 🔒 ORGANIZER ROUTE: ดึงกิจกรรมของผู้จัดงานคนนั้น
 Organizer_router.get(
   "/organizer/get_events",
   authenticateOrganizer,
@@ -125,6 +139,7 @@ Organizer_router.get(
   }
 );
 
+// 🔒 ORGANIZER ROUTE: ลบกิจกรรม
 Organizer_router.delete(
   "/organizer/delete_event/:id",
   authenticateOrganizer,
@@ -151,13 +166,11 @@ Organizer_router.delete(
   }
 );
 
-// ✅ ปรับแก้การส่งไฟล์รูปภาพด้วย Absolute Path
+// 🟢 PUBLIC ROUTE: แสดงรูปภาพ
 Organizer_router.get(
   "/organizer/image/:filename",
   (req: Request, res: Response) => {
     const filename = req.params.filename;
-    
-    // แปลง Relative Path ให้กลายเป็น Absolute Path ป้องกันปัญหา Express Error
     const absoluteImagePath = path.resolve(
       process.cwd(),
       "api/upload/organizer/thumbnail",
@@ -175,6 +188,7 @@ Organizer_router.get(
   }
 );
 
+// 🔒 ORGANIZER ROUTE: แก้ไขกิจกรรม
 Organizer_router.put(
   "/organizer/update_event/:id",
   authenticateOrganizer,
@@ -199,7 +213,6 @@ Organizer_router.put(
       is_active,
     } = req.body;
 
-    // สร้าง Dynamic Query เพื่ออัปเดตเฉพาะ Field ที่ส่งมาจริง
     const fieldsToUpdate: string[] = [];
     const queryParams: any[] = [];
 
@@ -213,7 +226,6 @@ Organizer_router.put(
     if (max_seat !== undefined) { fieldsToUpdate.push("`max_seat` = ?"); queryParams.push(Number(max_seat)); }
     if (is_active !== undefined) { fieldsToUpdate.push("`is_active` = ?"); queryParams.push(Number(is_active)); }
 
-    // ถ้ามีการอัปโหลดรูปภาพใหม่เข้ามา
     if (req.file) {
       fieldsToUpdate.push("`thumbnail` = ?");
       queryParams.push(req.file.filename);
@@ -223,7 +235,6 @@ Organizer_router.put(
       return res.status(400).send("No fields provided to update");
     }
 
-    // เพิ่มเงื่อนไข WHERE เพื่อตรวจสอบ id และ organizer_id
     const sql = `UPDATE \`event\` SET ${fieldsToUpdate.join(", ")} WHERE \`id\` = ? AND \`organizer_id\` = ?`;
     queryParams.push(id, o_id);
 
@@ -242,9 +253,7 @@ Organizer_router.put(
   }
 );
 
-// ====================================================
-// 2. อัปเดตหลายกิจกรรมพร้อมกัน (Multiple / Bulk Update)
-// ====================================================
+// 🔒 ORGANIZER ROUTE: Bulk Update
 Organizer_router.put(
   "/organizer/update_events_bulk",
   authenticateOrganizer,
@@ -260,7 +269,6 @@ Organizer_router.put(
       return res.status(400).send("Invalid or empty events list");
     }
 
-    // วนลูปสร้าง Query สำหรับแต่ละ Event
     const updatePromises = events.map((item) => {
       return new Promise((resolve, reject) => {
         const fieldsToUpdate: string[] = [];
@@ -277,7 +285,7 @@ Organizer_router.put(
         if (item.is_active !== undefined) { fieldsToUpdate.push("`is_active` = ?"); queryParams.push(item.is_active); }
 
         if (fieldsToUpdate.length === 0) {
-          return resolve(true); // ไม่มีฟิลด์เปลี่ยน ให้ข้าม
+          return resolve(true);
         }
 
         const sql = `UPDATE \`event\` SET ${fieldsToUpdate.join(", ")} WHERE \`id\` = ? AND \`organizer_id\` = ?`;

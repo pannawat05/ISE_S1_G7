@@ -4,6 +4,7 @@ import { CalendarDays, Ticket } from "lucide-react";
 const navItems = [
   { to: "/", label: "ค้นหากิจกรรม", icon: CalendarDays },
   { to: "/my-tickets", label: "ตั๋วของฉัน", icon: Ticket },
+  { to: "/dashboard", label: "แดชบอร์ด", icon: CalendarDays },
 ];
 
 export default function NavbarNav() {

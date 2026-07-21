@@ -1,4 +1,5 @@
-import { HeroSection, EventGrid } from "@/components/home";
+import { HeroSection } from "@/components/home";
+import EventGrid from "@/components/home/EventGrid"; // 👈 Import ตรงจากไฟล์ EventGrid
 import { Footer } from "@/components/navigater";
 
 export default function Home() {

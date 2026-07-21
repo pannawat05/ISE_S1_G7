@@ -3,6 +3,7 @@ import cors from 'cors';
 import authRouter from './route/auth.js';
 import emailRouter from './route/email.js';
 import Organizer_router from './route/organizer.js';
+import EventRouter from './route/event.js';
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));  
@@ -16,6 +17,7 @@ app.use(cors({
 app.use(emailRouter);
 app.use(authRouter);
 app.use(Organizer_router);
+app.use(EventRouter);
 app.get('/', (_req, res) => {
   res.send('Hello World!');
 });
