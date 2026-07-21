@@ -1,0 +1,10 @@
+EMAIL_USER='isesgcskmitl@gmail.com'
+EMAIL_PASS='bkik iffl rxgc rftg'
+
+DB_HOST=db
+DB_USER=root
+DB_PASSWORD=secretpassword
+DB_NAME=mydatabase
+
+
+JWT_SECRET='15f668364f8c76b8c7d6da0e101a06418ffa5caf6f770fff6a8aeff77011f2338190484fc4669f56b168498b7fd12eb379b7e90f3092fea848f4c768059e291f'

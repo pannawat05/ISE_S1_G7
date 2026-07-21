@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/navigater/sidebar';
 import { Menu, Upload, X } from 'lucide-react';
 import cookie from 'js-cookie';
+// ✅ ที่ถูกต้อง
+import { useNavigate } from "react-router-dom";
+
 
 // ---------- Types ----------
 type EventStatus = 'Draft' | 'Published' | 'Completed';
@@ -47,6 +50,7 @@ const EMPTY_EVENT: EventFormData = {
 };
 
 export default function Event() {
+  const navigate = useNavigate();
   const token = cookie.get('authToken');
   const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -338,6 +342,7 @@ export default function Event() {
           fetchEvents();
           showToast('สร้างกิจกรรมใหม่และบันทึกลงระบบสำเร็จแล้ว!', 'success');
           setIsModalOpen(false);
+          navigate('/');
         })
         .catch((error: Error) => {
           console.error('Fetch Error:', error);
