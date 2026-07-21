@@ -13,8 +13,6 @@ export default function HeroSection() {
 
       <p className="mt-5 text-sm md:text-base text-gray-400 max-w-2xl mx-auto leading-relaxed">
         จองตั๋วเข้าร่วมกิจกรรมและคอนเสิร์ตได้อย่างง่ายดาย
-        <br className="hidden sm:block" />
-        พร้อมระบบ Whitelist และ QR Code ที่ทันสมัย
       </p>
 
       <div className="mt-10">

@@ -3,7 +3,7 @@ import { Footer } from "@/components/navigater";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-black text-white font-sans">
+    <div className="h-full w-full overflow-y-auto bg-black text-white font-sans">
       <HeroSection />
       <EventGrid />
       <Footer />

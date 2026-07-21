@@ -1,0 +1,42 @@
+import express from "express";
+import * as organizerController from "../controllers/organizer.controller.js";
+import { authenticateOrganizer } from "../middlewares/organizer.middleware.js";
+import { authenticate } from "../middlewares/auth.middleware.js";
+import { uploadOrganizerLogo } from "../middlewares/upload.middleware.js";
+import type { AuthRequest } from "../middlewares/types.js";
+
+const router = express.Router();
+
+router.post("/add_event", authenticateOrganizer, organizerController.addEvent);
+router.get("/events", authenticateOrganizer, organizerController.listEvents);
+router.post(
+    "/create",
+    authenticate,
+    uploadOrganizerLogo.single("logo"),
+    (req, res) => organizerController.createOrganizerHandler(req as AuthRequest, res),
+);
+
+router.get("/:id", authenticate, (req, res) =>
+  organizerController.getOrganizer(req as AuthRequest, res),
+);
+
+router.get("/:id/events", authenticate, (req, res) =>
+  organizerController.listEventsByOrganizer(req as AuthRequest, res),
+);
+
+router.post("/:id/events", authenticate, (req, res) =>
+  organizerController.createEventForOrganizer(req as AuthRequest, res),
+);
+
+router.put(
+  "/:id",
+  authenticate,
+  uploadOrganizerLogo.single("logo"),
+  (req, res) => organizerController.updateOrganizerHandler(req as AuthRequest, res),
+);
+
+router.delete("/:id", authenticate, (req, res) =>
+  organizerController.deleteOrganizerHandler(req as AuthRequest, res),
+);
+
+export default router;

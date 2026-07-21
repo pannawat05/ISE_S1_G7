@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "@/api/client";
 import Cookies from "js-cookie";
 
 function Signin() {
@@ -17,20 +18,16 @@ function Signin() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetch("http://localhost:5001/auth/login", {
+    apiFetch<{ message: string; token?: string; role?: string }>("/auth/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(formData),
     })
-      .then((response) => response.json())
       .then((data) => {
         alert(data.message);
         if (data.token) {
           Cookies.set("authToken", data.token, { path: "/" });
           if (data.role === "organizer") {
-            window.location.href = "/dashboard";
+            window.location.href = "/profile/dashboard";
           } else {
             window.location.href = "/";
           }

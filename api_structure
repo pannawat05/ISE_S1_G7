@@ -1,0 +1,25 @@
+api/
+├── index.ts                    # entry point + CORS + static uploads
+├── model/
+│   ├── db.ts                   # MySQL pool
+│   ├── query.ts                # promise wrapper
+│   ├── types.ts                # types ตาม SQL schema
+│   ├── user.model.ts
+│   ├── organizer.model.ts
+│   ├── event.model.ts
+│   └── email.model.ts          # OTP store
+├── controllers/
+│   ├── auth.controller.ts
+│   ├── user.controller.ts
+│   ├── email.controller.ts
+│   └── organizer.controller.ts
+├── routes/
+│   ├── auth.route.ts
+│   ├── email.route.ts
+│   ├── organizer.route.ts
+│   └── user.route.ts
+└── middlewares/
+    ├── auth.middleware.ts      # JWT authenticate
+    ├── organizer.middleware.ts # ตรวจว่าเป็น owner ของ organizer
+    ├── upload.middleware.ts    # multer อัปโหลดโลโก้
+    └── types.ts

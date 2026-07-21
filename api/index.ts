@@ -1,25 +1,38 @@
-import express from 'express';
-import cors from 'cors';
-import authRouter from './route/auth.js';
-import emailRouter from './route/email.js';
-import Organizer_router from './route/organizer.js';
+import express from "express";
+import cors from "cors";
+import path from "path";
+import authRouter from "./routes/auth.route.js";
+import emailRouter from "./routes/email.route.js";
+import organizerRouter from "./routes/organizer.route.js";
+import userRouter from "./routes/user.route.js";
 
 const app = express();
-app.use(express.urlencoded({ extended: true }));  
+const port: number = Number(process.env.PORT) || 5001;
+
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-const port: number = 5001;
-app.use(cors({
-    origin: 'http://localhost:3000', // URL ของฝั่ง Frontend
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'token'], // เพิ่ม 'token' ใน allowedHeaders
-}));
-app.use(emailRouter);
-app.use(authRouter);
-app.use(Organizer_router);
-app.get('/', (_req, res) => {
-  res.send('Hello World!');
+// Cors
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization", "token"],
+  }),
+);
+
+// Files
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+// router
+app.use("/email", emailRouter);
+app.use("/auth", authRouter);
+app.use("/organizer", organizerRouter);
+app.use("/users", userRouter);
+
+app.get("/", (_req, res) => {
+  res.send("ISE API is running");
 });
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+  console.log(`API listening on port ${port}`);
 });

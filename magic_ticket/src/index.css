@@ -70,11 +70,11 @@
   }
 
   .mt-auth-page {
-    @apply min-h-[calc(100vh-69px)] flex items-center justify-center bg-black px-4 py-12 relative overflow-hidden;
+    @apply h-full flex items-center justify-center bg-black px-4 py-12 relative overflow-y-auto;
   }
 
   .mt-dashboard-shell {
-    @apply flex h-screen bg-black text-white font-sans overflow-hidden;
+    @apply flex h-full bg-black text-white font-sans overflow-hidden;
   }
 
   .mt-dashboard-header {
@@ -90,7 +90,7 @@
   }
 
   .mt-sidebar {
-    @apply fixed inset-y-0 left-0 z-50 w-64 bg-elevated text-white transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 border-r border-white/5;
+    @apply fixed inset-y-0 left-0 z-50 bg-elevated text-white transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 border-r border-white/5 shrink-0;
   }
 
   .mt-badge {

@@ -1,582 +1,534 @@
-// src/page/dashboard.tsx
-import { useState, useEffect } from 'react';
-import Sidebar from '../components/navigater/sidebar';
-import { Menu } from 'lucide-react';
-import cookie from 'js-cookie';
+import { useState, useEffect, useRef } from "react";
+import { useParams } from "react-router-dom";
+import {
+  Menu, Plus, Search, Calendar, MapPin, X, ChevronDown, Navigation, Crosshair,
+} from "lucide-react";
+import Cookies from "js-cookie";
+import { fetchOrganizerEventsList, createOrganizerEvent, type OrganizerEvent } from "@/api/organizer";
+import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 
-// ---------- Types ----------
-type EventStatus = 'Draft' | 'Published' | 'Completed';
+// ─── Types ────────────────────────────────────────────────────────────────────
+const EVENT_TYPES = ["Concert", "Conference", "Exhibition", "Party", "Festival", "Sport", "Other"];
 
-interface EventItem {
-  id: string;
-  name: string;
-  date: string;
-  time: string;
-  location: string;
-  ticketsSold: number;
-  ticketsTotal: number;
-  price: number;
-  status: EventStatus;
-  category: string;
-  description: string;
+interface CreateEventForm {
+  name: string; description: string; type: string; theme: string;
+  start_date: string; end_date: string;
+  place_name: string; address: string;
+  latitude: number; longitude: number;
 }
 
-type EventFormData = Omit<EventItem, 'id' | 'ticketsSold'> & {
-  id?: string;
-  ticketsSold?: number;
+const EMPTY_FORM: CreateEventForm = {
+  name: "", description: "", type: "Concert", theme: "",
+  start_date: "", end_date: "",
+  place_name: "", address: "",
+  latitude: 13.7563, longitude: 100.5018,
 };
 
-interface ToastState {
-  message: string;
-  type: 'success' | 'error' | 'warning';
+// ─── Status badge ─────────────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    approved: "text-green-400 bg-green-400/10 border-green-400/20",
+    pending:  "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
+    rejected: "text-red-400 bg-red-400/10 border-red-400/20",
+  };
+  const labels: Record<string, string> = {
+    approved: "Approved", pending: "Pending", rejected: "Rejected",
+  };
+  return (
+    <span className={`mt-badge ${styles[status] ?? "text-gray-400 bg-gray-400/10 border-gray-400/20"}`}>
+      {labels[status] ?? status}
+    </span>
+  );
 }
 
-const INITIAL_EVENTS: EventItem[] = [
-  {
-    id: '1',
-    name: '🔮 Magic Gathering 2026',
-    date: '2026-08-15',
-    time: '18:00',
-    location: 'Royal Paragon Hall',
-    ticketsSold: 450,
-    ticketsTotal: 500,
-    price: 1200,
-    status: 'Published',
-    category: 'Concert',
-    description: 'งานรวมตัวผู้คลั่งไคล้เวทมนตร์และดนตรีแนวฟิวชั่นครั้งยิ่งใหญ่ที่สุดในเอเชียตะวันออกเฉียงใต้'
-  },
-  {
-    id: '2',
-    name: '🎨 NFT Creator Showcase',
-    date: '2026-09-01',
-    time: '13:00',
-    location: 'Bitkub M-Tower',
-    ticketsSold: 120,
-    ticketsTotal: 150,
-    price: 350,
-    status: 'Draft',
-    category: 'Exhibition',
-    description: 'นิทรรศการแสดงผลงานศิลปะดิจิทัลที่คัดสรรจากศิลปินแถวหน้าของเมืองไทย'
+// ─── OSM static thumbnail (no interaction, no library) ───────────────────────
+function OsmThumbnail({ lat, lng, height = 144 }: { lat: number; lng: number; height?: number }) {
+  const bbox = [lng - 0.008, lat - 0.006, lng + 0.008, lat + 0.006].join(",");
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
+  return (
+    <iframe
+      src={src}
+      style={{ height, width: "100%", border: "none" }}
+      title="map"
+      loading="lazy"
+      className="pointer-events-none"
+      referrerPolicy="no-referrer"
+    />
+  );
+}
+
+// ─── Clickable Map Picker using div overlay on OSM iframe ────────────────────
+// Strategy: render iframe at a zoom level, capture click position on the
+// transparent overlay div, convert pixel offset to lat/lng delta.
+function MapPicker({
+  lat, lng, onChange,
+}: {
+  lat: number; lng: number;
+  onChange: (lat: number, lng: number) => void;
+}) {
+  const [center, setCenter] = useState({ lat, lng });
+  const [pin, setPin] = useState({ lat, lng });
+  const [iframeKey, setIframeKey] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const ZOOM = 14;
+
+  // Recalculate iframe src whenever center changes
+  const delta = 0.02;
+  const bbox = [
+    center.lng - delta, center.lat - delta * 0.7,
+    center.lng + delta, center.lat + delta * 0.7,
+  ].join(",");
+  const iframeSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${pin.lat},${pin.lng}`;
+
+  function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const fracX = x / rect.width;   // 0 = left, 1 = right
+    const fracY = y / rect.height;  // 0 = top, 1 = bottom
+
+    // Convert fraction to lat/lng offset from bbox
+    const lngSpan = delta * 2;
+    const latSpan = delta * 1.4;
+    const newLng = (center.lng - delta) + fracX * lngSpan;
+    const newLat = (center.lat + delta * 0.7) - fracY * latSpan;
+
+    const roundedLat = Math.round(newLat * 1e6) / 1e6;
+    const roundedLng = Math.round(newLng * 1e6) / 1e6;
+
+    setPin({ lat: roundedLat, lng: roundedLng });
+    onChange(roundedLat, roundedLng);
+    setIframeKey((k) => k + 1);
   }
-];
 
-const EMPTY_EVENT: EventFormData = {
-  name: '',
-  category: 'Concert',
-  date: '',
-  time: '',
-  location: '',
-  price: 0,
-  ticketsTotal: 100,
-  status: 'Draft',
-  description: ''
-};
-
-export default function Event() {
-  const token = cookie.get('authToken');
-  const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<EventStatus | 'All'>('All');
-
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [formEvent, setFormEvent] = useState<EventFormData>(EMPTY_EVENT);
-
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
-
-  const SidebarComponent = Sidebar as React.ComponentType<{
-    isOpen: boolean;
-    setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  }>;
-
-  const showToast = (message: string, type: ToastState['type'] = 'success') => {
-    setToast({ message, type });
-  };
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  const filteredEvents = events.filter((event) => {
-    const matchesSearch =
-      event.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || event.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      const allFilteredIds = filteredEvents.map((event) => event.id);
-      setSelectedIds(allFilteredIds);
-    } else {
-      setSelectedIds([]);
-    }
-  };
-
-  const handleSelectRow = (id: string) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter((selectedId) => selectedId !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
-  };
-
-  const handleBulkDelete = () => {
-    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบกิจกรรมที่เลือกทั้ง ${selectedIds.length} รายการ?`)) {
-      setEvents(events.filter((event) => !selectedIds.includes(event.id)));
-      setSelectedIds([]);
-      showToast('ลบรายการที่เลือกเรียบร้อยแล้ว', 'error');
-    }
-  };
-
-  const handleBulkStatusChange = (newStatus: EventStatus) => {
-    setEvents(
-      events.map((event) => {
-        if (selectedIds.includes(event.id)) {
-          return { ...event, status: newStatus };
-        }
-        return event;
-      })
-    );
-    setSelectedIds([]);
-    showToast(`เปลี่ยนสถานะเป็น ${newStatus} แล้ว`, 'success');
-  };
-
-  const handleDeleteRow = (id: string, name: string) => {
-    if (window.confirm(`คุณต้องการลบกิจกรรม "${name}" ใช่หรือไม่?`)) {
-      setEvents(events.filter((event) => event.id !== id));
-      setSelectedIds(selectedIds.filter((selectedId) => selectedId !== id));
-      showToast('ลบกิจกรรมสำเร็จ', 'error');
-    }
-  };
-
-  const openAddModal = () => {
-    setModalMode('add');
-    setFormEvent({
-      ...EMPTY_EVENT,
-      date: new Date().toISOString().split('T')[0],
-      time: '18:00'
+  function locateMe() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude, longitude } = pos.coords;
+      const newPos = { lat: Math.round(latitude * 1e6) / 1e6, lng: Math.round(longitude * 1e6) / 1e6 };
+      setCenter(newPos);
+      setPin(newPos);
+      onChange(newPos.lat, newPos.lng);
+      setIframeKey((k) => k + 1);
     });
-    setIsModalOpen(true);
-  };
+  }
 
-  const openEditModal = (event: EventItem) => {
-    setModalMode('edit');
-    setFormEvent(event);
-    setIsModalOpen(true);
-  };
-
-  // จัดการการส่งฟอร์ม (ปรับปรุงระบบเชื่อมต่อ API)
-  const handleSaveEvent = (e: React.FormEvent<HTMLFormElement>) => {
+  async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-
-    if (!formEvent.name?.trim() || !formEvent.location?.trim()) {
-      showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'warning');
-      return;
-    }
-
-    if (modalMode === 'add') {
-      const newEvent: EventItem = {
-        ...EMPTY_EVENT,
-        ...formEvent,
-        id: Date.now().toString(),
-        ticketsSold: 0
-      };
-
-      // 💡 แก้ไขจุดที่ 1: แปลง Key ของ Object ให้ตรงกับความต้องการของ SQL ใน Express Backend
-      const apiBody = {
-        name: newEvent.name,
-        place: newEvent.location,
-        type: newEvent.category,
-        start_date: `${newEvent.date} ${newEvent.time}:00`, // รวมเป็น DATETIME string
-        description: newEvent.description,
-        theme: '', // ปล่อยว่างไว้ตามโครงตารางเดิม หรือใส่ข้อมูลเพิ่มได้
-        status: newEvent.status,
-        max_seat: newEvent.ticketsTotal,
-        is_active: newEvent.status === 'Published' ? 1 : 0
-      };
-
-      fetch('http://localhost:5001/organizer/add_event', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` // ✅ แนบ Token ไปในรูปแบบ Bearer ที่ถูกต้อง
-        },
-        body: JSON.stringify(apiBody)
-      })
-        .then(async (response) => {
-          // 💡 แก้ไขจุดที่ 2: ดักจับ Error status code จาก Backend เช่น 401 หรือ 500
-          if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(errText || `Server responded with status ${response.status}`);
-          }
-          return response.text(); // เปลี่ยนเป็น .text() เนื่องจาก Express ใช้ .send() ส่งข้อความกลับ
-        })
-        .then(() => {
-          // อัปเดต State หน้า UI เมื่อฝั่ง Backend บันทึกสำเร็จแล้ว
-          setEvents([newEvent, ...events]);
-          showToast('สร้างกิจกรรมใหม่และบันทึกลงระบบสำเร็จแล้ว!', 'success');
-          setIsModalOpen(false);
-        })
-        .catch((error: Error) => {
-          console.error('Fetch Error:', error);
-          showToast(error.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์', 'error');
-        });
-    } else {
-      // สำหรับ Mode Edit (ทำแบบเดียวกันหากต้องการต่อ API ในอนาคต)
-      setEvents(
-        events.map((ev) =>
-          ev.id === formEvent.id ? { ...ev, ...formEvent, ticketsSold: ev.ticketsSold } : ev
-        )
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`,
+        { headers: { "Accept-Language": "th,en" } },
       );
-      showToast('แก้ไขข้อมูลกิจกรรมเรียบร้อย!', 'success');
-      setIsModalOpen(false);
+      const data = await res.json();
+      if (!data.length) { setSearchError("ไม่พบสถานที่นี้"); return; }
+      const { lat: rLat, lon: rLon } = data[0];
+      const newPos = { lat: parseFloat(rLat), lng: parseFloat(rLon) };
+      setCenter(newPos);
+      setPin(newPos);
+      onChange(newPos.lat, newPos.lng);
+      setIframeKey((k) => k + 1);
+    } catch {
+      setSearchError("ค้นหาไม่สำเร็จ");
+    } finally {
+      setSearching(false);
     }
-  };
-
-  const inputClassName = "mt-input";
-  const labelClassName = "block text-sm font-bold text-gray-300 mb-1";
+  }
 
   return (
-    <div className="mt-dashboard-shell">
-      <SidebarComponent isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+    <div className="space-y-2">
+      {/* Search box */}
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="ค้นหาสถานที่ เช่น Impact Arena..."
+          className="flex-1 mt-input text-sm"
+        />
+        <button type="submit" disabled={searching}
+          className="bg-violet-600/20 hover:bg-violet-600/30 disabled:opacity-50 px-3 py-1.5 rounded-lg font-medium text-violet-300 text-xs shrink-0">
+          {searching ? "..." : "ค้นหา"}
+        </button>
+        <button type="button" onClick={locateMe} title="ตำแหน่งของฉัน"
+          className="hover:bg-white/5 p-2 border border-white/10 rounded-lg text-gray-400 hover:text-white shrink-0">
+          <Crosshair size={15} />
+        </button>
+      </form>
+      {searchError && <p className="text-red-400 text-xs">{searchError}</p>}
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="mt-dashboard-header">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden text-gray-400 hover:text-white focus:outline-none cursor-pointer"
-            >
-              <Menu size={24} />
-            </button>
-            <h1 className="text-xl font-bold text-white">Organizer Management</h1>
-          </div>
-        </header>
-
-        <main className="mt-dashboard-main">
-          {toast && (
-            <div
-              className={`fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 text-white font-medium border ${
-                toast.type === "success"
-                  ? "mt-btn-primary border-transparent"
-                  : toast.type === "error"
-                    ? "bg-elevated border-white/10 text-gray-300"
-                    : "bg-purple-600/20 border-purple-500/40 text-purple-400"
-              }`}
-            >
-              <span>{toast.type === "success" ? "✨" : toast.type === "error" ? "🗑️" : "⚠️"}</span>
-              {toast.message}
-            </div>
-          )}
-
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-            <div>
-              <h2 className="text-3xl font-extrabold tracking-tight text-white">
-                จัดการงานกิจกรรม
-              </h2>
-              <p className="text-sm text-gray-400 mt-1">
-                สร้าง, แก้ไข และวิเคราะห์ความคืบหน้ากิจกรรมของคุณทั้งหมดได้ในหน้าเดียว
-              </p>
-            </div>
-
-            <button
-              onClick={openAddModal}
-              className="flex items-center gap-2 mt-btn-primary px-5 py-3 transform hover:-translate-y-0.5 cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-              </svg>
-              สร้างกิจกรรมใหม่
-            </button>
-          </div>
-
-          <div className="mt-surface p-5 mb-6">
-            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
-              <div className="relative flex-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-violet-400">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </span>
-                <input
-                  type="text"
-                  placeholder="ค้นหาชื่อกิจกรรม หรือ สถานที่จัดงาน..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`${inputClassName} pl-10`}
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm font-semibold text-gray-300">สถานะ:</span>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as EventStatus | "All")}
-                  className={`${inputClassName} cursor-pointer`}
-                >
-                  <option value="All">ทั้งหมด</option>
-                  <option value="Draft">ฉบับร่าง (Draft)</option>
-                  <option value="Published">เผยแพร่แล้ว (Published)</option>
-                  <option value="Completed">สิ้นสุดแล้ว (Completed)</option>
-                </select>
-              </div>
-            </div>
-
-            {selectedIds.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-purple-600/10 p-3 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></span>
-                  <p className="text-sm font-medium text-gray-300">
-                    เลือกอยู่{" "}
-                    <strong className="text-violet-400 font-extrabold">{selectedIds.length}</strong>{" "}
-                    รายการ
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => handleBulkStatusChange("Published")}
-                    className="mt-badge mt-badge-success px-3 py-1.5 cursor-pointer hover:bg-violet-400/20"
-                  >
-                    🚀 เปิดเผยแพร่ที่เลือก
-                  </button>
-                  <button
-                    onClick={() => handleBulkStatusChange("Draft")}
-                    className="mt-badge mt-badge-warning px-3 py-1.5 cursor-pointer hover:bg-purple-400/20"
-                  >
-                    ✏️ ตั้งเป็นฉบับร่างที่เลือก
-                  </button>
-                  <button
-                    onClick={handleBulkDelete}
-                    className="mt-badge mt-badge-muted px-3 py-1.5 cursor-pointer hover:bg-gray-400/20"
-                  >
-                    🗑️ ลบทั้งหมดที่เลือก
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-surface overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-white/5">
-                <thead className="bg-elevated">
-                  <tr>
-                    <th scope="col" className="px-6 py-4 text-left w-12">
-                      <div className="flex items-center h-5">
-                        <input
-                          type="checkbox"
-                          className="w-4.5 h-4.5 rounded border-white/10 text-violet-600 focus:ring-purple-500 accent-violet-600 cursor-pointer"
-                          checked={filteredEvents.length > 0 && selectedIds.length === filteredEvents.length}
-                          onChange={handleSelectAll}
-                        />
-                      </div>
-                    </th>
-                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">กิจกรรม</th>
-                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">วัน/เวลา</th>
-                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">สถานที่</th>
-                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">ราคาตั๋ว</th>
-                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">ยอดจองตั๋ว</th>
-                    <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">สถานะ</th>
-                    <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">การจัดการ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {filteredEvents.length > 0 ? (
-                    filteredEvents.map((event) => {
-                      const isChecked = selectedIds.includes(event.id);
-                      const ticketProgress = (event.ticketsSold / event.ticketsTotal) * 100;
-                      return (
-                        <tr
-                          key={event.id}
-                          className={`hover:bg-purple-600/5 transition-colors duration-150 ${isChecked ? "bg-purple-600/10" : ""}`}
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center h-5">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => handleSelectRow(event.id)}
-                                className="w-4.5 h-4.5 rounded border-white/10 text-violet-600 focus:ring-purple-500 accent-violet-600 cursor-pointer"
-                              />
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-white text-[15px]">{event.name}</span>
-                              <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded text-xs font-medium bg-violet-600/20 text-violet-400 border border-violet-400/20 w-max">
-                                {event.category}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-white font-medium">{event.date}</div>
-                            <div className="text-xs text-violet-400">⏱️ {event.time} น.</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">📍 {event.location}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
-                            {event.price === 0 ? (
-                              <span className="mt-badge mt-badge-success px-2 py-1 rounded-md">ฟรี</span>
-                            ) : (
-                              `฿${event.price.toLocaleString()}`
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-col w-36">
-                              <div className="flex justify-between items-center text-xs font-medium text-gray-400 mb-1">
-                                <span>{event.ticketsSold} / {event.ticketsTotal} ใบ</span>
-                                <span>{Math.round(ticketProgress)}%</span>
-                              </div>
-                              <div className="w-full bg-elevated rounded-full h-1.5 overflow-hidden">
-                                <div
-                                  className="bg-gradient-to-r from-violet-600 to-purple-600 h-1.5 rounded-full transition-all duration-500"
-                                  style={{ width: `${Math.min(ticketProgress, 100)}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={`mt-badge ${
-                                event.status === "Published"
-                                  ? "mt-badge-success"
-                                  : event.status === "Draft"
-                                    ? "mt-badge-warning"
-                                    : "mt-badge-muted"
-                              }`}
-                            >
-                              {event.status === "Published" && "🚀 เผยแพร่แล้ว"}
-                              {event.status === "Draft" && "✏️ ฉบับร่าง"}
-                              {event.status === "Completed" && "🏁 สิ้นสุดแล้ว"}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex items-center justify-end gap-3">
-                              <button
-                                onClick={() => openEditModal(event)}
-                                className="p-1.5 text-violet-400 hover:bg-violet-400/10 rounded-lg transition-colors cursor-pointer"
-                                title="แก้ไขกิจกรรม"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteRow(event.id, event.name)}
-                                className="p-1.5 text-gray-400 hover:bg-gray-400/10 hover:text-gray-300 rounded-lg transition-colors cursor-pointer"
-                                title="ลบกิจกรรม"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
-                        <div className="flex flex-col items-center justify-center gap-3">
-                          <span className="text-4xl">🎫</span>
-                          <p className="font-semibold text-lg text-gray-400">ไม่พบกิจกรรมที่คุณกำลังค้นหา</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </main>
+      {/* Map — clickable overlay on top of iframe */}
+      <div className="relative border border-white/10 rounded-xl overflow-hidden" style={{ height: 240 }}>
+        {/* iframe layer */}
+        <iframe
+          key={iframeKey}
+          src={iframeSrc}
+          style={{ height: "100%", width: "100%", border: "none" }}
+          title="map picker"
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
+        {/* Transparent click overlay */}
+        <div
+          ref={containerRef}
+          onClick={handleOverlayClick}
+          className="absolute inset-0 cursor-crosshair"
+          title="คลิกเพื่อปักหมุด"
+        />
+        {/* Hint label */}
+        <div className="bottom-2 left-1/2 absolute bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full text-white/80 text-xs -translate-x-1/2 pointer-events-none">
+          คลิกบนแผนที่เพื่อปักหมุด
+        </div>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="mt-surface w-full max-w-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-elevated border-b border-white/5 flex justify-between items-center">
-              <h3 className="text-xl font-extrabold text-white">
-                {modalMode === "add" ? "🔮 สร้างกิจกรรมเวทมนตร์ใหม่" : "✏️ แก้ไขข้อมูลกิจกรรม"}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+      {/* Coord display (readonly, editable manually) */}
+      <div className="gap-2 grid grid-cols-2">
+        <div className="space-y-1">
+          <label className="text-gray-500 text-xs">Latitude</label>
+          <input type="number" step="any" value={pin.lat}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (!isNaN(v)) { setPin((p) => ({ ...p, lat: v })); setCenter((c) => ({ ...c, lat: v })); onChange(v, pin.lng); setIframeKey((k) => k + 1); }
+            }}
+            className="mt-input font-mono text-sm" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-gray-500 text-xs">Longitude</label>
+          <input type="number" step="any" value={pin.lng}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (!isNaN(v)) { setPin((p) => ({ ...p, lng: v })); setCenter((c) => ({ ...c, lng: v })); onChange(pin.lat, v); setIframeKey((k) => k + 1); }
+            }}
+            className="mt-input font-mono text-sm" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Create Event Modal ───────────────────────────────────────────────────────
+function CreateEventModal({
+  organizerId, onClose, onCreated,
+}: {
+  organizerId: number; onClose: () => void; onCreated: (e: OrganizerEvent) => void;
+}) {
+  const [form, setForm] = useState<CreateEventForm>(EMPTY_FORM);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function set<K extends keyof CreateEventForm>(key: K, val: CreateEventForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: val }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim() || !form.place_name.trim() || !form.start_date || !form.end_date) {
+      setError("กรุณากรอกข้อมูลที่จำเป็นให้ครบ"); return;
+    }
+    if (new Date(form.end_date) <= new Date(form.start_date)) {
+      setError("วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น"); return;
+    }
+    setIsSubmitting(true); setError(null);
+    try {
+      const token = Cookies.get("authToken");
+      if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อน");
+      const result = await createOrganizerEvent(token, organizerId, {
+        name: form.name.trim(), place_name: form.place_name.trim(),
+        address: form.address.trim() || undefined,
+        latitude: form.latitude, longitude: form.longitude,
+        description: form.description.trim() || undefined,
+        theme: form.theme.trim() || undefined,
+        type: form.type, start_date: form.start_date, end_date: form.end_date,
+      });
+      onCreated({
+        id: result.eventId, name: form.name.trim(), place_name: form.place_name.trim(),
+        address: form.address.trim() || null,
+        latitude: String(form.latitude), longitude: String(form.longitude),
+        cover_image: "", description: form.description.trim() || null,
+        theme: form.theme.trim() || null, status: "pending", is_active: true,
+        start_date: form.start_date, end_date: form.end_date,
+        type_name: form.type, organizer_id: organizerId,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="z-[100] fixed inset-0 flex justify-center items-start bg-black/70 p-4 py-8 overflow-y-auto"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-[#111] shadow-2xl border border-white/10 rounded-2xl w-full max-w-lg">
+        <div className="flex justify-between items-center px-6 py-4 border-white/5 border-b">
+          <h2 className="font-bold text-white text-lg">สร้าง Event ใหม่</h2>
+          <button onClick={onClose} className="hover:bg-white/10 p-1 rounded-lg text-gray-400 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
+          {error && (
+            <p className="bg-red-500/10 px-4 py-3 border border-red-500/30 rounded-lg text-red-400 text-sm">{error}</p>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="mt-label">ชื่องาน <span className="text-red-400">*</span></label>
+            <input value={form.name} onChange={(e) => set("name", e.target.value)}
+              placeholder="เช่น Magic Harmony 2026 Concert" className="mt-input" />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="mt-label">รายละเอียด <span className="text-red-400">*</span></label>
+            <textarea value={form.description} onChange={(e) => set("description", e.target.value)}
+              rows={3} placeholder="อธิบายเกี่ยวกับงานนี้" className="mt-input resize-none" />
+          </div>
+
+          <div className="gap-3 grid grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="mt-label">ประเภทงาน <span className="text-red-400">*</span></label>
+              <div className="relative">
+                <select value={form.type} onChange={(e) => set("type", e.target.value)}
+                  className="mt-input appearance-none cursor-pointer">
+                  {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <ChevronDown size={16} className="top-1/2 right-3 absolute text-gray-400 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
+            <div className="space-y-1.5">
+              <label className="mt-label">ธีมงาน</label>
+              <input value={form.theme} onChange={(e) => set("theme", e.target.value)}
+                placeholder="ไม่บังคับ" className="mt-input" />
+            </div>
+          </div>
 
-            <form onSubmit={handleSaveEvent}>
-              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                <div>
-                  <label className={labelClassName}>ชื่อกิจกรรม <span className="text-violet-400">*</span></label>
-                  <input type="text" required value={formEvent.name || ""} onChange={(e) => setFormEvent({ ...formEvent, name: e.target.value })} placeholder="ใส่ชื่อชื่องานกิจกรรมให้น่าสนใจ..." className={inputClassName} />
-                </div>
+          <div className="gap-3 grid grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="mt-label">วันเวลาเริ่มงาน <span className="text-red-400">*</span></label>
+              <input type="datetime-local" value={form.start_date}
+                onChange={(e) => set("start_date", e.target.value)} className="mt-input cursor-pointer" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="mt-label">วันเวลาจบงาน <span className="text-red-400">*</span></label>
+              <input type="datetime-local" value={form.end_date}
+                onChange={(e) => set("end_date", e.target.value)} className="mt-input cursor-pointer" />
+            </div>
+          </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelClassName}>ประเภทกิจกรรม</label>
-                    <select value={formEvent.category || "Concert"} onChange={(e) => setFormEvent({ ...formEvent, category: e.target.value })} className={`${inputClassName} cursor-pointer`}>
-                      <option value="Concert">คอนเสิร์ต (Concert)</option>
-                      <option value="Conference">สัมมนา (Conference)</option>
-                      <option value="Exhibition">นิทรรศการ (Exhibition)</option>
-                      <option value="Party">งานปาร์ตี้ (Party)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelClassName}>สถานะเริ่มแรก</label>
-                    <select value={formEvent.status || "Draft"} onChange={(e) => setFormEvent({ ...formEvent, status: e.target.value as EventStatus })} className={`${inputClassName} cursor-pointer`}>
-                      <option value="Draft">ฉบับร่าง (Draft)</option>
-                      <option value="Published">เปิดเผยแพร่ (Published)</option>
-                    </select>
-                  </div>
-                </div>
+          <div className="space-y-1.5">
+            <label className="mt-label">ชื่อสถานที่ (place_name) <span className="text-red-400">*</span></label>
+            <input value={form.place_name} onChange={(e) => set("place_name", e.target.value)}
+              placeholder="เช่น อิมแพ็ค อารีน่า เมืองทองธานี" className="mt-input" />
+          </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelClassName}>วันที่จัดงาน <span className="text-violet-400">*</span></label>
-                    <input type="date" required value={formEvent.date || ""} onChange={(e) => setFormEvent({ ...formEvent, date: e.target.value })} className={`${inputClassName} cursor-pointer`} />
-                  </div>
-                  <div>
-                    <label className={labelClassName}>เวลาจัดงาน <span className="text-violet-400">*</span></label>
-                    <input type="time" required value={formEvent.time || ""} onChange={(e) => setFormEvent({ ...formEvent, time: e.target.value })} className={`${inputClassName} cursor-pointer`} />
-                  </div>
-                </div>
+          <div className="space-y-1.5">
+            <label className="mt-label">ที่อยู่ (address)</label>
+            <textarea value={form.address} onChange={(e) => set("address", e.target.value)}
+              rows={2} placeholder="ที่อยู่แบบเต็ม (ไม่บังคับ)" className="mt-input resize-none" />
+          </div>
 
-                <div>
-                  <label className={labelClassName}>สถานที่จัดงาน <span className="text-violet-400">*</span></label>
-                  <input type="text" required value={formEvent.location || ""} onChange={(e) => setFormEvent({ ...formEvent, location: e.target.value })} placeholder="ชื่อสถานที่ ห้องจัดงาน หรือพิกัดออนไลน์..." className={inputClassName} />
-                </div>
+          <div className="space-y-1.5">
+            <label className="mt-label">
+              ตำแหน่งบนแผนที่ <span className="text-red-400">*</span>
+            </label>
+            <MapPicker
+              lat={form.latitude} lng={form.longitude}
+              onChange={(lat, lng) => { set("latitude", lat); set("longitude", lng); }}
+            />
+          </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelClassName}>ราคาบัตรเข้าชม (บาท)</label>
-                    <input type="number" min="0" value={formEvent.price ?? 0} onChange={(e) => setFormEvent({ ...formEvent, price: parseInt(e.target.value) || 0 })} className={inputClassName} />
-                  </div>
-                  <div>
-                    <label className={labelClassName}>จำนวนบัตรทั้งหมดที่มีขาย (ใบ)</label>
-                    <input type="number" min="1" required value={formEvent.ticketsTotal ?? 100} onChange={(e) => setFormEvent({ ...formEvent, ticketsTotal: parseInt(e.target.value) || 1 })} className={inputClassName} />
-                  </div>
-                </div>
+          <div className="flex gap-3 pt-4 border-white/5 border-t">
+            <button type="button" onClick={onClose} disabled={isSubmitting}
+              className="flex-1 hover:bg-white/5 disabled:opacity-50 px-4 py-2.5 border border-white/10 rounded-xl font-semibold text-white text-sm">
+              ยกเลิก
+            </button>
+            <button type="submit" disabled={isSubmitting}
+              className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-4 py-2.5 rounded-xl font-semibold text-white text-sm disabled:cursor-not-allowed">
+              {isSubmitting ? "กำลังสร้าง..." : "สร้าง Event"}
+            </button>
+          </div>
+          <p className="text-gray-600 text-xs text-center">
+            status ตั้งต้นเป็น "pending" จนกว่า Admin จะตรวจสอบ
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
 
-                <div>
-                  <label className={labelClassName}>รายละเอียดกิจกรรมเพิ่มเติม</label>
-                  <textarea rows={3} value={formEvent.description || ""} onChange={(e) => setFormEvent({ ...formEvent, description: e.target.value })} placeholder="เขียนอธิบายความน่าสนใจของกิจกรรมเพื่อดึงดูดใจผู้คน..." className={`${inputClassName} resize-none`}></textarea>
-                </div>
-              </div>
+// ─── Event Card ───────────────────────────────────────────────────────────────
+function EventCard({ event }: { event: OrganizerEvent }) {
+  const start = new Date(event.start_date);
+  const dateStr = start.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+  const timeStr = start.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  const lat = parseFloat(event.latitude);
+  const lng = parseFloat(event.longitude);
+  const hasCoords = !isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0);
 
-              <div className="px-6 py-4 bg-elevated border-t border-white/5 flex justify-end items-center gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-elevated hover:bg-surface text-gray-300 border border-white/10 font-medium rounded-xl transition-all duration-200 cursor-pointer">
-                  ยกเลิก
-                </button>
-                <button type="submit" className="px-6 py-2.5 mt-btn-primary cursor-pointer">
-                  {modalMode === "add" ? "✨ บันทึกสร้างกิจกรรม" : "💾 บันทึกการแก้ไข"}
-                </button>
-              </div>
-            </form>
+  return (
+    <div className="flex flex-col mt-surface overflow-hidden">
+      {hasCoords && (
+        <div className="w-full h-36 overflow-hidden">
+          <OsmThumbnail lat={lat} lng={lng} height={144} />
+        </div>
+      )}
+      <div className="flex flex-col gap-3 p-4">
+        <div className="flex justify-between items-start gap-2">
+          <div className="min-w-0">
+            <p className="font-semibold text-white truncate">{event.name}</p>
+            <span className="inline-flex items-center bg-violet-600/20 mt-0.5 px-2 py-0.5 rounded text-violet-400 text-xs">
+              {event.type_name}
+            </span>
+          </div>
+          <StatusBadge status={event.status} />
+        </div>
+        <div className="space-y-1.5 text-gray-400 text-xs">
+          <div className="flex items-center gap-1.5">
+            <Calendar size={13} className="text-violet-400 shrink-0" />
+            <span>{dateStr} · {timeStr}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <MapPin size={13} className="text-violet-400 shrink-0" />
+            <span className="truncate">{event.place_name}</span>
+          </div>
+          {hasCoords && (
+            <a href={`https://www.google.com/maps?q=${lat},${lng}`}
+              target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors">
+              <MapPin size={12} /> เปิดใน Google Maps
+            </a>
+          )}
+        </div>
+        {event.description && (
+          <p className="text-gray-500 text-xs line-clamp-2">{event.description}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+export default function EventPage() {
+  const { id } = useParams<{ id: string }>();
+  const { setIsOpen } = useProfileSidebar();
+  const organizerId = Number(id);
+
+  const [events, setEvents] = useState<OrganizerEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [showCreate, setShowCreate] = useState(false);
+
+  useEffect(() => {
+    const token = Cookies.get("authToken");
+    if (!token || isNaN(organizerId)) { setIsLoading(false); return; }
+    fetchOrganizerEventsList(token, organizerId)
+      .then(setEvents)
+      .catch((err: Error) => setFetchError(err.message))
+      .finally(() => setIsLoading(false));
+  }, [organizerId]);
+
+  const filtered = events.filter((e) => {
+    const matchSearch = e.name.toLowerCase().includes(search.toLowerCase())
+      || e.place_name.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === "all" || e.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  return (
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      <header className="mt-dashboard-header shrink-0">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setIsOpen(true)} className="md:hidden text-gray-400 hover:text-white cursor-pointer">
+            <Menu size={24} />
+          </button>
+          <h1 className="font-semibold text-white text-2xl">Events</h1>
+          {!isLoading && (
+            <span className="bg-white/10 px-2.5 py-0.5 rounded-full text-gray-400 text-xs">
+              {events.length} งาน
+            </span>
+          )}
+        </div>
+        <button onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 px-4 py-2 rounded-xl font-semibold text-white text-sm cursor-pointer">
+          <Plus size={18} /> สร้าง Event
+        </button>
+      </header>
+
+      <main className="mt-dashboard-main">
+        <div className="flex sm:flex-row flex-col gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search size={16} className="top-1/2 left-3 absolute text-gray-500 -translate-y-1/2" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาชื่องาน หรือสถานที่..." className="mt-input pl-9" />
+          </div>
+          <div className="relative">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              className="mt-input pr-8 appearance-none cursor-pointer">
+              <option value="all">สถานะทั้งหมด</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <ChevronDown size={16} className="top-1/2 right-3 absolute text-gray-400 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
+
+        {isLoading && (
+          <div className="gap-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => <div key={i} className="bg-white/5 rounded-2xl h-64 animate-pulse" />)}
+          </div>
+        )}
+
+        {!isLoading && fetchError && (
+          <div className="bg-red-500/10 mt-surface p-4 border border-red-500/30 text-red-400 text-sm">{fetchError}</div>
+        )}
+
+        {!isLoading && !fetchError && events.length === 0 && (
+          <div className="flex flex-col items-center gap-4 mt-surface py-16 text-center">
+            <div className="flex justify-center items-center bg-violet-600/10 rounded-2xl w-16 h-16">
+              <Calendar size={32} className="text-violet-400" />
+            </div>
+            <div>
+              <p className="font-semibold text-white text-lg">ยังไม่มี Event</p>
+              <p className="mt-1 text-gray-500 text-sm">สร้าง event แรกของ organizer นี้เพื่อเริ่มต้น</p>
+            </div>
+            <button onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 px-5 py-2.5 rounded-xl font-semibold text-white text-sm">
+              <Plus size={16} /> สร้าง Event แรก
+            </button>
+          </div>
+        )}
+
+        {!isLoading && !fetchError && events.length > 0 && filtered.length === 0 && (
+          <div className="flex flex-col items-center gap-3 mt-surface py-12 text-center">
+            <Search size={28} className="text-gray-600" />
+            <p className="text-gray-400 text-sm">ไม่พบ event ที่ตรงกับการค้นหา</p>
+          </div>
+        )}
+
+        {!isLoading && filtered.length > 0 && (
+          <div className="gap-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((event) => <EventCard key={event.id} event={event} />)}
+          </div>
+        )}
+      </main>
+
+      {showCreate && (
+        <CreateEventModal
+          organizerId={organizerId}
+          onClose={() => setShowCreate(false)}
+          onCreated={(newEvent) => { setEvents((prev) => [newEvent, ...prev]); setShowCreate(false); }}
+        />
       )}
     </div>
   );

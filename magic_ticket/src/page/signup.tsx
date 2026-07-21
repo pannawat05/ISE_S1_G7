@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "@/api/client";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -25,17 +26,13 @@ export default function SignUp() {
       return;
     }
 
-    fetch("http://localhost:5001/email/sendotp", {
+    apiFetch("/email/sendotp", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({
         email: formData.email,
         otp: Math.floor(100000 + Math.random() * 900000),
       }),
     })
-      .then((response) => response.json())
       .then((data) => {
         console.log("Success:", data);
         localStorage.setItem("signupData", JSON.stringify(formData));
