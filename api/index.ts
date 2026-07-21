@@ -5,6 +5,9 @@ import authRouter from "./routes/auth.route.js";
 import emailRouter from "./routes/email.route.js";
 import organizerRouter from "./routes/organizer.route.js";
 import userRouter from "./routes/user.route.js";
+import eventsRouter from "./routes/events.route.js";
+import adminRouter from "./routes/admin.route.js";
+import sysadminRouter from "./routes/sysadmin.route.js";
 
 const app = express();
 const port: number = Number(process.env.PORT) || 5001;
@@ -28,6 +31,9 @@ app.use("/email", emailRouter);
 app.use("/auth", authRouter);
 app.use("/organizer", organizerRouter);
 app.use("/users", userRouter);
+app.use("/events", eventsRouter);
+app.use("/admin", adminRouter);
+app.use("/sysadmin", sysadminRouter);
 
 app.get("/", (_req, res) => {
   res.send("ISE API is running");

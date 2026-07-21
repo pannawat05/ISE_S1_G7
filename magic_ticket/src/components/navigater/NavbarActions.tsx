@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 import Cookies from "js-cookie";
 import type { UserProfile } from "@/api/user";
 
@@ -17,18 +17,13 @@ export default function NavbarActions() {
   const [token, setToken] = useState<string | undefined>(() => Cookies.get("authToken"));
   const [user, setUser] = useState<UserProfile | null>(readUserFromStorage);
 
-  // Re-read whenever localStorage changes (e.g. after login/update from another tab or same page)
   useEffect(() => {
     function sync() {
       setToken(Cookies.get("authToken"));
       setUser(readUserFromStorage());
     }
-
-    // Custom event dispatched by signin + updateProfile
     window.addEventListener("user-updated", sync);
-    // Standard storage event (cross-tab)
     window.addEventListener("storage", sync);
-
     return () => {
       window.removeEventListener("user-updated", sync);
       window.removeEventListener("storage", sync);
@@ -46,9 +41,22 @@ export default function NavbarActions() {
   }
 
   const fullname = user ? `${user.firstname ?? ""} ${user.lastname ?? ""}`.trim() : "—";
+  const isAdmin = user?.role === "admin";
+  const isSysAdmin = user?.role === "sysadmin";
 
   return (
     <div className="flex items-center gap-3">
+      {/* Admin badge — visible only for admin role */}
+      {(isAdmin || isSysAdmin) && (
+        <Link
+          to="/admin"
+          className="hidden sm:flex items-center gap-1.5 bg-violet-600/10 hover:bg-violet-600/20 px-3 py-1.5 border border-violet-500/40 rounded-full font-semibold text-violet-300 text-xs transition-colors"
+        >
+          <ShieldCheck size={14} />
+          {user?.role}
+        </Link>
+      )}
+
       <Link to="/profile/account">
         <div className="hidden sm:flex items-center gap-2 pl-2 border-white/10 border-l">
           <img
@@ -58,6 +66,9 @@ export default function NavbarActions() {
           />
           <div className="flex flex-col leading-tight">
             <span className="font-medium text-white text-xs">{fullname}</span>
+            {(isAdmin || isSysAdmin) && (
+              <span className="font-medium text-[10px] text-violet-400">{user?.role}</span>
+            )}
           </div>
         </div>
       </Link>

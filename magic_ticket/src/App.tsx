@@ -52,6 +52,8 @@ function App() {
 
             <Route path="/" element={<pages.Home />} />
 
+            <Route path="/admin" element={<pages.AdminPage />} />
+
             <Route path="/my-tickets" element={<pages.MyTickets />} />
 
             <Route path="/signup" element={<pages.SignUp />} />
