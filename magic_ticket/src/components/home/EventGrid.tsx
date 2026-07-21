@@ -12,7 +12,7 @@ export default function EventGrid() {
         // เช็กคีย์ Token ให้ครอบคลุมหลายชื่อ
         const token = cookie.get("token") || localStorage.getItem("token") || cookie.get("access_token");
 
-        const response = await fetch("http://localhost:5001/organizer/get_events", {
+        const response = await fetch("http://localhost:5001/get_events", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
