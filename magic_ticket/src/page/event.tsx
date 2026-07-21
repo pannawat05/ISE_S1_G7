@@ -221,17 +221,38 @@ export default function Event() {
     }
   };
 
-  const handleBulkStatusChange = (newStatus: EventStatus) => {
-    setEvents(
-      events.map((event) => {
-        if (selectedIds.includes(event.id)) {
-          return { ...event, status: newStatus };
-        }
-        return event;
-      })
-    );
-    setSelectedIds([]);
-    showToast(`เปลี่ยนสถานะเป็น ${newStatus} แล้ว`, 'success');
+  // ✅ เปลี่ยนสถานะหลายรายการด้วย Bulk Update API
+  const handleBulkStatusChange = async (newStatus: EventStatus) => {
+    try {
+      const payload = {
+        events: selectedIds.map((id) => ({
+          id: Number(id),
+          status: newStatus,
+          is_active: newStatus === 'Published' ? 1 : 0
+        }))
+      };
+
+      const response = await fetch('http://localhost:5001/organizer/update_events_bulk', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || 'Failed to update status');
+      }
+
+      setSelectedIds([]);
+      fetchEvents();
+      showToast(`เปลี่ยนสถานะเป็น ${newStatus} แล้ว`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('เกิดข้อผิดพลาดในการเปลี่ยนสถานะกลุ่ม', 'error');
+    }
   };
 
   const handleDeleteRow = (id: string, name: string) => {
@@ -270,7 +291,6 @@ export default function Event() {
     setModalMode('edit');
     setFormEvent(event);
     setThumbnailFile(null);
-    // ✅ เรียกใช้ Route /organizer/image/:filename ให้ตรงกับ Backend Express
     setPreviewUrl(event.thumbnail ? `http://localhost:5001/organizer/image/${event.thumbnail}` : null);
     setIsModalOpen(true);
   };
@@ -324,8 +344,8 @@ export default function Event() {
           showToast(error.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์', 'error');
         });
     } else {
-      // 💾 โหมดแก้ไข (Edit Event Mode)
-      fetch(`http://localhost:5001/organizer/edit_event/${formEvent.id}`, {
+      // ✅ แก้ไข Endpoint อัปเดตรายการเดียวให้ตรงกับ Backend API (/organizer/update_event/:id)
+      fetch(`http://localhost:5001/organizer/update_event/${formEvent.id}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`
