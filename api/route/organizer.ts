@@ -1,11 +1,12 @@
 import express, { type Request, type Response } from "express";
+import path from "path"; // ✅ นำเข้า path module สำหรับจัดการ Absolute Path
 import db from "../model/db.js";
-import { authenticateOrganizer } from "../middleware/auth.js"; // เปลี่ยนมาใช้ตัวตรวจสอบที่เราปรับปรุงใหม่
+import { authenticateOrganizer } from "../middleware/auth.js";
+import uploadthumbnail from "../middleware/upload.js";
 
 const Organizer_router = express.Router();
 
-// ขยาย Type ของ Express Request เพื่อไม่ให้ TypeScript แจ้งเตือนข้อผิดพลาด
-// ✅ ตอนนี้ augmentation นี้จะมีผลจริง เพราะไม่มีการ override express ให้เป็น `any` อีกต่อไป
+// ✅ ขยาย Type ของ Express Request เพื่อให้ TypeScript รู้อิทธิพลของ req.user
 declare global {
   namespace Express {
     interface Request {
@@ -14,7 +15,6 @@ declare global {
   }
 }
 
-// ✅ กำหนด shape ของ body ให้ชัดเจน แทนการปล่อยเป็น any โดยปริยาย
 interface AddEventBody {
   name: string;
   place: string;
@@ -30,23 +30,49 @@ interface AddEventBody {
 Organizer_router.post(
   "/organizer/add_event",
   authenticateOrganizer,
+  uploadthumbnail.single("thumbnail"),
   (req: Request<{}, {}, AddEventBody>, res: Response) => {
-    const { name, place, type, start_date, description, theme, status, max_seat, is_active } = req.body;
+    const {
+      name,
+      place,
+      type,
+      start_date,
+      description,
+      theme,
+      status,
+      max_seat,
+      is_active,
+    } = req.body;
 
-    // ✅ ตรวจสอบข้อมูลที่จำเป็นก่อน insert ลง DB (เดิมไม่มีการเช็คเลย ถ้าค่าที่จำเป็นขาดจะทำให้เกิด SQL error ที่ debug ยาก)
+    // ตรวจสอบข้อมูลที่จำเป็น
     if (!name?.trim() || !place?.trim() || !start_date) {
-      return res.status(400).send("Missing required fields: name, place, start_date");
+      return res
+        .status(400)
+        .send("Missing required fields: name, place, start_date");
     }
 
-    // ดึงค่า organizer_id ที่ผ่านการตรวจสอบจากฐานข้อมูลใน Middleware มาแล้วอย่างปลอดภัย
     const o_id = req.user?.organizerId;
     if (!o_id) {
       return res.status(401).send("Unauthorized: Missing organizer ID");
     }
 
+    const thumbnailPath = req.file ? req.file.filename : null;
+
     db.query(
-      "INSERT INTO `event`(`name`, `place`, `type`, `theme`, `description`, `start_date`, `status`, `is_active`, `max_seat`, `organizer_id`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [name, place, type, theme, description, start_date, status, is_active, max_seat, o_id],
+      "INSERT INTO `event`(`name`, `place`, `type`, `theme`, `description`, `start_date`, `status`, `is_active`, `max_seat`, `organizer_id`, `thumbnail`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        name,
+        place,
+        type,
+        theme,
+        description,
+        start_date,
+        status,
+        is_active,
+        max_seat,
+        o_id,
+        thumbnailPath,
+      ],
       (err: any, result: any) => {
         if (err) {
           console.error("Database Error:", err);
@@ -101,11 +127,36 @@ Organizer_router.delete(
 
         if (result.affectedRows === 0) {
           return res.status(404).send("Event not found or unauthorized");
-        }       
+        }
+
+        return res.status(200).send("Event deleted successfully");
       }
     );
   }
 );
 
+// ✅ ปรับแก้การส่งไฟล์รูปภาพด้วย Absolute Path
+Organizer_router.get(
+  "/organizer/image/:filename",
+  (req: Request, res: Response) => {
+    const filename = req.params.filename;
+    
+    // แปลง Relative Path ให้กลายเป็น Absolute Path ป้องกันปัญหา Express Error
+    const absoluteImagePath = path.resolve(
+      process.cwd(),
+      "api/upload/organizer/thumbnail",
+      filename
+    );
+
+    res.sendFile(absoluteImagePath, (err) => {
+      if (err) {
+        console.error("Error sending image:", err);
+        if (!res.headersSent) {
+          res.status(404).send("Image not found");
+        }
+      }
+    });
+  }
+);
 
 export default Organizer_router;
