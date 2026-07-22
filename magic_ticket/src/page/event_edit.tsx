@@ -1,138 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Menu, ArrowLeft, Save, X, ChevronDown,
-  ImageIcon, Trash2, Crosshair, Plus,
+  Menu, ArrowLeft, Save, X, ChevronDown, Plus,
 } from "lucide-react";
 import Cookies from "js-cookie";
 import { fetchSingleEvent, updateOrganizerEvent, type OrganizerEvent, type EventImage } from "@/api/organizer";
+import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 import { API_BASE } from "@/api/client";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
-import { useLeaflet } from "@/hooks/useLeaflet";
-
-declare global { interface Window { L: typeof import("leaflet"); } }
-
-const EVENT_TYPES = ["Concert","Conference","Exhibition","Party","Festival","Sport","Other"];
+import { LeafletMapPicker } from "@/components/shared";
+import { ImageIcon, Trash2 } from "lucide-react";
 
 interface ExistingImage { id: number; url: string; display_order: number }
-// ─── Leaflet Map Picker ───────────────────────────────────────────────────────
-function LeafletMapPicker({ lat, lng, onChange, onPlaceName }: {
-  lat: number; lng: number;
-  onChange: (lat: number, lng: number) => void;
-  onPlaceName?: (name: string) => void;
-}) {
-  const mapDivRef = useRef<HTMLDivElement>(null);
-  const mapRef    = useRef<import("leaflet").Map | null>(null);
-  const markerRef = useRef<import("leaflet").Marker | null>(null);
-  const { ready } = useLeaflet();
-  const [q, setQ] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [searchErr, setSearchErr] = useState<string | null>(null);
-
-  async function reverseGeocode(rLat: number, rLng: number) {
-    if (!onPlaceName) return;
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${rLat}&lon=${rLng}&format=json`,
-        { headers: { "Accept-Language": "th,en" } },
-      );
-      const d = await res.json();
-      if (d?.display_name) onPlaceName(d.display_name.split(",")[0].trim());
-    } catch { /* silent */ }
-  }
-
-  useEffect(() => {
-    if (!ready || !mapDivRef.current || mapRef.current) return;
-    const L = window.L;
-    L.Icon.Default.mergeOptions({
-      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-      iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    });
-    const map = L.map(mapDivRef.current).setView([lat, lng], 13);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap" }).addTo(map);
-    const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
-    marker.on("dragend", () => {
-      const { lat: mLat, lng: mLng } = marker.getLatLng();
-      const rLat = Math.round(mLat * 1e6) / 1e6;
-      const rLng = Math.round(mLng * 1e6) / 1e6;
-      onChange(rLat, rLng); reverseGeocode(rLat, rLng);
-    });
-    map.on("click", (e: import("leaflet").LeafletMouseEvent) => {
-      const rLat = Math.round(e.latlng.lat * 1e6) / 1e6;
-      const rLng = Math.round(e.latlng.lng * 1e6) / 1e6;
-      marker.setLatLng([rLat, rLng]); onChange(rLat, rLng); reverseGeocode(rLat, rLng);
-    });
-    mapRef.current = map; markerRef.current = marker;
-    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
-  }, [ready]);
-
-  useEffect(() => {
-    if (!markerRef.current) return;
-    markerRef.current.setLatLng([lat, lng]);
-    mapRef.current?.panTo([lat, lng]);
-  }, [lat, lng]);
-
-  async function doSearch() {
-    if (!q.trim()) return;
-    setSearching(true); setSearchErr(null);
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
-        { headers: { "Accept-Language": "th,en" } },
-      );
-      const data = await res.json();
-      if (!data.length) { setSearchErr("ไม่พบสถานที่นี้"); return; }
-      const rLat = parseFloat(data[0].lat);
-      const rLng = parseFloat(data[0].lon);
-      onChange(rLat, rLng);
-      mapRef.current?.setView([rLat, rLng], 15);
-      if (onPlaceName && data[0].display_name)
-        onPlaceName(data[0].display_name.split(",")[0].trim());
-    } catch { setSearchErr("ค้นหาไม่สำเร็จ"); }
-    finally { setSearching(false); }
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); doSearch(); } }}
-          placeholder="ค้นหาสถานที่..." className="flex-1 mt-input text-sm" />
-        <button type="button" onClick={doSearch} disabled={searching}
-          className="bg-violet-600/20 hover:bg-violet-600/30 disabled:opacity-50 px-3 py-1.5 rounded-lg font-medium text-violet-300 text-xs shrink-0">
-          {searching ? "..." : "ค้นหา"}
-        </button>
-        <button type="button" onClick={() => {
-          navigator.geolocation?.getCurrentPosition(({ coords }) => {
-            const rLat = Math.round(coords.latitude * 1e6) / 1e6;
-            const rLng = Math.round(coords.longitude * 1e6) / 1e6;
-            onChange(rLat, rLng); mapRef.current?.setView([rLat, rLng], 15); reverseGeocode(rLat, rLng);
-          });
-        }} className="hover:bg-white/5 p-2 border border-white/10 rounded-lg text-gray-400 hover:text-white shrink-0">
-          <Crosshair size={15} />
-        </button>
-      </div>
-      {searchErr && <p className="text-red-400 text-xs">{searchErr}</p>}
-      {!ready && <div className="flex justify-center items-center border border-white/10 rounded-xl h-60 text-gray-500 text-sm">กำลังโหลดแผนที่...</div>}
-      <div ref={mapDivRef} className={`overflow-hidden rounded-xl border border-white/10 ${ready ? "opacity-100" : "opacity-0 h-0"}`} style={{ height: 260 }} />
-      <div className="gap-2 grid grid-cols-2">
-        <div className="space-y-1">
-          <label className="text-gray-500 text-xs">Latitude</label>
-          <input type="number" step="any" value={lat}
-            onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(v, lng); }}
-            className="mt-input font-mono text-sm" />
-        </div>
-        <div className="space-y-1">
-          <label className="text-gray-500 text-xs">Longitude</label>
-          <input type="number" step="any" value={lng}
-            onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(lat, v); }}
-            className="mt-input font-mono text-sm" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Cover Picker: preview แทน drop zone ─────────────────────────────────────
 function CoverPicker({ existingUrl, file, onChange }: {
@@ -324,7 +203,8 @@ export default function EventEditPage() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [type, setType] = useState("Concert");
+  const [typeId, setTypeId] = useState(0);
+  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [theme, setTheme] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -350,6 +230,11 @@ export default function EventEditPage() {
   }
 
   useEffect(() => {
+    // Fetch event types from API
+    fetchEventTypes().then(setEventTypes).catch(console.error);
+  }, []);
+
+  useEffect(() => {
     const token = Cookies.get("authToken");
     if (!token || !orgId || !eventId) { setIsLoading(false); return; }
     fetchSingleEvent(token, Number(orgId), Number(eventId))
@@ -357,7 +242,8 @@ export default function EventEditPage() {
         setEvent(ev);
         setName(ev.name);
         setDescription(ev.description ?? "");
-        setType(ev.type_name);
+        // Match type name to ID from eventTypes after fetch, fallback uses type_name lookup later
+        setTypeId(0); // reset; will be set after types load via effect below
         setTheme(ev.theme ?? "");
         setStartDate(toDatetimeLocal(ev.start_date));
         setEndDate(toDatetimeLocal(ev.end_date));
@@ -378,6 +264,13 @@ export default function EventEditPage() {
       .finally(() => setIsLoading(false));
   }, [orgId, eventId]);
 
+  // Sync typeId once both event and types are loaded
+  useEffect(() => {
+    if (!event || !eventTypes.length) return;
+    const matched = eventTypes.find((t) => t.name === event.type_name);
+    if (matched) setTypeId(matched.id);
+  }, [event, eventTypes]);
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !placeName.trim() || !startDate || !endDate) {
@@ -393,7 +286,7 @@ export default function EventEditPage() {
       const fd = new FormData();
       fd.append("name", name.trim());
       fd.append("description", description.trim());
-      fd.append("type", type);
+      fd.append("type_id", String(typeId));
       fd.append("theme", theme.trim());
       fd.append("start_date", startDate);
       fd.append("end_date", endDate);
@@ -417,7 +310,7 @@ export default function EventEditPage() {
       setEvent(updated);
       setName(updated.name);
       setDescription(updated.description ?? "");
-      setType(updated.type_name);
+      // typeId will resync via effect
       setTheme(updated.theme ?? "");
       setStartDate(toDatetimeLocal(updated.start_date));
       setEndDate(toDatetimeLocal(updated.end_date));
@@ -503,8 +396,14 @@ export default function EventEditPage() {
                 <div className="space-y-1.5">
                   <label className="mt-label">ประเภทงาน <span className="text-red-400">*</span></label>
                   <div className="relative">
-                    <select value={type} onChange={(e) => setType(e.target.value)} className="mt-input appearance-none cursor-pointer">
-                      {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    <select
+                      value={typeId}
+                      onChange={(e) => setTypeId(Number(e.target.value))}
+                      disabled={!eventTypes.length}
+                      className="disabled:opacity-50 mt-input pr-8 w-full appearance-none cursor-pointer"
+                    >
+                      {typeId === 0 && <option value={0}>เลือกประเภท</option>}
+                      {eventTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                     <ChevronDown size={16} className="top-1/2 right-3 absolute text-gray-400 -translate-y-1/2 pointer-events-none" />
                   </div>

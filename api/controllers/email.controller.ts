@@ -1,15 +1,6 @@
 import type { Request, Response } from "express";
-// @ts-expect-error nodemailer has no bundled types in this project
-import nodemailer from "nodemailer";
+import { transporter } from "../lib/mailer.js";
 import { deleteOtp, saveOtp, verifyOtp } from "../model/email.model.js";
-
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 export async function sendOtp(req: Request, res: Response) {
   const { email } = req.body;

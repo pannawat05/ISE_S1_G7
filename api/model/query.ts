@@ -1,4 +1,4 @@
-import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import type { RowDataPacket, ResultSetHeader, ExecuteValues } from "mysql2";
 import db from "./db.js";
 
 export const pool = db.promise();
@@ -13,7 +13,7 @@ export async function query<T extends RowDataPacket[]>(
 
 export async function execute(
   sql: string,
-  params: any[] = [],
+  params: ExecuteValues[] = [],
 ): Promise<ResultSetHeader> {
   const [result] = await pool.execute<ResultSetHeader>(sql, params);
   return result;

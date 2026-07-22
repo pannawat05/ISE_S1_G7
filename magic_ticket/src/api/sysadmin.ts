@@ -68,7 +68,7 @@ export interface SysUser {
   email: string;
   f_name: string;
   l_name: string;
-  role: "admin" | "customer";
+  role: "admin" | "customer" | "sysadmin";
   created_at: string;
 }
 

@@ -382,7 +382,7 @@ function EventTypesManager({ token }: { token: string }) {
   const [msg, setMsg] = useState<string | null>(null);
 
   function load() {
-    fetchEventTypes(token).then(setTypes).catch(console.error).finally(() => setLoading(false));
+    fetchEventTypes().then(setTypes).catch(console.error).finally(() => setLoading(false));
   }
   useEffect(() => { load(); }, []);
 

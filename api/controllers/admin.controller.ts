@@ -1,17 +1,7 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/types.js";
-// @ts-expect-error nodemailer has no bundled types
-import nodemailer from "nodemailer";
 import { query, execute } from "../model/query.js";
-import { findUserById } from "../model/user.model.js";
-
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+import { notifyEventApproved, notifyEventRejected } from "../lib/mailer.js";
 
 // ─── List all events for admin review ────────────────────────────────────────
 export async function listAllEvents(req: AuthRequest, res: Response) {
@@ -22,10 +12,7 @@ export async function listAllEvents(req: AuthRequest, res: Response) {
     const conditions: string[] = [];
     const params: unknown[] = [];
 
-    if (status) {
-      conditions.push("e.status = ?");
-      params.push(status);
-    }
+    if (status) { conditions.push("e.status = ?"); params.push(status); }
     if (search) {
       conditions.push("(e.name LIKE ? OR o.name LIKE ?)");
       params.push(`%${search}%`, `%${search}%`);
@@ -72,36 +59,8 @@ export async function approveEvent(req: AuthRequest, res: Response) {
   if (isNaN(eventId)) return res.status(400).json({ message: "Invalid event ID" });
 
   try {
-    await execute(
-      "UPDATE events SET status = 'approved', updated_at = NOW() WHERE id = ?",
-      [eventId],
-    );
-
-    // Notify organizer owner
-    const rows = await query<{ email: string; f_name: string; event_name: string }[]>(
-      `SELECT u.email, u.f_name, e.name AS event_name
-       FROM events e
-       JOIN organizers o ON o.id  = e.organizer_id
-       JOIN users      u ON u.id  = o.owner_id
-       WHERE e.id = ? LIMIT 1`,
-      [eventId],
-    );
-
-    if (rows[0]) {
-      const { email, f_name, event_name } = rows[0];
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: `✅ กิจกรรม "${event_name}" ได้รับการอนุมัติแล้ว`,
-        html: `
-          <p>เรียน คุณ${f_name},</p>
-          <p>กิจกรรม <strong>${event_name}</strong> ของคุณได้รับการอนุมัติแล้ว
-             และจะแสดงบนหน้าเว็บไซต์ Magic Ticket เรียบร้อย</p>
-          <p>ขอบคุณที่ใช้บริการ Magic Ticket</p>
-        `.trim(),
-      }).catch((e: unknown) => console.error("Email send error:", e));
-    }
-
+    await execute("UPDATE events SET status = 'approved', updated_at = NOW() WHERE id = ?", [eventId]);
+    await notifyEventApproved(eventId);
     return res.json({ message: "Event approved" });
   } catch (err) {
     console.error("ADMIN APPROVE ERROR:", err);
@@ -118,36 +77,8 @@ export async function rejectEvent(req: AuthRequest, res: Response) {
   if (!note) return res.status(400).json({ message: "กรุณาระบุเหตุผลการ reject" });
 
   try {
-    await execute(
-      "UPDATE events SET status = 'rejected', updated_at = NOW() WHERE id = ?",
-      [eventId],
-    );
-
-    const rows = await query<{ email: string; f_name: string; event_name: string }[]>(
-      `SELECT u.email, u.f_name, e.name AS event_name
-       FROM events e
-       JOIN organizers o ON o.id  = e.organizer_id
-       JOIN users      u ON u.id  = o.owner_id
-       WHERE e.id = ? LIMIT 1`,
-      [eventId],
-    );
-
-    if (rows[0]) {
-      const { email, f_name, event_name } = rows[0];
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: `❌ กิจกรรม "${event_name}" ไม่ผ่านการอนุมัติ`,
-        html: `
-          <p>เรียน คุณ${f_name},</p>
-          <p>กิจกรรม <strong>${event_name}</strong> ของคุณไม่ผ่านการอนุมัติ</p>
-          <p><strong>เหตุผล:</strong> ${note}</p>
-          <p>หากต้องการแก้ไขและส่งใหม่ กรุณาเข้าสู่ระบบและแก้ไขข้อมูลกิจกรรมของคุณ</p>
-          <p>ขอบคุณที่ใช้บริการ Magic Ticket</p>
-        `.trim(),
-      }).catch((e: unknown) => console.error("Email send error:", e));
-    }
-
+    await execute("UPDATE events SET status = 'rejected', updated_at = NOW() WHERE id = ?", [eventId]);
+    await notifyEventRejected(eventId, note);
     return res.json({ message: "Event rejected" });
   } catch (err) {
     console.error("ADMIN REJECT ERROR:", err);

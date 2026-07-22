@@ -1,14 +1,11 @@
 import express from "express";
 import * as organizerController from "../controllers/organizer.controller.js";
-import { authenticateOrganizer } from "../middlewares/organizer.middleware.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { uploadOrganizerLogo, uploadEventImages } from "../middlewares/upload.middleware.js";
 import type { AuthRequest } from "../middlewares/types.js";
 
 const router = express.Router();
 
-router.post("/add_event", authenticateOrganizer, organizerController.addEvent);
-router.get("/events", authenticateOrganizer, organizerController.listEvents);
 router.post(
     "/create",
     authenticate,

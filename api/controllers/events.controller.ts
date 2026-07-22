@@ -1,10 +1,11 @@
 import type { Request, Response } from "express";
 import { query } from "../model/query.js";
+import type { EventImages, ListEvent, PublicEvent, PublicEventList, Total } from "../model/types.js";
 
 // Public — no auth required, used by organizer create-event form and home filter
 export async function listEventTypes(_req: Request, res: Response) {
   try {
-    const rows = await query<{ id: number; name: string }[]>(
+    const rows = await query<ListEvent[]>(
       "SELECT id, name FROM event_types ORDER BY name ASC",
     );
     return res.json({ event_types: rows });
@@ -19,15 +20,7 @@ export async function getPublicEvent(req: Request, res: Response) {
   if (isNaN(eventId)) return res.status(400).json({ message: "Invalid event ID" });
 
   try {
-    const rows = await query<{
-      id: number; name: string; place_name: string; address: string | null;
-      description: string | null; cover_image: string;
-      start_date: string; end_date: string;
-      type_name: string; organizer_name: string;
-      organizer_logo: string | null;
-      latitude: string; longitude: string;
-      theme: string | null;
-    }[]>(
+    const rows = await query<PublicEvent[]>(
       `SELECT e.id, e.name, e.place_name, e.address, e.description,
               e.cover_image, e.start_date, e.end_date,
               e.latitude, e.longitude, e.theme,
@@ -44,7 +37,7 @@ export async function getPublicEvent(req: Request, res: Response) {
     if (!rows.length) return res.status(404).json({ message: "Event not found" });
 
     // Fetch extra images
-    const images = await query<{ id: number; url: string; display_order: number }[]>(
+    const images = await query<EventImages[]>(
       "SELECT id, url, display_order FROM event_images WHERE event_id = ? ORDER BY display_order ASC",
       [eventId],
     );
@@ -83,13 +76,7 @@ export async function listPublicEvents(req: Request, res: Response) {
 
     const where = `WHERE ${conditions.join(" AND ")}`;
 
-    const rows = await query<{
-      id: number; name: string; place_name: string; address: string | null;
-      description: string | null; cover_image: string;
-      start_date: string; end_date: string;
-      type_name: string; organizer_name: string;
-      latitude: string; longitude: string;
-    }[]>(
+    const rows = await query<PublicEventList[]>(
       `SELECT e.id, e.name, e.place_name, e.address, e.description,
               e.cover_image, e.start_date, e.end_date,
               e.latitude, e.longitude,
@@ -103,7 +90,7 @@ export async function listPublicEvents(req: Request, res: Response) {
       [...params, limit, offset],
     );
 
-    const countRows = await query<{ total: number }[]>(
+    const countRows = await query<Total[]>(
       `SELECT COUNT(*) AS total
        FROM events e
        JOIN event_types et ON et.id = e.type_id

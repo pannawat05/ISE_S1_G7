@@ -50,6 +50,49 @@ export interface EventRow extends RowDataPacket {
   updated_at: Date;
 }
 
+export interface PublicEvent extends RowDataPacket {
+  id: number;
+  name: string;
+  place_name: string;
+  address: string | null;
+  description: string | null;
+  cover_image: string;
+  start_date: string;
+  end_date: string;
+  type_name: string;
+  organizer_name: string;
+  organizer_logo: string | null;
+  latitude: string;
+  longitude: string;
+  theme: string | null;
+}
+
+export interface PublicEventList extends RowDataPacket {
+  id: number;
+  name: string;
+  place_name: string;
+  address: string | null;
+  description: string | null;
+  cover_image: string;
+  start_date: string;
+  end_date: string;
+  type_name: string;
+  organizer_name: string;
+  latitude: string;
+  longitude: string;
+}
+
+export interface EventImages extends RowDataPacket {
+  id: number;
+  url: string;
+  display_order: number; 
+}
+
+export interface ListEvent extends RowDataPacket {
+  id: number;
+  name: string;
+}
+
 export interface CreateEventInput {
   name: string;
   place_name: string;
@@ -65,4 +108,8 @@ export interface CreateEventInput {
   end_date: string;
   organizer_id: number;
   type_id: number;
+}
+
+export interface Total extends RowDataPacket {
+  total: number;
 }

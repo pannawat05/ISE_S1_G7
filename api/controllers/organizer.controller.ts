@@ -1,6 +1,5 @@
 import type { Response } from "express";
-import type { AuthRequest, OrganizeRequest } from "../middlewares/types.js";
-import type { EventStatus } from "../model/types.js";
+import type { AuthRequest } from "../middlewares/types.js";
 import {
   createEvent,
   findEventsByOrganizerId,
@@ -14,133 +13,49 @@ import {
 } from "../model/event.model.js";
 import {
   createOrganizer,
-  findOrganizerByOwnerId,
   findOrganizerById,
   updateOrganizer,
   deleteOrganizer,
 } from "../model/organizer.model.js";
 
-function mapFrontendStatus(status: string | undefined): EventStatus {
-  switch (status?.toLowerCase()) {
-    case "published":
-    case "approved":
-      return "approved";
-    case "rejected":
-      return "rejected";
-    default:
-      return "pending";
-  }
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Verify that the authenticated user owns the organizer. Returns organizer or sends error. */
+async function resolveOrganizerOwner(
+  req: AuthRequest,
+  res: Response,
+  organizerId: number,
+) {
+  const organizer = await findOrganizerById(organizerId);
+  if (!organizer) { res.status(404).json({ message: "Organizer not found" }); return null; }
+  if (organizer.owner_id !== req.user!.id) { res.status(403).json({ message: "Forbidden" }); return null; }
+  return organizer;
 }
 
-function buildEndDate(startDate: string): string {
-  const start = new Date(startDate);
-  if (Number.isNaN(start.getTime())) {
-    return startDate;
-  }
-  start.setHours(start.getHours() + 3);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())} ${pad(start.getHours())}:${pad(start.getMinutes())}:${pad(start.getSeconds())}`;
+type MulterFiles = Record<string, Express.Multer.File[]>;
+
+function getFiles(req: AuthRequest): MulterFiles {
+  return (req as AuthRequest & { files?: MulterFiles }).files ?? {};
 }
 
-export async function addEvent(req: OrganizeRequest, res: Response) {
-  const {
-    name,
-    place,
-    place_name,
-    type,
-    start_date,
-    end_date,
-    description,
-    theme,
-    status,
-    is_active,
-    address,
-    latitude,
-    longitude,
-    cover_image,
-  } = req.body;
-
-  const organizerId = req.user?.organizerId;
-
-  if (!organizerId) {
-    return res.status(401).json({ message: "Unauthorized: Missing organizer ID" });
-  }
-
-  const eventName = name?.trim();
-  const eventPlace = (place_name ?? place)?.trim();
-
-  if (!eventName || !eventPlace || !start_date || !type) {
-    return res.status(400).json({
-      message: "name, place, type, and start_date are required",
-    });
-  }
-
-  try {
-    const typeId = await findOrCreateEventType(type);
-    const eventId = await createEvent({
-      name: eventName,
-      place_name: eventPlace,
-      address: address ?? null,
-      latitude: latitude ?? 0,
-      longitude: longitude ?? 0,
-      cover_image: cover_image ?? "",
-      description: description ?? null,
-      theme: theme ?? null,
-      status: mapFrontendStatus(status),
-      is_active: is_active === 0 || is_active === false ? false : true,
-      start_date,
-      end_date: end_date ?? buildEndDate(start_date),
-      organizer_id: organizerId,
-      type_id: typeId,
-    });
-
-    return res.status(201).json({
-      message: "Event added successfully",
-      eventId,
-    });
-  } catch (err) {
-    console.error("ADD EVENT ERROR:", err);
-    return res.status(500).json({ message: "Error adding event" });
-  }
+function getSingleFile(req: AuthRequest): Express.Multer.File | undefined {
+  return (req as AuthRequest & { file?: Express.Multer.File }).file;
 }
 
-export async function listEvents(req: OrganizeRequest, res: Response) {
-  const organizerId = req.user?.organizerId;
-
-  if (!organizerId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  try {
-    const events = await findEventsByOrganizerId(organizerId);
-    return res.json({ events });
-  } catch (err) {
-    console.error("LIST EVENTS ERROR:", err);
-    return res.status(500).json({ message: "Error fetching events" });
-  }
-}
+// ─── Organizer CRUD ───────────────────────────────────────────────────────────
 
 export async function createOrganizerHandler(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
-
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
   const { name, description } = req.body;
-  const logoFile = (req as AuthRequest & { file?: Express.Multer.File }).file;
+  const logoFile = getSingleFile(req);
 
-  if (!name?.trim()) {
-    return res.status(400).json({ message: "ชื่อ Organizer is required" });
-  }
+  if (!name?.trim()) return res.status(400).json({ message: "ชื่อ Organizer is required" });
 
   try {
-    const logoUrl = logoFile
-      ? `/uploads/organizer/logo/${logoFile.filename}`
-      : "";
-
+    const logoUrl = logoFile ? `/uploads/organizer/logo/${logoFile.filename}` : "";
     const organizerId = await createOrganizer(name.trim(), logoUrl, description ?? "", userId);
-
     return res.status(201).json({
       message: "Organizer created successfully",
       organizerId,
@@ -156,26 +71,13 @@ export async function createOrganizerHandler(req: AuthRequest, res: Response) {
 export async function getOrganizer(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   const organizerId = Number(req.params.id);
-
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (Number.isNaN(organizerId)) {
-    return res.status(400).json({ message: "Invalid organizer ID" });
-  }
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
 
   try {
     const organizer = await findOrganizerById(organizerId);
-    if (!organizer) {
-      return res.status(404).json({ message: "Organizer not found" });
-    }
-
-    // Check ownership
-    if (organizer.owner_id !== userId) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
+    if (!organizer) return res.status(404).json({ message: "Organizer not found" });
+    if (organizer.owner_id !== userId) return res.status(403).json({ message: "Forbidden" });
     return res.json({
       id: organizer.id,
       name: organizer.name,
@@ -194,27 +96,15 @@ export async function getOrganizer(req: AuthRequest, res: Response) {
 export async function updateOrganizerHandler(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   const organizerId = Number(req.params.id);
-
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (Number.isNaN(organizerId)) {
-    return res.status(400).json({ message: "Invalid organizer ID" });
-  }
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
 
   const { name, description } = req.body;
-  const logoFile = (req as AuthRequest & { file?: Express.Multer.File }).file;
+  const logoFile = getSingleFile(req);
 
   try {
-    const organizer = await findOrganizerById(organizerId);
-    if (!organizer) {
-      return res.status(404).json({ message: "Organizer not found" });
-    }
-
-    if (organizer.owner_id !== userId) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
 
     const updates: { name?: string; logo_url?: string; description?: string } = {};
     if (name?.trim()) updates.name = name.trim();
@@ -222,7 +112,6 @@ export async function updateOrganizerHandler(req: AuthRequest, res: Response) {
     if (logoFile) updates.logo_url = `/uploads/organizer/logo/${logoFile.filename}`;
 
     await updateOrganizer(organizerId, updates);
-
     const updated = await findOrganizerById(organizerId);
 
     return res.json({
@@ -243,27 +132,13 @@ export async function updateOrganizerHandler(req: AuthRequest, res: Response) {
 export async function deleteOrganizerHandler(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   const organizerId = Number(req.params.id);
-
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (Number.isNaN(organizerId)) {
-    return res.status(400).json({ message: "Invalid organizer ID" });
-  }
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
 
   try {
-    const organizer = await findOrganizerById(organizerId);
-    if (!organizer) {
-      return res.status(404).json({ message: "Organizer not found" });
-    }
-
-    if (organizer.owner_id !== userId) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
     await deleteOrganizer(organizerId);
-
     return res.json({ message: "Organizer deleted successfully" });
   } catch (err) {
     console.error("DELETE ORGANIZER ERROR:", err);
@@ -271,18 +146,16 @@ export async function deleteOrganizerHandler(req: AuthRequest, res: Response) {
   }
 }
 
-export async function listEventsByOrganizer(req: AuthRequest, res: Response) {
-  const userId = req.user?.id;
-  const organizerId = Number(req.params.id);
+// ─── Event CRUD (scoped to organizer) ────────────────────────────────────────
 
-  if (!userId) return res.status(401).json({ message: "Unauthorized" });
-  if (Number.isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
+export async function listEventsByOrganizer(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
 
   try {
-    const organizer = await findOrganizerById(organizerId);
-    if (!organizer) return res.status(404).json({ message: "Organizer not found" });
-    if (organizer.owner_id !== userId) return res.status(403).json({ message: "Forbidden" });
-
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
     const events = await findEventsByOrganizerId(organizerId);
     return res.json({ events });
   } catch (err) {
@@ -292,36 +165,33 @@ export async function listEventsByOrganizer(req: AuthRequest, res: Response) {
 }
 
 export async function createEventForOrganizer(req: AuthRequest, res: Response) {
-  const userId = req.user?.id;
   const organizerId = Number(req.params.id);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
 
-  if (!userId) return res.status(401).json({ message: "Unauthorized" });
-  if (Number.isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
-
-  const { name, place_name, address, latitude, longitude, description, theme, type, type_id, start_date, end_date, is_active } = req.body;
-
-  // Accept type_id (number from frontend dropdown) OR type (string, fallback)
-  const resolvedTypeId = type_id ? Number(type_id) : null;
+  const {
+    name, place_name, address, latitude, longitude,
+    description, theme, type, type_id, start_date, end_date, is_active,
+  } = req.body;
 
   if (!name?.trim() || !place_name?.trim() || !start_date || !end_date) {
     return res.status(400).json({ message: "name, place_name, start_date, end_date are required" });
   }
+
+  const resolvedTypeId = type_id ? Number(type_id) : null;
   if (!resolvedTypeId && !type?.trim()) {
     return res.status(400).json({ message: "type_id or type is required" });
   }
 
-  // Extract uploaded files from multer .fields()
-  const files = (req as AuthRequest & { files?: Record<string, Express.Multer.File[]> }).files ?? {};
+  const files = getFiles(req);
   const coverFile = files["cover_image"]?.[0];
   const coverImageUrl = coverFile ? `/uploads/event/${coverFile.filename}` : "";
 
   try {
-    const organizer = await findOrganizerById(organizerId);
-    if (!organizer) return res.status(404).json({ message: "Organizer not found" });
-    if (organizer.owner_id !== userId) return res.status(403).json({ message: "Forbidden" });
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
 
-    // Use type_id directly if provided, otherwise find/create by name
-    const finalTypeId = resolvedTypeId ?? await findOrCreateEventType(type);
+    const finalTypeId = resolvedTypeId ?? (await findOrCreateEventType(type));
     const eventId = await createEvent({
       name: name.trim(),
       place_name: place_name.trim(),
@@ -339,11 +209,9 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
       type_id: finalTypeId,
     });
 
-    // Insert event_images
-    const extraImageFiles = files["event_images"] ?? [];
-    for (let i = 0; i < extraImageFiles.length; i++) {
-      const imgUrl = `/uploads/event/${extraImageFiles[i].filename}`;
-      await insertEventImage(eventId, imgUrl, i + 1);
+    const extraImages = files["event_images"] ?? [];
+    for (let i = 0; i < extraImages.length; i++) {
+      await insertEventImage(eventId, `/uploads/event/${extraImages[i]?.filename}`, i + 1);
     }
 
     return res.status(201).json({
@@ -358,18 +226,18 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
 }
 
 export async function getEventById(req: AuthRequest, res: Response) {
-  const userId = req.user?.id;
   const organizerId = Number(req.params.id);
   const eventId = Number(req.params.eventId);
-  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
   if (isNaN(organizerId) || isNaN(eventId)) return res.status(400).json({ message: "Invalid ID" });
+
   try {
-    const organizer = await findOrganizerById(organizerId);
-    if (!organizer) return res.status(404).json({ message: "Organizer not found" });
-    if (organizer.owner_id !== userId) return res.status(403).json({ message: "Forbidden" });
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
     const event = await findEventById(eventId);
-    if (!event || event.organizer_id !== organizerId) return res.status(404).json({ message: "Event not found" });
-    // event.images is already included by findEventById
+    if (!event || event.organizer_id !== organizerId) {
+      return res.status(404).json({ message: "Event not found" });
+    }
     return res.json({ event });
   } catch (err) {
     console.error("GET EVENT ERROR:", err);
@@ -378,42 +246,44 @@ export async function getEventById(req: AuthRequest, res: Response) {
 }
 
 export async function updateEventHandler(req: AuthRequest, res: Response) {
-  const userId = req.user?.id;
   const organizerId = Number(req.params.id);
   const eventId = Number(req.params.eventId);
-  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
   if (isNaN(organizerId) || isNaN(eventId)) return res.status(400).json({ message: "Invalid ID" });
 
-  const { name, place_name, address, latitude, longitude, description, theme, type, start_date, end_date, is_active } = req.body;
-  const files = (req as AuthRequest & { files?: Record<string, Express.Multer.File[]> }).files ?? {};
+  const {
+    name, place_name, address, latitude, longitude,
+    description, theme, type, start_date, end_date, is_active,
+  } = req.body;
+  const files = getFiles(req);
   const coverFile = files["cover_image"]?.[0];
 
   try {
-    const organizer = await findOrganizerById(organizerId);
-    if (!organizer) return res.status(404).json({ message: "Organizer not found" });
-    if (organizer.owner_id !== userId) return res.status(403).json({ message: "Forbidden" });
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+
     const existing = await findEventById(eventId);
-    if (!existing || existing.organizer_id !== organizerId) return res.status(404).json({ message: "Event not found" });
+    if (!existing || existing.organizer_id !== organizerId) {
+      return res.status(404).json({ message: "Event not found" });
+    }
 
     const updates: Record<string, unknown> = {};
-    if (name?.trim())        updates.name = name.trim();
-    if (place_name?.trim())  updates.place_name = place_name.trim();
-    if (address !== undefined) updates.address = address ?? null;
-    if (latitude !== undefined) updates.latitude = Number(latitude);
-    if (longitude !== undefined) updates.longitude = Number(longitude);
+    if (name?.trim())              updates.name        = name.trim();
+    if (place_name?.trim())        updates.place_name  = place_name.trim();
+    if (address !== undefined)     updates.address     = address ?? null;
+    if (latitude !== undefined)    updates.latitude    = Number(latitude);
+    if (longitude !== undefined)   updates.longitude   = Number(longitude);
     if (description !== undefined) updates.description = description ?? null;
-    if (theme !== undefined) updates.theme = theme ?? null;
-    if (start_date) updates.start_date = start_date;
-    if (end_date)   updates.end_date = end_date;
-    if (is_active !== undefined) updates.is_active = is_active !== false && is_active !== "false";
-    if (coverFile)  updates.cover_image = `/uploads/event/${coverFile.filename}`;
-    if (type?.trim()) {
-      updates.type_id = await findOrCreateEventType(type.trim());
-    }
+    if (theme !== undefined)       updates.theme       = theme ?? null;
+    if (start_date)                updates.start_date  = start_date;
+    if (end_date)                  updates.end_date    = end_date;
+    if (is_active !== undefined)   updates.is_active   = is_active !== false && is_active !== "false";
+    if (coverFile)                 updates.cover_image = `/uploads/event/${coverFile.filename}`;
+    if (type?.trim())              updates.type_id     = await findOrCreateEventType(type.trim());
 
     await updateEvent(eventId, updates as Parameters<typeof updateEvent>[1]);
 
-    // Handle event images: remove deleted ones
+    // Remove deleted images
     const bodyRaw = req.body as Record<string, string | string[]>;
     const removeRaw = bodyRaw["remove_image_ids[]"];
     if (removeRaw) {
@@ -424,28 +294,22 @@ export async function updateEventHandler(req: AuthRequest, res: Response) {
       }
     }
 
-    // Handle display_order updates for existing images
-    // Format: reorder_images[id]=order  e.g. reorder_images[12]=1&reorder_images[13]=2
-    const reorderRaw = bodyRaw as Record<string, string>;
-    const reorderKeys = Object.keys(reorderRaw).filter((k) => k.startsWith("reorder_images["));
+    // Reorder existing images: reorder_images[{id}]={order}
+    const reorderKeys = Object.keys(req.body as object).filter((k) => k.startsWith("reorder_images["));
     for (const key of reorderKeys) {
       const match = key.match(/^reorder_images\[(\d+)\]$/);
       if (!match) continue;
       const imgId = Number(match[1]);
-      const order = Number(reorderRaw[key]);
-      if (!isNaN(imgId) && !isNaN(order)) {
-        await updateEventImageOrder(imgId, order);
-      }
+      const order = Number((req.body as Record<string, string>)[key]);
+      if (!isNaN(imgId) && !isNaN(order)) await updateEventImageOrder(imgId, order);
     }
 
-    // Handle event images: insert new ones
-    const newImageFiles = files["event_images"] ?? [];
-    if (newImageFiles.length > 0) {
+    // Add new images
+    const newImages = files["event_images"] ?? [];
+    if (newImages.length > 0) {
       let maxOrder = await getMaxDisplayOrder(eventId);
-      for (const imgFile of newImageFiles) {
-        maxOrder += 1;
-        const url = `/uploads/event/${imgFile.filename}`;
-        await insertEventImage(eventId, url, maxOrder);
+      for (const imgFile of newImages) {
+        await insertEventImage(eventId, `/uploads/event/${imgFile.filename}`, ++maxOrder);
       }
     }
 
