@@ -1,4 +1,5 @@
 import { Calendar, MapPin, Building2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { PublicEvent } from "@/api/events";
 import { getCoverUrl } from "@/api/events";
 
@@ -32,48 +33,49 @@ export default function EventCard({ event }: EventCardProps) {
   const typeColor = TYPE_COLORS[event.type_name] ?? TYPE_COLORS.Other;
 
   return (
-    <article className="group flex flex-col bg-surface hover:shadow-lg hover:shadow-purple-900/20 border border-white/5 hover:border-purple-500/30 rounded-2xl overflow-hidden transition-all hover:-translate-y-1 duration-300">
-      {/* Cover */}
-      <div className="relative aspect-[16/10] overflow-hidden">
-        <img
-          src={coverSrc}
-          alt={event.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER; }}
-        />
-        {/* Type badge */}
-        <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-medium ${typeColor}`}>
-          {event.type_name}
-        </span>
-      </div>
+    <Link to={`/events/${event.id}`} className="group block">
+      <article className="flex flex-col bg-surface hover:shadow-lg hover:shadow-purple-900/20 border border-white/5 hover:border-purple-500/30 rounded-2xl h-full overflow-hidden transition-all hover:-translate-y-1 duration-300">
+        {/* Cover */}
+        <div className="relative aspect-[16/10] overflow-hidden">
+          <img
+            src={coverSrc}
+            alt={event.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER; }}
+          />
+          <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-medium ${typeColor}`}>
+            {event.type_name}
+          </span>
+        </div>
 
-      {/* Content */}
-      <div className="flex flex-col flex-1 p-5">
-        <h3 className="mb-1.5 font-bold text-white text-base line-clamp-2 leading-snug">
-          {event.name}
-        </h3>
+        {/* Content */}
+        <div className="flex flex-col flex-1 p-5">
+          <h3 className="mb-1.5 font-bold text-white group-hover:text-violet-300 text-base line-clamp-2 leading-snug transition-colors">
+            {event.name}
+          </h3>
 
-        {event.description && (
-          <p className="mb-4 text-gray-400 text-sm line-clamp-2 leading-relaxed">
-            {event.description}
-          </p>
-        )}
+          {event.description && (
+            <p className="mb-4 text-gray-400 text-sm line-clamp-2 leading-relaxed">
+              {event.description}
+            </p>
+          )}
 
-        <div className="space-y-2 mt-auto text-gray-500 text-xs">
-          <div className="flex items-center gap-2">
-            <Calendar size={13} className="text-violet-400 shrink-0" />
-            <span>{dateStr} · {timeStr}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin size={13} className="text-violet-400 shrink-0" />
-            <span className="truncate">{event.place_name}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Building2 size={13} className="text-violet-400 shrink-0" />
-            <span className="truncate">{event.organizer_name}</span>
+          <div className="space-y-2 mt-auto text-gray-500 text-xs">
+            <div className="flex items-center gap-2">
+              <Calendar size={13} className="text-violet-400 shrink-0" />
+              <span>{dateStr} · {timeStr}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin size={13} className="text-violet-400 shrink-0" />
+              <span className="truncate">{event.place_name}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Building2 size={13} className="text-violet-400 shrink-0" />
+              <span className="truncate">{event.organizer_name}</span>
+            </div>
           </div>
         </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }

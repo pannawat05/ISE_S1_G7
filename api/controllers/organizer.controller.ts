@@ -298,10 +298,16 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
   if (Number.isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
 
-  const { name, place_name, address, latitude, longitude, description, theme, type, start_date, end_date, is_active } = req.body;
+  const { name, place_name, address, latitude, longitude, description, theme, type, type_id, start_date, end_date, is_active } = req.body;
 
-  if (!name?.trim() || !place_name?.trim() || !type?.trim() || !start_date || !end_date) {
-    return res.status(400).json({ message: "name, place_name, type, start_date, end_date are required" });
+  // Accept type_id (number from frontend dropdown) OR type (string, fallback)
+  const resolvedTypeId = type_id ? Number(type_id) : null;
+
+  if (!name?.trim() || !place_name?.trim() || !start_date || !end_date) {
+    return res.status(400).json({ message: "name, place_name, start_date, end_date are required" });
+  }
+  if (!resolvedTypeId && !type?.trim()) {
+    return res.status(400).json({ message: "type_id or type is required" });
   }
 
   // Extract uploaded files from multer .fields()
@@ -314,7 +320,8 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
     if (!organizer) return res.status(404).json({ message: "Organizer not found" });
     if (organizer.owner_id !== userId) return res.status(403).json({ message: "Forbidden" });
 
-    const typeId = await findOrCreateEventType(type);
+    // Use type_id directly if provided, otherwise find/create by name
+    const finalTypeId = resolvedTypeId ?? await findOrCreateEventType(type);
     const eventId = await createEvent({
       name: name.trim(),
       place_name: place_name.trim(),
@@ -329,7 +336,7 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
       start_date,
       end_date,
       organizer_id: organizerId,
-      type_id: typeId,
+      type_id: finalTypeId,
     });
 
     // Insert event_images

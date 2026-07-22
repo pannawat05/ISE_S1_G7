@@ -52,6 +52,8 @@ function App() {
 
             <Route path="/" element={<pages.Home />} />
 
+            <Route path="/events/:id" element={<pages.EventDetail />} />
+
             <Route path="/admin" element={<pages.AdminPage />} />
 
             <Route path="/my-tickets" element={<pages.MyTickets />} />
@@ -60,7 +62,7 @@ function App() {
 
             <Route path="/signin" element={<pages.Signin />} />
 
-            <Route path="/otp" element={<pages.OTP />} />
+            <Route path="/otp" element={<pages.Otp />} />
 
             <Route path="/profile" element={<ProfileLayout />}>
 
@@ -71,6 +73,8 @@ function App() {
               <Route path="dashboard/:id" element={<pages.Dashboards />} />
 
               <Route path="events/:id" element={<pages.Event />} />
+
+              <Route path="events/:id/create" element={<pages.CreateEvent />} />
 
               <Route path="events/:id/edit/:eventId" element={<pages.EventEdit />} />
 

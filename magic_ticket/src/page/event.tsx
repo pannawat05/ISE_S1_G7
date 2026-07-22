@@ -1,17 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   Menu, Plus, Search, Calendar, MapPin, X, ChevronDown,
   Crosshair, ImageIcon, Trash2, Pencil,
 } from "lucide-react";
 import Cookies from "js-cookie";
 import { fetchOrganizerEventsList, createOrganizerEvent, type OrganizerEvent } from "@/api/organizer";
+import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 import { useLeaflet } from "@/hooks/useLeaflet";
 import { API_BASE } from "@/api/client";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const EVENT_TYPES = ["Concert", "Conference", "Exhibition", "Party", "Festival", "Sport", "Other"];
+// Removed hard-coded EVENT_TYPES - will fetch from API
 
 declare global {
   interface Window { L: typeof import("leaflet"); }
@@ -19,14 +20,14 @@ declare global {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CreateEventForm {
-  name: string; description: string; type: string; theme: string;
+  name: string; description: string; type_id: number; theme: string;
   start_date: string; end_date: string;
   place_name: string; address: string;
   latitude: number; longitude: number;
 }
 
 const EMPTY_FORM: CreateEventForm = {
-  name: "", description: "", type: "Concert", theme: "",
+  name: "", description: "", type_id: 0, theme: "",
   start_date: "", end_date: "",
   place_name: "", address: "",
   latitude: 13.7563, longitude: 100.5018,
@@ -326,6 +327,24 @@ function CreateEventModal({ organizerId, onClose, onCreated }: {
   const [extraFiles, setExtraFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
+  const [typesLoading, setTypesLoading] = useState(true);
+
+  // Fetch event types on mount
+  useEffect(() => {
+    const token = Cookies.get("authToken");
+    if (!token) return;
+    fetchEventTypes(token)
+      .then((types) => {
+        setEventTypes(types);
+        // Set first type as default if available
+        if (types.length > 0 && form.type_id === 0) {
+          setForm(prev => ({ ...prev, type_id: types[0].id }));
+        }
+      })
+      .catch(console.error)
+      .finally(() => setTypesLoading(false));
+  }, []);
 
   function set<K extends keyof CreateEventForm>(key: K, val: CreateEventForm[K]) {
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -333,7 +352,7 @@ function CreateEventModal({ organizerId, onClose, onCreated }: {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !form.place_name.trim() || !form.start_date || !form.end_date) {
+    if (!form.name.trim() || !form.place_name.trim() || !form.start_date || !form.end_date || !form.type_id) {
       setError("กรุณากรอกข้อมูลที่จำเป็นให้ครบ"); return;
     }
     if (new Date(form.end_date) <= new Date(form.start_date)) {
@@ -350,6 +369,7 @@ function CreateEventModal({ organizerId, onClose, onCreated }: {
       extraFiles.forEach((f) => fd.append("event_images", f));
 
       const result = await createOrganizerEvent(token, organizerId, fd);
+      const selectedType = eventTypes.find(t => t.id === form.type_id);
 
       const coverUrl = coverFiles[0] ? URL.createObjectURL(coverFiles[0]) : "";
       onCreated({
@@ -359,7 +379,7 @@ function CreateEventModal({ organizerId, onClose, onCreated }: {
         cover_image: coverUrl, description: form.description.trim() || null,
         theme: form.theme.trim() || null, status: "pending", is_active: true,
         start_date: form.start_date, end_date: form.end_date,
-        type_name: form.type, organizer_id: organizerId,
+        type_name: selectedType?.name ?? "", organizer_id: organizerId,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -397,9 +417,20 @@ function CreateEventModal({ organizerId, onClose, onCreated }: {
             <div className="space-y-1.5">
               <label className="mt-label">ประเภทงาน <span className="text-red-400">*</span></label>
               <div className="relative">
-                <select value={form.type} onChange={(e) => set("type", e.target.value)}
-                  className="mt-input appearance-none cursor-pointer">
-                  {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                <select 
+                  value={form.type_id} 
+                  onChange={(e) => set("type_id", Number(e.target.value))}
+                  disabled={typesLoading || eventTypes.length === 0}
+                  className="disabled:opacity-50 mt-input appearance-none cursor-pointer"
+                >
+                  {typesLoading && <option value={0}>กำลังโหลด...</option>}
+                  {!typesLoading && eventTypes.length === 0 && <option value={0}>ไม่มีประเภท</option>}
+                  {!typesLoading && eventTypes.length > 0 && form.type_id === 0 && (
+                    <option value={0}>เลือกประเภท</option>
+                  )}
+                  {eventTypes.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
                 </select>
                 <ChevronDown size={16} className="top-1/2 right-3 absolute text-gray-400 -translate-y-1/2 pointer-events-none" />
               </div>
@@ -557,6 +588,7 @@ function EventCard({ event }: { event: OrganizerEvent }) {
 export default function EventPage() {
   const { id } = useParams<{ id: string }>();
   const { setIsOpen } = useProfileSidebar();
+  const navigate = useNavigate();
   const organizerId = Number(id);
 
   const [events, setEvents] = useState<OrganizerEvent[]>([]);
@@ -564,7 +596,6 @@ export default function EventPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
-  const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
     const token = Cookies.get("authToken");
@@ -593,7 +624,7 @@ export default function EventPage() {
             <span className="bg-white/10 px-2.5 py-0.5 rounded-full text-gray-400 text-xs">{events.length} งาน</span>
           )}
         </div>
-        <button onClick={() => setShowCreate(true)}
+        <button onClick={() => navigate(`/profile/events/${organizerId}/create`)}
           className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 px-4 py-2 rounded-xl font-semibold text-white text-sm cursor-pointer">
           <Plus size={18} /> สร้าง Event
         </button>
@@ -636,7 +667,7 @@ export default function EventPage() {
               <p className="font-semibold text-white text-lg">ยังไม่มี Event</p>
               <p className="mt-1 text-gray-500 text-sm">สร้าง event แรกของ organizer นี้เพื่อเริ่มต้น</p>
             </div>
-            <button onClick={() => setShowCreate(true)}
+            <button onClick={() => navigate(`/profile/events/${organizerId}/create`)}
               className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 px-5 py-2.5 rounded-xl font-semibold text-white text-sm">
               <Plus size={16} /> สร้าง Event แรก
             </button>
@@ -655,13 +686,7 @@ export default function EventPage() {
         )}
       </main>
 
-      {showCreate && (
-        <CreateEventModal
-          organizerId={organizerId}
-          onClose={() => setShowCreate(false)}
-          onCreated={(newEvent) => { setEvents((prev) => [newEvent, ...prev]); setShowCreate(false); }}
-        />
-      )}
+
     </div>
   );
 }

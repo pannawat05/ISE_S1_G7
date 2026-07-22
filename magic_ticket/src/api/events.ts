@@ -11,8 +11,11 @@ export interface PublicEvent {
   end_date: string;
   type_name: string;
   organizer_name: string;
+  organizer_logo: string | null;
   latitude: string;
   longitude: string;
+  theme: string | null;
+  images?: { id: number; url: string; display_order: number }[];
 }
 
 export interface FetchEventsParams {
@@ -41,4 +44,9 @@ export function getCoverUrl(coverImage: string): string | null {
   if (!coverImage) return null;
   if (coverImage.startsWith("http")) return coverImage;
   return `${API_BASE}${coverImage}`;
+}
+
+export async function fetchPublicEventById(id: number): Promise<PublicEvent> {
+  const data = await apiFetch<{ event: PublicEvent }>(`/events/${id}`);
+  return data.event;
 }

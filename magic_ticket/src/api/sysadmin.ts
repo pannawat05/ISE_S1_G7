@@ -1,13 +1,13 @@
 import { apiFetch } from "./client";
 
-// ─── Event Types ──────────────────────────────────────────────────────────────
+// ─── Event Types (public — no token required) ─────────────────────────────────
 export interface EventType {
   id: number;
   name: string;
 }
 
-export async function fetchEventTypes(token: string): Promise<EventType[]> {
-  const d = await apiFetch<{ event_types: EventType[] }>("/sysadmin/event-types", { token });
+export async function fetchEventTypes(): Promise<EventType[]> {
+  const d = await apiFetch<{ event_types: EventType[] }>("/events/types");
   return d.event_types ?? [];
 }
 

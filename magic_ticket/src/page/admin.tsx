@@ -483,67 +483,222 @@ function EventTypesManager({ token }: { token: string }) {
   );
 }
 // ─── Payment Methods Manager ──────────────────────────────────────────────────
+const PAYMENT_CATEGORIES: PaymentCategory[] = ["credit card", "prompt pay", "mobile banking", "cash"];
+
+const EMPTY_PM = { category: "prompt pay" as PaymentCategory, channel: "", gateway: "" };
+
 function PaymentMethodsManager({ token }: { token: string }) {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ ...EMPTY_PM });
+  const [saving, setSaving] = useState(false);
+  // edit state
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ ...EMPTY_PM });
 
   function load() { fetchPaymentMethods(token).then(setMethods).catch(console.error).finally(() => setLoading(false)); }
   useEffect(() => { load(); }, []);
+
+  async function handleAdd() {
+    if (!form.channel.trim()) { flash("❌ กรุณากรอกชื่อช่องทาง"); return; }
+    setSaving(true);
+    try {
+      await createPaymentMethod(token, {
+        category: form.category,
+        channel: form.channel.trim(),
+        gateway: form.gateway.trim() || undefined,
+      });
+      setForm({ ...EMPTY_PM });
+      setShowForm(false);
+      load();
+      flash("✅ เพิ่ม Payment Method สำเร็จ");
+    } catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+    finally { setSaving(false); }
+  }
+
+  async function handleUpdate(id: number) {
+    if (!editForm.channel.trim()) return;
+    try {
+      await updatePaymentMethod(token, id, {
+        category: editForm.category,
+        channel: editForm.channel.trim(),
+        gateway: editForm.gateway.trim() || undefined,
+      });
+      setEditId(null);
+      load();
+      flash("✅ อัปเดตสำเร็จ");
+    } catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+  }
 
   async function handleToggle(id: number) {
     try { await togglePaymentMethod(token, id); load(); }
     catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
   }
+
   async function handleDelete(id: number) {
     if (!confirm("ลบ Payment Method นี้?")) return;
     try { await deletePaymentMethod(token, id); load(); flash("✅ ลบสำเร็จ"); }
     catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
   }
-  function flash(m: string) { setMsg(m); setTimeout(() => setMsg(null), 3000); }
+
+  function flash(m: string) { setMsg(m); setTimeout(() => setMsg(null), 3500); }
 
   const categoryColors: Record<PaymentCategory, string> = {
-    "credit card": "bg-blue-500/20 text-blue-300",
-    "prompt pay": "bg-green-500/20 text-green-300",
+    "credit card":    "bg-blue-500/20   text-blue-300",
+    "prompt pay":     "bg-green-500/20  text-green-300",
     "mobile banking": "bg-purple-500/20 text-purple-300",
-    "cash": "bg-orange-500/20 text-orange-300",
+    "cash":           "bg-orange-500/20 text-orange-300",
   };
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-white text-lg">Payment Methods</h3>
-        {msg && <p className="text-violet-300 text-sm">{msg}</p>}
+        <div className="flex items-center gap-3">
+          {msg && <p className="text-violet-300 text-sm">{msg}</p>}
+          <button
+            onClick={() => { setShowForm((v) => !v); setForm({ ...EMPTY_PM }); }}
+            className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 px-3 py-1.5 rounded-lg text-white text-sm"
+          >
+            <Plus size={15} />
+            เพิ่ม
+          </button>
+        </div>
       </div>
-      {loading && <div className="space-y-2 animate-pulse">
-        {[1,2].map(i => <div key={i} className="bg-white/5 rounded-lg h-16" />)}
-      </div>}
+
+      {/* Add Form */}
+      {showForm && (
+        <div className="space-y-3 bg-white/[0.03] p-4 border border-violet-500/20 rounded-xl">
+          <p className="font-medium text-violet-300 text-sm">เพิ่ม Payment Method ใหม่</p>
+          <div className="gap-3 grid grid-cols-1 sm:grid-cols-3">
+            {/* Category */}
+            <div className="space-y-1">
+              <label className="text-gray-500 text-xs">ประเภท *</label>
+              <div className="relative">
+                <select value={form.category}
+                  onChange={(e) => setForm((p) => ({ ...p, category: e.target.value as PaymentCategory }))}
+                  className="mt-input pr-8 w-full appearance-none cursor-pointer">
+                  {PAYMENT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <ChevronDown size={14} className="top-1/2 right-3 absolute text-gray-400 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+            {/* Channel */}
+            <div className="space-y-1">
+              <label className="text-gray-500 text-xs">ช่องทาง (channel) *</label>
+              <input value={form.channel}
+                onChange={(e) => setForm((p) => ({ ...p, channel: e.target.value }))}
+                placeholder="เช่น Visa, KBank, PromptPay"
+                className="mt-input" />
+            </div>
+            {/* Gateway */}
+            <div className="space-y-1">
+              <label className="text-gray-500 text-xs">Gateway (ถ้ามี)</label>
+              <input value={form.gateway}
+                onChange={(e) => setForm((p) => ({ ...p, gateway: e.target.value }))}
+                placeholder="เช่น Stripe, Omise"
+                className="mt-input" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowForm(false)}
+              className="px-3 py-1.5 border border-white/10 rounded-lg text-gray-400 hover:text-white text-sm">
+              ยกเลิก
+            </button>
+            <button onClick={handleAdd} disabled={saving || !form.channel.trim()}
+              className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-4 py-1.5 rounded-lg text-white text-sm">
+              {saving ? "กำลังบันทึก..." : "บันทึก"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      {loading && (
+        <div className="space-y-2 animate-pulse">
+          {[1, 2, 3].map((i) => <div key={i} className="bg-white/5 rounded-lg h-16" />)}
+        </div>
+      )}
       {!loading && (
         <div className="space-y-2">
           {methods.map((method) => (
-            <div key={method.id} className="flex items-center gap-3 bg-white/[0.02] p-4 border border-white/5 rounded-lg">
-              <CreditCard size={18} className="text-violet-400" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className={`mt-badge ${categoryColors[method.category]}`}>{method.category}</span>
-                  <span className="font-medium text-white">{method.channel}</span>
-                  {method.gateway && <span className="text-gray-400 text-xs">via {method.gateway}</span>}
+            <div key={method.id} className="bg-white/[0.02] p-4 border border-white/5 rounded-lg">
+              {editId === method.id ? (
+                /* ── Edit row ── */
+                <div className="space-y-3">
+                  <div className="gap-3 grid grid-cols-1 sm:grid-cols-3">
+                    <div className="relative">
+                      <select value={editForm.category}
+                        onChange={(e) => setEditForm((p) => ({ ...p, category: e.target.value as PaymentCategory }))}
+                        className="mt-input pr-8 w-full text-sm appearance-none cursor-pointer">
+                        {PAYMENT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <ChevronDown size={13} className="top-1/2 right-3 absolute text-gray-400 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    <input value={editForm.channel}
+                      onChange={(e) => setEditForm((p) => ({ ...p, channel: e.target.value }))}
+                      placeholder="channel" className="mt-input text-sm" />
+                    <input value={editForm.gateway}
+                      onChange={(e) => setEditForm((p) => ({ ...p, gateway: e.target.value }))}
+                      placeholder="gateway (ถ้ามี)" className="mt-input text-sm" />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setEditId(null)}
+                      className="px-3 py-1 border border-white/10 rounded-lg text-gray-400 hover:text-white text-xs">
+                      ยกเลิก
+                    </button>
+                    <button onClick={() => handleUpdate(method.id)}
+                      className="flex items-center gap-1 bg-violet-600 hover:bg-violet-700 px-3 py-1 rounded-lg text-white text-xs">
+                      <Check size={13} /> บันทึก
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <button onClick={() => handleToggle(method.id)} className="p-1">
-                {method.is_active ? (
-                  <ToggleRight size={20} className="text-green-400" />
-                ) : (
-                  <ToggleLeft size={20} className="text-gray-500" />
-                )}
-              </button>
-              <button onClick={() => handleDelete(method.id)}
-                className="p-1 text-gray-400 hover:text-red-400">
-                <Trash2 size={16} />
-              </button>
+              ) : (
+                /* ── Display row ── */
+                <div className="flex items-center gap-3">
+                  <CreditCard size={18} className="text-violet-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`mt-badge text-xs ${categoryColors[method.category]}`}>
+                        {method.category}
+                      </span>
+                      <span className="font-medium text-white">{method.channel}</span>
+                      {method.gateway && (
+                        <span className="text-gray-500 text-xs">via {method.gateway}</span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-gray-600 text-xs">
+                      {method.is_active ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                    </p>
+                  </div>
+                  {/* Toggle */}
+                  <button onClick={() => handleToggle(method.id)} title="toggle" className="p-1 shrink-0">
+                    {method.is_active
+                      ? <ToggleRight size={22} className="text-green-400" />
+                      : <ToggleLeft  size={22} className="text-gray-500" />}
+                  </button>
+                  {/* Edit */}
+                  <button onClick={() => {
+                    setEditId(method.id);
+                    setEditForm({ category: method.category, channel: method.channel, gateway: method.gateway ?? "" });
+                  }} className="p-1 text-gray-400 hover:text-white shrink-0">
+                    <Pencil size={15} />
+                  </button>
+                  {/* Delete */}
+                  <button onClick={() => handleDelete(method.id)}
+                    className="p-1 text-gray-400 hover:text-red-400 shrink-0">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
-          {methods.length === 0 && <p className="py-8 text-gray-500 text-center">ยังไม่มี Payment Methods</p>}
+          {methods.length === 0 && (
+            <p className="py-10 text-gray-500 text-sm text-center">ยังไม่มี Payment Methods — กด "เพิ่ม" เพื่อเริ่มต้น</p>
+          )}
         </div>
       )}
     </div>

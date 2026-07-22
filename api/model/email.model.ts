@@ -5,14 +5,14 @@ interface OtpRecord {
 
 const otpStore = new Map<string, OtpRecord>();
 
-export function saveOtp(email: string, otp: string, ttlMs = 5 * 60 * 1000) {
+export async function saveOtp(email: string, otp: string, ttlMs = 5 * 60 * 1000): Promise<void> {
   otpStore.set(email, {
     otp,
     expiresAt: Date.now() + ttlMs,
   });
 }
 
-export function verifyOtp(email: string, otp: string): string | null {
+export async function verifyOtp(email: string, otp: string): Promise<string | null> {
   const record = otpStore.get(email);
 
   if (!record) {
@@ -32,6 +32,6 @@ export function verifyOtp(email: string, otp: string): string | null {
   return null;
 }
 
-export function deleteOtp(email: string) {
+export async function deleteOtp(email: string): Promise<void> {
   otpStore.delete(email);
 }
