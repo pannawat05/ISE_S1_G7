@@ -294,7 +294,6 @@ export default function EventDetailPage() {
               <Ticket size={18} />
               ซื้อบัตร
             </button>
-            <p className="text-gray-600 text-xs text-center">ระบบซื้อบัตรจะเปิดให้บริการเร็วๆ นี้</p>
           </div>
         </div>
 
