@@ -30,7 +30,7 @@ CREATE TABLE users (
     password VARCHAR(255) NOT NULL,
     f_name VARCHAR(100) NOT NULL,
     l_name VARCHAR(100) NOT NULL,
-    role ENUM('admin','customer') DEFAULT 'customer',
+    role ENUM('admin','customer', 'sysadmin') DEFAULT 'customer',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
