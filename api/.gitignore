@@ -1,6 +1,5 @@
 .env
 /logs
-uploads/
 
 # Logs
 logs
