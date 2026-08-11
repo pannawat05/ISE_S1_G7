@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import Swal from "sweetalert2";
 import { apiFetch } from "@/api/client";
 
 function Otp() {

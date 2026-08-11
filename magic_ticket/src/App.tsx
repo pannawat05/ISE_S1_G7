@@ -54,6 +54,8 @@ function App() {
 
             <Route path="/events/:id" element={<pages.EventDetail />} />
 
+            <Route path="/payment" element={<pages.Payment />} />
+
             <Route path="/admin" element={<pages.AdminPage />} />
 
             <Route path="/my-tickets" element={<pages.MyTickets />} />

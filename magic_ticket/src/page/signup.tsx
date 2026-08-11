@@ -50,7 +50,7 @@ export default function SignUp() {
 
       <div className="mt-auth-card">
         <div className="mb-8 text-center">
-          <div className="mb-2 text-3xl">✨🧙‍♂️</div>
+          {/* <div className="mb-2 text-3xl">✨🧙‍♂️</div> */}
           <h2 className="mt-heading font-extrabold text-3xl">
             สร้างบัญชีเวทมนตร์
           </h2>

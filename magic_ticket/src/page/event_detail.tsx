@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Calendar, MapPin, Building2, Tag,
   Ticket, ChevronLeft, ChevronRight, ExternalLink,
 } from "lucide-react";
 import { fetchPublicEventById, getCoverUrl, type PublicEvent } from "@/api/events";
 import { API_BASE } from "@/api/client";
+import BookingDrawer from "@/components/booking";
 
 const PLACEHOLDER = "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&q=80";
 
@@ -118,6 +119,7 @@ export default function EventDetailPage() {
   const [event, setEvent] = useState<PublicEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
 
   useEffect(() => {
     const eventId = Number(id);
@@ -289,15 +291,27 @@ export default function EventDetailPage() {
 
             {/* CTA */}
             <button
+              onClick={() => setBookingOpen(true)}
               className="flex justify-center items-center gap-2 bg-violet-600 hover:bg-violet-700 py-3 rounded-xl w-full font-semibold text-white text-sm transition-colors"
             >
               <Ticket size={18} />
               ซื้อบัตร
             </button>
+            <p className="text-gray-600 text-xs text-center">เลือกโซนและที่นั่งที่ต้องการ</p>
           </div>
         </div>
 
       </div>
+
+      {/* Booking Drawer */}
+      {event && (
+        <BookingDrawer
+          eventId={event.id}
+          eventName={event.name}
+          isOpen={bookingOpen}
+          onClose={() => setBookingOpen(false)}
+        />
+      )}
     </div>
   );
 }

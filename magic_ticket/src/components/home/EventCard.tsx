@@ -36,7 +36,7 @@ export default function EventCard({ event }: EventCardProps) {
     <Link to={`/events/${event.id}`} className="group block">
       <article className="flex flex-col bg-surface hover:shadow-lg hover:shadow-purple-900/20 border border-white/5 hover:border-purple-500/30 rounded-2xl h-full overflow-hidden transition-all hover:-translate-y-1 duration-300">
         {/* Cover */}
-        <div className="relative aspect-[16/10] overflow-hidden">
+        <div className="relative aspect-16/10 overflow-hidden">
           <img
             src={coverSrc}
             alt={event.name}

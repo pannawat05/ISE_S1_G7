@@ -17,6 +17,18 @@ import {
   updateOrganizer,
   deleteOrganizer,
 } from "../model/organizer.model.js";
+import {
+  listZonesByEvent,
+  createZone,
+  updateZone,
+  deleteZone,
+  findZoneById,
+  insertZoneImage,
+  deleteZoneImage,
+  getMaxZoneImageOrder,
+  setSeatCount,
+  countSeats,
+} from "../model/zone.model.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -318,5 +330,148 @@ export async function updateEventHandler(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error("UPDATE EVENT ERROR:", err);
     return res.status(500).json({ message: "Error updating event" });
+  }
+}
+
+// ─── Zone CRUD ────────────────────────────────────────────────────────────────
+
+export async function listZones(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const eventId = Number(req.params.eventId);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId)) return res.status(400).json({ message: "Invalid ID" });
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+    const zones = await listZonesByEvent(eventId);
+    return res.json({ zones });
+  } catch (err) {
+    console.error("LIST ZONES ERROR:", err);
+    return res.status(500).json({ message: "Error fetching zones" });
+  }
+}
+
+export async function createZoneHandler(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const eventId = Number(req.params.eventId);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId)) return res.status(400).json({ message: "Invalid ID" });
+
+  const { name, category, type, price, seat_count } = req.body;
+  if (!name?.trim() || !category?.trim() || !type?.trim()) {
+    return res.status(400).json({ message: "name, category, type are required" });
+  }
+
+  const files = getFiles(req);
+  const zoneImageFiles = files["zone_images"] ?? [];
+
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+
+    const zoneId = await createZone({
+      event_id: eventId,
+      name: name.trim(),
+      category: category.trim(),
+      type: type.trim(),
+      price: Number(price) || 0,
+    });
+
+    // Auto-generate seats if seat_count provided
+    const seatCount = parseInt(seat_count ?? "0", 10);
+    if (seatCount > 0) await setSeatCount(zoneId, seatCount);
+
+    // Insert zone images
+    for (let i = 0; i < zoneImageFiles.length; i++) {
+      const file = zoneImageFiles[i];
+      await insertZoneImage(zoneId, `/uploads/zone/${file?.filename}`, file?.originalname, i + 1);
+    }
+
+    const zones = await listZonesByEvent(eventId);
+    return res.status(201).json({ message: "Zone created", zoneId, zones });
+  } catch (err) {
+    console.error("CREATE ZONE ERROR:", err);
+    return res.status(500).json({ message: "Error creating zone" });
+  }
+}
+
+export async function updateZoneHandler(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const eventId = Number(req.params.eventId);
+  const zoneId = Number(req.params.zoneId);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId) || isNaN(zoneId)) return res.status(400).json({ message: "Invalid ID" });
+
+  const { name, category, type, price, seat_count } = req.body;
+  const files = getFiles(req);
+  const zoneImageFiles = files["zone_images"] ?? [];
+
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+
+    const zone = await findZoneById(zoneId);
+    if (!zone || zone.event_id !== eventId) return res.status(404).json({ message: "Zone not found" });
+
+    await updateZone(zoneId, {
+      ...(name?.trim() && { name: name.trim() }),
+      ...(category?.trim() && { category: category.trim() }),
+      ...(type?.trim() && { type: type.trim() }),
+      ...(price !== undefined && { price: Number(price) }),
+    });
+
+    // Adjust seat count if provided
+    if (seat_count !== undefined) {
+      const target = parseInt(seat_count, 10);
+      if (!isNaN(target) && target >= 0) await setSeatCount(zoneId, target);
+    }
+
+    // Remove deleted zone images
+    const bodyRaw = req.body as Record<string, string | string[]>;
+    const removeRaw = bodyRaw["remove_image_ids[]"];
+    if (removeRaw) {
+      const ids = Array.isArray(removeRaw) ? removeRaw : [removeRaw];
+      for (const id of ids) {
+        const numId = Number(id);
+        if (!isNaN(numId)) await deleteZoneImage(numId);
+      }
+    }
+
+    // Add new zone images
+    if (zoneImageFiles.length > 0) {
+      let maxOrder = await getMaxZoneImageOrder(zoneId);
+      for (const file of zoneImageFiles) {
+        await insertZoneImage(zoneId, `/uploads/zone/${file.filename}`, file.originalname, ++maxOrder);
+      }
+    }
+
+    const zones = await listZonesByEvent(eventId);
+    return res.json({ message: "Zone updated", zones });
+  } catch (err) {
+    console.error("UPDATE ZONE ERROR:", err);
+    return res.status(500).json({ message: "Error updating zone" });
+  }
+}
+
+export async function deleteZoneHandler(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const eventId = Number(req.params.eventId);
+  const zoneId = Number(req.params.zoneId);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId) || isNaN(zoneId)) return res.status(400).json({ message: "Invalid ID" });
+
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+
+    const zone = await findZoneById(zoneId);
+    if (!zone || zone.event_id !== eventId) return res.status(404).json({ message: "Zone not found" });
+
+    await deleteZone(zoneId);
+    const zones = await listZonesByEvent(eventId);
+    return res.json({ message: "Zone deleted", zones });
+  } catch (err) {
+    console.error("DELETE ZONE ERROR:", err);
+    return res.status(500).json({ message: "Error deleting zone" });
   }
 }

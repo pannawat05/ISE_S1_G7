@@ -8,7 +8,7 @@ import { fetchSingleEvent, updateOrganizerEvent, type OrganizerEvent, type Event
 import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 import { API_BASE } from "@/api/client";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
-import { LeafletMapPicker } from "@/components/shared";
+import { LeafletMapPicker, ZoneEditor } from "@/components/shared";
 import { ImageIcon, Trash2 } from "lucide-react";
 
 interface ExistingImage { id: number; url: string; display_order: number }
@@ -462,6 +462,14 @@ export default function EventEditPage() {
                   onChange={(rLat, rLng) => { setLat(rLat); setLng(rLng); }}
                   onPlaceName={(n) => { if (!placeName) setPlaceName(n); }} />
               </div>
+            </div>
+
+            {/* ผังที่นั่ง / โซน */}
+            <div className="mt-surface p-5">
+              <ZoneEditor
+                organizerId={Number(orgId)}
+                eventId={Number(eventId)}
+              />
             </div>
 
             {/* Save */}

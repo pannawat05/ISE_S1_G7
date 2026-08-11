@@ -177,3 +177,74 @@ export async function updateOrganizerEvent(
     method: "PUT", token, body,
   });
 }
+
+// ─── Zone API ─────────────────────────────────────────────────────────────────
+
+export interface ZoneImage {
+  id: number;
+  url: string;
+  name: string;
+  display_order: number;
+}
+
+export interface Zone {
+  id: number;
+  name: string;
+  category: string;
+  type: string;
+  price: number;
+  event_id: number;
+  seat_count: number;
+  images: ZoneImage[];
+}
+
+export async function fetchZones(
+  token: string,
+  organizerId: number,
+  eventId: number,
+): Promise<Zone[]> {
+  const data = await apiFetch<{ zones: Zone[] }>(
+    `/organizer/${organizerId}/events/${eventId}/zones`,
+    { token },
+  );
+  return data.zones ?? [];
+}
+
+export async function createZone(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  body: FormData,
+): Promise<{ zoneId: number; zones: Zone[] }> {
+  return apiFetch(`/organizer/${organizerId}/events/${eventId}/zones`, {
+    method: "POST",
+    token,
+    body,
+  });
+}
+
+export async function updateZone(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  zoneId: number,
+  body: FormData,
+): Promise<{ zones: Zone[] }> {
+  return apiFetch(`/organizer/${organizerId}/events/${eventId}/zones/${zoneId}`, {
+    method: "PUT",
+    token,
+    body,
+  });
+}
+
+export async function deleteZone(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  zoneId: number,
+): Promise<{ zones: Zone[] }> {
+  return apiFetch(`/organizer/${organizerId}/events/${eventId}/zones/${zoneId}`, {
+    method: "DELETE",
+    token,
+  });
+}

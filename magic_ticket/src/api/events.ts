@@ -50,3 +50,40 @@ export async function fetchPublicEventById(id: number): Promise<PublicEvent> {
   const data = await apiFetch<{ event: PublicEvent }>(`/events/${id}`);
   return data.event;
 }
+
+// ─── Booking: zones + seats ───────────────────────────────────────────────────
+export interface PublicZoneImage {
+  id: number;
+  url: string;
+  name: string;
+  display_order: number;
+}
+
+export interface PublicZone {
+  id: number;
+  name: string;
+  category: string;
+  type: string;
+  price: number;
+  total_seats: number;
+  available_seats: number;
+  images: PublicZoneImage[];
+}
+
+export interface PublicSeat {
+  id: number;
+  name: string;
+  position: string;
+  is_active: boolean;
+  is_available: boolean;
+}
+
+export async function fetchEventZones(eventId: number): Promise<PublicZone[]> {
+  const data = await apiFetch<{ zones: PublicZone[] }>(`/events/${eventId}/zones`);
+  return data.zones ?? [];
+}
+
+export async function fetchZoneSeats(eventId: number, zoneId: number): Promise<PublicSeat[]> {
+  const data = await apiFetch<{ seats: PublicSeat[] }>(`/events/${eventId}/zones/${zoneId}/seats`);
+  return data.seats ?? [];
+}

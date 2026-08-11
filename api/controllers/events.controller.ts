@@ -2,6 +2,105 @@ import type { Request, Response } from "express";
 import { query } from "../model/query.js";
 import type { EventImages, ListEvent, PublicEvent, PublicEventList, Total } from "../model/types.js";
 
+// ─── Public zone/seat data for booking ───────────────────────────────────────
+export async function listEventZones(req: Request, res: Response) {
+  const eventId = Number(req.params.id);
+  if (isNaN(eventId)) return res.status(400).json({ message: "Invalid event ID" });
+
+  try {
+    // Verify event is approved & active
+    const eventRows = await query<{ id: number }[]>(
+      "SELECT id FROM events WHERE id = ? AND status = 'approved' AND is_active = 1 LIMIT 1",
+      [eventId],
+    );
+    if (!eventRows.length) return res.status(404).json({ message: "Event not found" });
+
+    // Zones with seat stats
+    const zones = await query<{
+      id: number; name: string; category: string; type: string; price: number;
+      total_seats: number; available_seats: number;
+    }[]>(
+      `SELECT
+         z.id, z.name, z.category, z.type, z.price,
+         COUNT(s.id)                                                      AS total_seats,
+         COUNT(CASE WHEN s.is_active = 1 AND t.id IS NULL THEN 1 END)   AS available_seats
+       FROM zones z
+       LEFT JOIN seats   s ON s.zone_id = z.id
+       LEFT JOIN tickets t ON t.seat_id = s.id AND t.status NOT IN ('cancelled')
+       WHERE z.event_id = ?
+       GROUP BY z.id
+       ORDER BY z.id ASC`,
+      [eventId],
+    );
+
+    // Zone images
+    if (zones.length) {
+      const zoneIds = zones.map((z) => z.id);
+      const images = await query<{ zone_id: number; id: number; url: string; name: string; display_order: number }[]>(
+        `SELECT zone_id, id, url, name, display_order
+         FROM zone_images
+         WHERE zone_id IN (${zoneIds.map(() => "?").join(",")})
+         ORDER BY zone_id, display_order ASC`,
+        zoneIds,
+      );
+
+      // Attach images to zones
+      const zonesWithImages = zones.map((z) => ({
+        ...z,
+        price: Number(z.price),
+        total_seats: Number(z.total_seats),
+        available_seats: Number(z.available_seats),
+        images: images
+          .filter((img) => img.zone_id === z.id)
+          .map(({ zone_id: _z, ...img }) => img),
+      }));
+
+      return res.json({ zones: zonesWithImages });
+    }
+
+    return res.json({ zones: [] });
+  } catch (err) {
+    console.error("LIST EVENT ZONES ERROR:", err);
+    return res.status(500).json({ message: "Error fetching zones" });
+  }
+}
+
+// ─── Public seats for a specific zone ────────────────────────────────────────
+export async function listZoneSeats(req: Request, res: Response) {
+  const eventId = Number(req.params.id);
+  const zoneId  = Number(req.params.zoneId);
+  if (isNaN(eventId) || isNaN(zoneId)) return res.status(400).json({ message: "Invalid ID" });
+
+  try {
+    const seats = await query<{
+      id: number; name: string; position: string;
+      is_active: number; is_taken: number;
+    }[]>(
+      `SELECT
+         s.id, s.name, s.position, s.is_active,
+         CASE WHEN t.id IS NOT NULL THEN 1 ELSE 0 END AS is_taken
+       FROM seats s
+       LEFT JOIN tickets t ON t.seat_id = s.id AND t.status NOT IN ('cancelled')
+       WHERE s.zone_id = ?
+       ORDER BY s.position ASC`,
+      [zoneId],
+    );
+
+    return res.json({
+      seats: seats.map((s) => ({
+        id: s.id,
+        name: s.name,
+        position: s.position,
+        is_active: Boolean(s.is_active),
+        is_available: Boolean(s.is_active) && !s.is_taken,
+      })),
+    });
+  } catch (err) {
+    console.error("LIST ZONE SEATS ERROR:", err);
+    return res.status(500).json({ message: "Error fetching seats" });
+  }
+}
+
 // Public — no auth required, used by organizer create-event form and home filter
 export async function listEventTypes(_req: Request, res: Response) {
   try {

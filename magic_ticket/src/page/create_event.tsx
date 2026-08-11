@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronDown, Calendar, MapPin, Loader2 } from "lucide-react";
 import Cookies from "js-cookie";
-import { createOrganizerEvent } from "@/api/organizer";
+import { createOrganizerEvent, createZone } from "@/api/organizer";
 import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
-import { LeafletMapPicker, ImageUploadZone } from "@/components/shared";
+import { LeafletMapPicker, ImageUploadZone, ZoneEditor, type ZoneDraft } from "@/components/shared";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CreateEventForm {
@@ -38,7 +38,9 @@ export default function CreateEventPage() {
   const [form, setForm] = useState<CreateEventForm>(EMPTY_FORM);
   const [coverFiles, setCoverFiles] = useState<File[]>([]);
   const [extraFiles, setExtraFiles] = useState<File[]>([]);
+  const [zoneDrafts, setZoneDrafts] = useState<ZoneDraft[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStep, setSubmitStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [typesLoading, setTypesLoading] = useState(true);
@@ -72,6 +74,8 @@ export default function CreateEventPage() {
       const token = Cookies.get("authToken");
       if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อน");
 
+      // Step 1: Create event
+      setSubmitStep("กำลังสร้าง Event...");
       const fd = new FormData();
       fd.append("name", form.name.trim());
       fd.append("place_name", form.place_name.trim());
@@ -86,12 +90,32 @@ export default function CreateEventPage() {
       if (coverFiles[0])           fd.append("cover_image", coverFiles[0]);
       extraFiles.forEach((f) =>    fd.append("event_images", f));
 
-      await createOrganizerEvent(token, organizerId, fd);
+      const { eventId } = await createOrganizerEvent(token, organizerId, fd);
+
+      // Step 2: Create zone drafts (if any)
+      const validDrafts = zoneDrafts.filter((d) => d.name.trim());
+      if (validDrafts.length > 0) {
+        setSubmitStep(`กำลังบันทึกโซน (0/${validDrafts.length})...`);
+        for (let i = 0; i < validDrafts.length; i++) {
+          const draft = validDrafts[i];
+          setSubmitStep(`กำลังบันทึกโซน (${i + 1}/${validDrafts.length})...`);
+          const zfd = new FormData();
+          zfd.append("name", draft.name.trim());
+          zfd.append("category", draft.category);
+          zfd.append("type", draft.type);
+          zfd.append("price", String(draft.price));
+          zfd.append("seat_count", String(draft.seat_count));
+          draft.imageFiles.forEach((f) => zfd.append("zone_images", f));
+          await createZone(token, organizerId, eventId, zfd);
+        }
+      }
+
       navigate(`/profile/events/${organizerId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
       setIsSubmitting(false);
+      setSubmitStep(null);
     }
   }
 
@@ -232,6 +256,13 @@ export default function CreateEventPage() {
               </div>
             </section>
 
+            {/* ── ผังที่นั่ง / โซน ── */}
+            <ZoneEditor
+              organizerId={organizerId}
+              eventId={null}
+              onDraftsChange={setZoneDrafts}
+            />
+
             {/* ── Submit ── */}
             <div className="flex gap-3 pb-8">
               <button type="button"
@@ -245,7 +276,7 @@ export default function CreateEventPage() {
                 className="flex flex-1 justify-center items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-4 py-3 rounded-xl font-semibold text-white text-sm transition-colors disabled:cursor-not-allowed"
               >
                 {isSubmitting
-                  ? <><Loader2 size={16} className="animate-spin" /> กำลังสร้าง...</>
+                  ? <><Loader2 size={16} className="animate-spin" /> {submitStep ?? "กำลังสร้าง..."}</>
                   : "สร้าง Event 🎫"}
               </button>
             </div>

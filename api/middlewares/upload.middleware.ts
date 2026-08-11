@@ -33,3 +33,9 @@ export const uploadEventImages = multer({
   fileFilter: imageFilter,
   limits: { fileSize: 10 * 1024 * 1024 },
 });
+
+export const uploadZoneImages = multer({
+  storage: makeStorage("uploads/zone", "zone"),
+  fileFilter: imageFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
