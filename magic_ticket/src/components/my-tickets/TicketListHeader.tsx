@@ -1,25 +1,17 @@
 export default function TicketListHeader() {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+    <div className="flex sm:flex-row flex-col sm:justify-between sm:items-start gap-4 mb-8">
       <div>
-        <h1 className="text-3xl md:text-4xl font-serif text-white">
+        <h1 className="font-serif text-white text-3xl md:text-4xl">
           ตั๋วเข้าชมของฉัน{" "}
-          <span className="text-gray-500 font-sans text-2xl md:text-3xl">
+          <span className="font-sans text-gray-500 text-2xl md:text-3xl">
             (My Tickets)
           </span>
         </h1>
-        <p className="mt-2 text-sm text-gray-500 max-w-xl">
+        <p className="mt-2 max-w-xl text-gray-500 text-sm">
           จัดการตั๋ว ที่นั่ง กิจกรรม และสถานะการชำระเงินทั้งหมดของคุณในที่เดียว
         </p>
       </div>
-
-      <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer shrink-0">
-        <input
-          type="checkbox"
-          className="w-4 h-4 rounded border-white/10 bg-transparent accent-violet-600"
-        />
-        รับใบเสร็จรับเงิน
-      </label>
     </div>
   );
 }

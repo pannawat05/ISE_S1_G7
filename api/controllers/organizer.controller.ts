@@ -475,3 +475,147 @@ export async function deleteZoneHandler(req: AuthRequest, res: Response) {
     return res.status(500).json({ message: "Error deleting zone" });
   }
 }
+
+// ─── Dashboard Stats ──────────────────────────────────────────────────────────
+
+export async function getDashboard(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
+
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+
+    const now = new Date();
+
+    // ── All events for this organizer with stats ──
+    const { query } = await import("../model/query.js");
+
+    const events = await query<{
+      id: number;
+      name: string;
+      cover_image: string;
+      status: string;
+      is_active: number;
+      start_date: string;
+      end_date: string;
+      place_name: string;
+      type_name: string;
+      total_seats: number;
+      sold_tickets: number;
+      revenue: number;
+      checkins: number;
+    }[]>(
+      `SELECT
+         e.id, e.name, e.cover_image, e.status, e.is_active,
+         e.start_date, e.end_date, e.place_name,
+         et.name AS type_name,
+         COALESCE(seat_stats.total_seats, 0) AS total_seats,
+         COALESCE(ticket_stats.sold_tickets, 0) AS sold_tickets,
+         COALESCE(ticket_stats.revenue, 0)      AS revenue,
+         COALESCE(ticket_stats.checkins, 0)     AS checkins
+       FROM events e
+       JOIN event_types et ON et.id = e.type_id
+       -- Total seats across all zones
+       LEFT JOIN (
+         SELECT z.event_id, COUNT(s.id) AS total_seats
+         FROM zones z
+         LEFT JOIN seats s ON s.zone_id = z.id
+         GROUP BY z.event_id
+       ) seat_stats ON seat_stats.event_id = e.id
+       -- Ticket stats: sold = paid+checked_in, revenue = sum(zone.price)
+       LEFT JOIN (
+         SELECT
+           z2.event_id,
+           COUNT(t.id)                                                        AS sold_tickets,
+           SUM(z2.price)                                                      AS revenue,
+           COUNT(CASE WHEN t.status = 'checked_in' THEN 1 END)               AS checkins
+         FROM tickets t
+         JOIN seats  s2 ON s2.id = t.seat_id
+         JOIN zones  z2 ON z2.id = s2.zone_id
+         WHERE t.status IN ('paid', 'checked_in')
+         GROUP BY z2.event_id
+       ) ticket_stats ON ticket_stats.event_id = e.id
+       WHERE e.organizer_id = ?
+       ORDER BY e.start_date DESC`,
+      [organizerId],
+    );
+
+    // ── Compute event lifecycle status ──
+    function eventLifecycle(e: typeof events[0]): "live" | "upcoming" | "ended" | "pending" | "rejected" {
+      if (e.status === "pending")  return "pending";
+      if (e.status === "rejected") return "rejected";
+      const start = new Date(e.start_date);
+      const end   = new Date(e.end_date);
+      if (now >= start && now <= end) return "live";
+      if (now < start)               return "upcoming";
+      return "ended";
+    }
+
+    // ── KPI aggregates ──
+    const totalEvents   = events.length;
+    const liveCount     = events.filter((e) => eventLifecycle(e) === "live").length;
+    const upcomingCount = events.filter((e) => eventLifecycle(e) === "upcoming").length;
+    const endedCount    = events.filter((e) => eventLifecycle(e) === "ended").length;
+
+    const totalSeats   = events.reduce((s, e) => s + Number(e.total_seats), 0);
+    const totalSold    = events.reduce((s, e) => s + Number(e.sold_tickets), 0);
+    const totalRevenue = events.reduce((s, e) => s + Number(e.revenue), 0);
+    const totalCheckin = events.reduce((s, e) => s + Number(e.checkins), 0);
+
+    const attendanceRate = totalSold > 0 ? Math.round((totalCheckin / totalSold) * 100) : 0;
+    const capacityRate   = totalSeats > 0 ? Math.round((totalSold / totalSeats) * 100) : 0;
+
+    // ── Enrich events with lifecycle + derived fields ──
+    const enriched = events.map((e) => {
+      const lifecycle = eventLifecycle(e);
+      const isSoldOut = Number(e.total_seats) > 0 && Number(e.sold_tickets) >= Number(e.total_seats);
+      const salesPct = Number(e.total_seats) > 0
+        ? Math.round((Number(e.sold_tickets) / Number(e.total_seats)) * 100)
+        : null;
+      const checkinPct = Number(e.sold_tickets) > 0
+        ? Math.round((Number(e.checkins) / Number(e.sold_tickets)) * 100)
+        : 0;
+
+      return {
+        id: e.id,
+        name: e.name,
+        cover_image: e.cover_image,
+        status: e.status,
+        is_active: Boolean(e.is_active),
+        lifecycle,
+        is_sold_out: isSoldOut,
+        start_date: e.start_date,
+        end_date: e.end_date,
+        place_name: e.place_name,
+        type_name: e.type_name,
+        total_seats: Number(e.total_seats),
+        sold_tickets: Number(e.sold_tickets),
+        revenue: Number(e.revenue),
+        checkins: Number(e.checkins),
+        sales_pct: salesPct,
+        checkin_pct: checkinPct,
+      };
+    });
+
+    return res.json({
+      kpi: {
+        total_events: totalEvents,
+        live: liveCount,
+        upcoming: upcomingCount,
+        ended: endedCount,
+        total_seats: totalSeats,
+        total_sold: totalSold,
+        total_revenue: totalRevenue,
+        total_checkins: totalCheckin,
+        attendance_rate: attendanceRate,
+        capacity_rate: capacityRate,
+      },
+      events: enriched,
+    });
+  } catch (err) {
+    console.error("DASHBOARD ERROR:", err);
+    return res.status(500).json({ message: "Error fetching dashboard" });
+  }
+}

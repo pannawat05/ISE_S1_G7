@@ -56,6 +56,11 @@ router.delete("/:id", authenticate, (req, res) =>
   organizerController.deleteOrganizerHandler(req as AuthRequest, res),
 );
 
+// Dashboard stats
+router.get("/:id/dashboard", authenticate, (req, res) =>
+  organizerController.getDashboard(req as AuthRequest, res),
+);
+
 // ─── Zone routes ──────────────────────────────────────────────────────────────
 router.get("/:id/events/:eventId/zones", authenticate, (req, res) =>
   organizerController.listZones(req as AuthRequest, res),

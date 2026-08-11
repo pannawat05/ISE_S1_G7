@@ -248,3 +248,52 @@ export async function deleteZone(
     token,
   });
 }
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+export type EventLifecycle = "live" | "upcoming" | "ended" | "pending" | "rejected";
+
+export interface DashboardEvent {
+  id: number;
+  name: string;
+  cover_image: string;
+  status: "pending" | "approved" | "rejected";
+  is_active: boolean;
+  lifecycle: EventLifecycle;
+  is_sold_out: boolean;
+  start_date: string;
+  end_date: string;
+  place_name: string;
+  type_name: string;
+  total_seats: number;
+  sold_tickets: number;
+  revenue: number;
+  checkins: number;
+  sales_pct: number | null;
+  checkin_pct: number;
+}
+
+export interface DashboardKPI {
+  total_events: number;
+  live: number;
+  upcoming: number;
+  ended: number;
+  total_seats: number;
+  total_sold: number;
+  total_revenue: number;
+  total_checkins: number;
+  attendance_rate: number;
+  capacity_rate: number;
+}
+
+export interface DashboardData {
+  kpi: DashboardKPI;
+  events: DashboardEvent[];
+}
+
+export async function fetchDashboard(
+  token: string,
+  organizerId: number,
+): Promise<DashboardData> {
+  return apiFetch<DashboardData>(`/organizer/${organizerId}/dashboard`, { token });
+}
