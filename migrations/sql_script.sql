@@ -90,8 +90,8 @@ CREATE TABLE events (
 -- Zone
 CREATE TABLE zones (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    category VARCHAR(100) NOT NULL, --บอกประเภทว่ายืน/นั่ง/ ....
-    type VARCHAR(100) NOT NULL, --บอกประเภทว่าฟรี/ ปกติ/ vip
+    category VARCHAR(100) NOT NULL, 
+    type VARCHAR(100) NOT NULL, 
     name VARCHAR(100) NOT NULL,
     price DECIMAL(10,2) DEFAULT 0.00,
     event_id INT NOT NULL,

@@ -105,6 +105,8 @@ export async function checkout(req: AuthRequest, res: Response) {
       amount,
     });
   } catch (err) {
+    console.error(process.env.STRIPE_SECRET_KEY);
+    
     console.error("CHECKOUT ERROR:", err);
     return res.status(500).json({ message: "Checkout failed" });
   }
