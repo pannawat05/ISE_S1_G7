@@ -297,3 +297,76 @@ export async function fetchDashboard(
 ): Promise<DashboardData> {
   return apiFetch<DashboardData>(`/organizer/${organizerId}/dashboard`, { token });
 }
+
+// ─── Whitelist ────────────────────────────────────────────────────────────────
+
+export interface WhitelistEntry {
+  id: number;
+  users_id: number;
+  f_name: string;
+  l_name: string;
+  email: string;
+  note: string | null;
+}
+
+export interface UserSearchResult {
+  id: number;
+  f_name: string;
+  l_name: string;
+  email: string;
+}
+
+export async function searchUsers(
+  token: string,
+  organizerId: number,
+  q: string,
+): Promise<UserSearchResult[]> {
+  const data = await apiFetch<{ users: UserSearchResult[] }>(
+    `/organizer/${organizerId}/search-users?q=${encodeURIComponent(q)}`,
+    { token },
+  );
+  return data.users ?? [];
+}
+
+export async function fetchWhitelist(
+  token: string,
+  organizerId: number,
+  eventId: number,
+): Promise<WhitelistEntry[]> {
+  const data = await apiFetch<{ whitelist: WhitelistEntry[] }>(
+    `/organizer/${organizerId}/events/${eventId}/whitelist`,
+    { token },
+  );
+  return data.whitelist ?? [];
+}
+
+export async function addToWhitelist(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  usersId: number,
+  note?: string,
+): Promise<WhitelistEntry[]> {
+  const data = await apiFetch<{ whitelist: WhitelistEntry[] }>(
+    `/organizer/${organizerId}/events/${eventId}/whitelist`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify({ users_id: usersId, note }),
+    },
+  );
+  return data.whitelist ?? [];
+}
+
+export async function removeFromWhitelist(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  wlId: number,
+): Promise<WhitelistEntry[]> {
+  const data = await apiFetch<{ whitelist: WhitelistEntry[] }>(
+    `/organizer/${organizerId}/events/${eventId}/whitelist/${wlId}`,
+    { method: "DELETE", token },
+  );
+  return data.whitelist ?? [];
+}

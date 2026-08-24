@@ -280,9 +280,9 @@ CREATE TABLE white_list (
         REFERENCES events(id)
         ON DELETE CASCADE,
 
-    CONSTRAINT fk_wl_staff
+    CONSTRAINT fk_wl_added_by
         FOREIGN KEY (add_by)
-        REFERENCES staff(id),
+        REFERENCES users(id),
 
     CONSTRAINT uq_white_list
         UNIQUE(users_id,event_id)

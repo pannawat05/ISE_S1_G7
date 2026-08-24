@@ -1,48 +1,22 @@
 import express from "express";
 import * as organizerController from "../controllers/organizer.controller.js";
+import * as whitelistController from "../controllers/whitelist.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { uploadOrganizerLogo, uploadEventImages, uploadZoneImages } from "../middlewares/upload.middleware.js";
 import type { AuthRequest } from "../middlewares/types.js";
 
 const router = express.Router();
 
+// ─── Organizer CRUD ───────────────────────────────────────────────────────────
 router.post(
-    "/create",
-    authenticate,
-    uploadOrganizerLogo.single("logo"),
-    (req, res) => organizerController.createOrganizerHandler(req as AuthRequest, res),
+  "/create",
+  authenticate,
+  uploadOrganizerLogo.single("logo"),
+  (req, res) => organizerController.createOrganizerHandler(req as AuthRequest, res),
 );
 
 router.get("/:id", authenticate, (req, res) =>
   organizerController.getOrganizer(req as AuthRequest, res),
-);
-
-router.get("/:id/events", authenticate, (req, res) =>
-  organizerController.listEventsByOrganizer(req as AuthRequest, res),
-);
-
-router.get("/:id/events/:eventId", authenticate, (req, res) =>
-  organizerController.getEventById(req as AuthRequest, res),
-);
-
-router.post(
-  "/:id/events",
-  authenticate,
-  uploadEventImages.fields([
-    { name: "cover_image", maxCount: 1 },
-    { name: "event_images", maxCount: 10 },
-  ]),
-  (req, res) => organizerController.createEventForOrganizer(req as AuthRequest, res),
-);
-
-router.put(
-  "/:id/events/:eventId",
-  authenticate,
-  uploadEventImages.fields([
-    { name: "cover_image", maxCount: 1 },
-    { name: "event_images", maxCount: 10 },
-  ]),
-  (req, res) => organizerController.updateEventHandler(req as AuthRequest, res),
 );
 
 router.put(
@@ -56,9 +30,43 @@ router.delete("/:id", authenticate, (req, res) =>
   organizerController.deleteOrganizerHandler(req as AuthRequest, res),
 );
 
-// Dashboard stats
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 router.get("/:id/dashboard", authenticate, (req, res) =>
   organizerController.getDashboard(req as AuthRequest, res),
+);
+
+// ─── User search (for whitelist) ──────────────────────────────────────────────
+router.get("/:id/search-users", authenticate, (req, res) =>
+  whitelistController.searchUsers(req as AuthRequest, res),
+);
+
+// ─── Event CRUD ───────────────────────────────────────────────────────────────
+router.get("/:id/events", authenticate, (req, res) =>
+  organizerController.listEventsByOrganizer(req as AuthRequest, res),
+);
+
+router.post(
+  "/:id/events",
+  authenticate,
+  uploadEventImages.fields([
+    { name: "cover_image", maxCount: 1 },
+    { name: "event_images", maxCount: 10 },
+  ]),
+  (req, res) => organizerController.createEventForOrganizer(req as AuthRequest, res),
+);
+
+router.get("/:id/events/:eventId", authenticate, (req, res) =>
+  organizerController.getEventById(req as AuthRequest, res),
+);
+
+router.put(
+  "/:id/events/:eventId",
+  authenticate,
+  uploadEventImages.fields([
+    { name: "cover_image", maxCount: 1 },
+    { name: "event_images", maxCount: 10 },
+  ]),
+  (req, res) => organizerController.updateEventHandler(req as AuthRequest, res),
 );
 
 // ─── Zone routes ──────────────────────────────────────────────────────────────
@@ -82,6 +90,19 @@ router.put(
 
 router.delete("/:id/events/:eventId/zones/:zoneId", authenticate, (req, res) =>
   organizerController.deleteZoneHandler(req as AuthRequest, res),
+);
+
+// ─── Whitelist routes ─────────────────────────────────────────────────────────
+router.get("/:id/events/:eventId/whitelist", authenticate, (req, res) =>
+  whitelistController.listWhitelist(req as AuthRequest, res),
+);
+
+router.post("/:id/events/:eventId/whitelist", authenticate, (req, res) =>
+  whitelistController.addToWhitelist(req as AuthRequest, res),
+);
+
+router.delete("/:id/events/:eventId/whitelist/:wlId", authenticate, (req, res) =>
+  whitelistController.removeFromWhitelist(req as AuthRequest, res),
 );
 
 export default router;

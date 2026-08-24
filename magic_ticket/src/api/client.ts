@@ -1,5 +1,5 @@
 const API_BASE =
-  import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:5001";
+  import.meta.env.BASE_API?.replace(/\/$/, "") || "http://localhost:5001";
 
 type RequestOptions = Omit<RequestInit, "headers"> & {
   headers?: Record<string, string>;
