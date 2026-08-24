@@ -19,6 +19,34 @@ router.get("/:id", authenticate, (req, res) =>
   organizerController.getOrganizer(req as AuthRequest, res),
 );
 
+router.get("/:id/events", authenticate, (req, res) =>
+  organizerController.listEventsByOrganizer(req as AuthRequest, res),
+);
+
+router.get("/:id/events/:eventId", authenticate, (req, res) =>
+  organizerController.getEventById(req as AuthRequest, res),
+);
+
+router.post(
+  "/:id/events",
+  authenticate,
+  uploadEventImages.fields([
+    { name: "cover_image", maxCount: 1 },
+    { name: "event_images", maxCount: 10 },
+  ]),
+  (req, res) => organizerController.createEventForOrganizer(req as AuthRequest, res),
+);
+
+router.put(
+  "/:id/events/:eventId",
+  authenticate,
+  uploadEventImages.fields([
+    { name: "cover_image", maxCount: 1 },
+    { name: "event_images", maxCount: 10 },
+  ]),
+  (req, res) => organizerController.updateEventHandler(req as AuthRequest, res),
+);
+
 router.put(
   "/:id",
   authenticate,
@@ -30,7 +58,7 @@ router.delete("/:id", authenticate, (req, res) =>
   organizerController.deleteOrganizerHandler(req as AuthRequest, res),
 );
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
+// Dashboard stats
 router.get("/:id/dashboard", authenticate, (req, res) =>
   organizerController.getDashboard(req as AuthRequest, res),
 );

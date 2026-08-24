@@ -10,12 +10,13 @@ export interface CheckoutRequest {
 }
 
 export interface CheckoutResponse {
-  session_id: string;
   client_secret: string;
+  payment_intent_id?: string;
+  session_id?: string;
   amount: number;
-  currency: string;
-  ticket_count: number;
-  mock: boolean;
+  currency?: string;
+  ticket_count?: number;
+  mock?: boolean;
 }
 
 export interface TicketResult {
@@ -25,12 +26,19 @@ export interface TicketResult {
   seat_position: string | null;
 }
 
+export interface ConfirmRequest {
+  payment_intent_id?: string;
+  session_id?: string;
+  simulate_failure?: boolean;
+}
+
 export interface ConfirmResponse {
   message: string;
-  session_id: string;
   status: "paid" | "failed";
-  amount: number;
-  tickets: TicketResult[];
+  payment_intent_id?: string;
+  session_id?: string;
+  amount?: number;
+  tickets?: TicketResult[];
 }
 
 export interface SessionStatus {
@@ -68,15 +76,25 @@ export async function checkout(
   });
 }
 
+/**
+ * รองรับการส่งทั้ง payment_intent_id (Stripe Real) หรือ session_id (Mock/Session)
+ */
 export async function confirmPayment(
   token: string,
-  sessionId: string,
+  paymentIntentOrSessionId: string,
   simulateFailure = false,
 ): Promise<ConfirmResponse> {
+  // เช็คว่า id ขึ้นต้นด้วย pi_ (Stripe Intent) หรือไม่
+  const isStripeIntent = paymentIntentOrSessionId.startsWith("pi_");
+
+  const body: ConfirmRequest = isStripeIntent
+    ? { payment_intent_id: paymentIntentOrSessionId }
+    : { session_id: paymentIntentOrSessionId, simulate_failure: simulateFailure };
+
   return apiFetch("/payment/confirm", {
     method: "POST",
     token,
-    body: JSON.stringify({ session_id: sessionId, simulate_failure: simulateFailure }),
+    body: JSON.stringify(body),
   });
 }
 

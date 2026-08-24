@@ -1,55 +1,74 @@
 version: "3.8"
 
 services:
+
   # --- 1. Node.js Service ---
   web-app:
     build:
       context: ./magic_ticket
       dockerfile: Dockerfile
     container_name: node_app_container
+
     ports:
       - "3000:3000"
+
     environment:
-      - NODE_ENV=development
-      - CHOKIDAR_USEPOLLING=true
-      - DB_HOST=db-mysql
-      - DB_USER=root
-      - DB_PASSWORD=secretpassword
-      - DB_NAME=mydatabase
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      DB_HOST: db-mysql
+      DB_USER: root
+      DB_PASSWORD: secretpassword
+      DB_NAME: mydatabase
+
     volumes:
-      # Bind mount: edit files locally, changes sync into the container
+      # Sync source code from host to container
       - ./magic_ticket:/app
-      # Keep container node_modules (don't overwrite with host)
+
+      # Keep node_modules inside container
       - web_app_node_modules:/app/node_modules
+
     depends_on:
       - db-mysql
+
     restart: unless-stopped
+
 
   # --- 2. MySQL Database Service ---
   db-mysql:
     image: mysql:8.0
     container_name: mysql_container
+
     ports:
       - "3306:3306"
+
     environment:
-      - MYSQL_ROOT_PASSWORD=secretpassword
-      - MYSQL_DATABASE=mydatabase
+      MYSQL_ROOT_PASSWORD: secretpassword
+      MYSQL_DATABASE: mydatabase
+
     volumes:
+      # Keep database data persistent
       - mysql_data:/var/lib/mysql
+
     restart: always
+
 
   # --- 3. phpMyAdmin Service ---
   phpmyadmin:
     image: phpmyadmin:5.2
     container_name: phpmyadmin_container
+
     ports:
       - "8080:80"
+
     environment:
-      - PMA_HOST=db-mysql
-      - PMA_PORT=3306
+      PMA_HOST: db-mysql
+      PMA_PORT: 3306
+
     depends_on:
       - db-mysql
+
     restart: always
+
 
   # --- 4. API Service ---
   api:
@@ -57,23 +76,33 @@ services:
       context: ./api
       dockerfile: Dockerfile
     container_name: api_container
+
     command: npm run dev
+
     ports:
       - "5001:5001"
+
     environment:
-      - NODE_ENV=development
-      - DB_HOST=db-mysql
-      - DB_USER=root
-      - DB_PASSWORD=secretpassword
-      - DB_NAME=mydatabase
+      NODE_ENV: development
+      DB_HOST: db-mysql
+      DB_USER: root
+      DB_PASSWORD: secretpassword
+      DB_NAME: mydatabase
+
     volumes:
-      # Bind mount: edit files locally, changes sync into the container
+      # Sync API source code from host to container
       - ./api:/app
+
+      # Keep API node_modules inside container
       - api_node_modules:/app/node_modules
+
     depends_on:
       - db-mysql
+
     restart: unless-stopped
 
+
+# --- Named Volumes ---
 volumes:
   mysql_data:
   web_app_node_modules:
