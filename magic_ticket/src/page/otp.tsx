@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "@/api/client";
 
 function Otp() {
   const [otpValues, setOtpValues] = useState<string[]>(new Array(6).fill(""));
@@ -108,29 +109,29 @@ function Otp() {
 
       setIsSubmitting(true);
 
-      fetch("http://localhost:5001/email/verifyotp", {
+      apiFetch<{ status?: number; error?: string }>("/email/verifyotp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp: otpCode }),
       })
-        .then((response) => response.json())
         .then((data) => {
-          if (data.message === "OTP verified successfully") {
-            return fetch("http://localhost:5001/auth/signup", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(formData),
-            })
-              .then((response) => response.json())
+          if (data.status === 200) {
+            return apiFetch<{ status?: number; error?: string; message?: string }>(
+              "/auth/signup",
+              {
+                method: "POST",
+                body: JSON.stringify(formData),
+              },
+            )
               .then((signupRes) => {
-                if (signupRes.message === "Registration completed successfully") {
+                
+                if (signupRes.status === 201) {
                   alert("สมัครสมาชิกและยืนยันตัวตนสำเร็จ!");
                   localStorage.removeItem("signupData");
                   window.location.href = "/signin";
                 } else {
                   alert(
                     signupRes.error ||
-                      "การยืนยัน OTP ผ่านแล้ว แต่เกิดข้อผิดพลาดในการบันทึกข้อมูลระบบ"
+                    "การยืนยัน OTP ผ่านแล้ว แต่เกิดข้อผิดพลาดในการบันทึกข้อมูลระบบ"
                   );
                   setIsSubmitting(false);
                 }

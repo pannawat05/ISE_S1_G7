@@ -11,11 +11,20 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    include: ["leaflet", "react-leaflet"],
+  },
   server: {
     host: true,
     port: 3000,
     watch: {
       usePolling: true,
+    },
+    proxy: {
+      "/api": {
+        target: "http://localhost:5001",
+        changeOrigin: true,
+      },
     },
   },
 })

@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { apiFetch } from "@/api/client";
+import { fetchUser } from "@/api/user";
 import Cookies from "js-cookie";
 
 function Signin() {
@@ -15,25 +17,25 @@ function Signin() {
     });
   };
 
+  const goto = useNavigate();
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetch("http://localhost:5001/auth/login", {
+    apiFetch<{ message: string; token?: string; role?: string }>("/auth/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(formData),
     })
-      .then((response) => response.json())
-      .then((data) => {
-        alert(data.message);
+      .then(async (data) => {
         if (data.token) {
           Cookies.set("authToken", data.token, { path: "/" });
-          if (data.role === "organizer") {
-            window.location.href = "/dashboard";
-          } else {
-            window.location.href = "/";
-          }
+          // Pre-fetch user so Navbar can read it immediately
+          localStorage.removeItem("user");
+          await fetchUser(data.token);
+          // Notify Navbar to re-read localStorage
+          window.dispatchEvent(new Event("user-updated"));
+          goto("/");
+        } else {
+          alert(data.message);
         }
       })
       .catch((error) => {
@@ -44,16 +46,16 @@ function Signin() {
 
   return (
     <div className="mt-auth-page">
-      <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-purple-600/10 blur-[100px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-600/10 blur-[100px] rounded-full pointer-events-none" />
+      <div className="top-1/4 left-1/4 absolute bg-purple-600/10 blur-[100px] rounded-full w-80 h-80 pointer-events-none" />
+      <div className="right-1/4 bottom-1/4 absolute bg-violet-600/10 blur-[100px] rounded-full w-80 h-80 pointer-events-none" />
 
       <div className="mt-auth-card">
-        <div className="text-center mb-8">
-          <div className="text-3xl mb-2">🔮✨</div>
-          <h2 className="text-3xl font-extrabold mt-heading">
+        <div className="mb-8 text-center">
+          {/* <div className="mb-2 text-3xl">🔮✨</div> */}
+          <h2 className="mt-heading font-extrabold text-3xl">
             ยินดีต้อนรับกลับมา
           </h2>
-          <p className="text-sm text-gray-400 mt-2">
+          <p className="mt-2 text-gray-400 text-sm">
             กรุณาเข้าสู่ระบบเพื่อใช้งานบัญชีเวทมนตร์ของคุณ
           </p>
         </div>
@@ -87,33 +89,33 @@ function Signin() {
             />
           </div>
 
-          <div className="flex items-center justify-between text-xs pt-1">
+          <div className="flex justify-between items-center pt-1 text-xs">
             <div className="flex items-center">
               <input
                 id="remember-me"
                 name="remember-me"
                 type="checkbox"
-                className="h-4 w-4 bg-elevated border-white/10 text-violet-600 focus:ring-purple-500/50 focus:ring-offset-0 rounded"
+                className="bg-elevated border-white/10 rounded focus:ring-purple-500/50 focus:ring-offset-0 w-4 h-4 text-violet-600"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-gray-400">
+              <label htmlFor="remember-me" className="block ml-2 text-gray-400">
                 จดจำฉันไว้
               </label>
             </div>
 
-            <a href="#" className="font-medium mt-link">
+            <a href="#" className="mt-link font-medium">
               ลืมรหัสผ่าน?
             </a>
           </div>
 
           <button
             type="submit"
-            className="w-full mt-4 py-3 mt-btn-primary transform hover:-translate-y-0.5 active:translate-y-0 text-sm tracking-wide"
+            className="mt-4 mt-btn-primary py-3 w-full text-sm tracking-wide hover:-translate-y-0.5 active:translate-y-0 transform"
           >
             เปิดประตูมิติเข้าสู่ระบบ 🔮
           </button>
         </form>
 
-        <div className="text-center mt-6 text-xs text-gray-500">
+        <div className="mt-6 text-gray-500 text-xs text-center">
           ยังไม่มีบัญชีใช่ไหม?{" "}
           <Link
             to="/signup"

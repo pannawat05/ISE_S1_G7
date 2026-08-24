@@ -1,8 +1,9 @@
 {
-  "devDependencies": {
-    "@types/js-cookie": "^3.0.6"
-  },
   "dependencies": {
-    "lucide-react": "^1.25.0"
+    "qrcode": "^1.5.4",
+    "stripe": "^22.5.0"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6"
   }
 }

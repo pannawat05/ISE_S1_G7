@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "@/api/client";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -25,45 +26,41 @@ export default function SignUp() {
       return;
     }
 
-    fetch("http://localhost:5001/email/sendotp", {
+    apiFetch("/email/sendotp", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({
         email: formData.email,
-        otp: Math.floor(100000 + Math.random() * 900000),
       }),
     })
-      .then((response) => response.json())
       .then((data) => {
-        console.log("Success:", data);
+        console.log("OTP sent:", data);
         localStorage.setItem("signupData", JSON.stringify(formData));
         window.location.href = "/otp";
       })
       .catch((error) => {
-        console.error("Error:", error);
+        console.error("Error sending OTP:", error);
+        alert("เกิดข้อผิดพลาดในการส่ง OTP กรุณาลองใหม่");
       });
   };
 
   return (
     <div className="mt-auth-page">
-      <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-purple-600/10 blur-[100px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-600/10 blur-[100px] rounded-full pointer-events-none" />
+      <div className="top-1/4 left-1/4 absolute bg-purple-600/10 blur-[100px] rounded-full w-80 h-80 pointer-events-none" />
+      <div className="right-1/4 bottom-1/4 absolute bg-violet-600/10 blur-[100px] rounded-full w-80 h-80 pointer-events-none" />
 
       <div className="mt-auth-card">
-        <div className="text-center mb-8">
-          <div className="text-3xl mb-2">✨🧙‍♂️</div>
-          <h2 className="text-3xl font-extrabold mt-heading">
+        <div className="mb-8 text-center">
+          {/* <div className="mb-2 text-3xl">✨🧙‍♂️</div> */}
+          <h2 className="mt-heading font-extrabold text-3xl">
             สร้างบัญชีเวทมนตร์
           </h2>
-          <p className="text-sm text-gray-400 mt-2">
+          <p className="mt-2 text-gray-400 text-sm">
             เข้าร่วมการเดินทางข้ามมิติไปกับเรา
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="gap-4 grid grid-cols-2">
             <div>
               <label className="mt-label">ชื่อจริง</label>
               <input
@@ -131,13 +128,13 @@ export default function SignUp() {
 
           <button
             type="submit"
-            className="w-full mt-4 py-3 mt-btn-primary transform hover:-translate-y-0.5 active:translate-y-0 text-sm tracking-wide"
+            className="mt-4 mt-btn-primary py-3 w-full text-sm tracking-wide hover:-translate-y-0.5 active:translate-y-0 transform"
           >
             ร่ายมนตร์สมัครสมาชิก 🔮
           </button>
         </form>
 
-        <div className="text-center mt-6 text-xs text-gray-500">
+        <div className="mt-6 text-gray-500 text-xs text-center">
           มีบัญชีอยู่แล้วใช่ไหม?{" "}
           <Link
             to="/signin"
