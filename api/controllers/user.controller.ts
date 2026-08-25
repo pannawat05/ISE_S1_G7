@@ -92,3 +92,57 @@ export async function updateMe(req: AuthRequest, res: Response) {
     return res.status(500).json({ error: "Internal server error" });
   }
 }
+
+// ─── GET /users/my-staff-assignments ─────────────────────────────────────────
+export async function getMyStaffAssignments(req: AuthRequest, res: Response) {
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    const { query } = await import("../model/query.js");
+
+    const assignments = await query<{
+      staff_id: number;
+      staff_role: string;
+      organizer_id: number;
+      organizer_name: string;
+      organizer_logo: string | null;
+      event_id: number | null;
+      event_name: string | null;
+      event_role: string | null;
+      event_status: string | null;
+      start_date: string | null;
+      end_date: string | null;
+      place_name: string | null;
+      cover_image: string | null;
+      assigned_at: string | null;
+    }[]>(
+      `SELECT
+         s.id           AS staff_id,
+         s.role         AS staff_role,
+         o.id           AS organizer_id,
+         o.name         AS organizer_name,
+         o.logo_url     AS organizer_logo,
+         e.id           AS event_id,
+         e.name         AS event_name,
+         es.role        AS event_role,
+         e.status       AS event_status,
+         e.start_date,
+         e.end_date,
+         e.place_name,
+         e.cover_image,
+         es.assigned_at
+       FROM staff s
+       JOIN organizers o ON o.id = s.organizer_id
+       LEFT JOIN event_staff es ON es.staff_id = s.id
+       LEFT JOIN events e ON e.id = es.event_id AND e.status != 'deleted'
+       WHERE s.users_id = ?
+       ORDER BY e.start_date DESC`,
+      [req.user.id],
+    );
+
+    return res.json({ assignments });
+  } catch (err) {
+    console.error("MY STAFF ASSIGNMENTS ERROR:", err);
+    return res.status(500).json({ message: "Error fetching assignments" });
+  }
+}
