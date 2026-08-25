@@ -8,11 +8,8 @@ import type { RowDataPacket } from "mysql2";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
-interface ZoneQuery extends RowDataPacket {
-  id: number;
-  price: number;
-  event_id: number;
-}
+interface ZoneQuery extends RowDataPacket { id: number; price: number; event_id: number; }
+interface SeatId   extends RowDataPacket { id: number; }
 
 export async function checkout(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
@@ -41,16 +38,13 @@ export async function checkout(req: AuthRequest, res: Response) {
       return res.status(404).json({ message: "Zone not found" });
     const zone = zones[0];
 
-    interface SeatId extends RowDataPacket {
-      id: number;
-    }
-
     if (seat_ids?.length > 0) {
       const placeholders = seat_ids.map(() => "?").join(",");
       const takenCheck = await query<SeatId[]>(
         `SELECT s.id FROM seats s
          JOIN tickets t ON t.seat_id = s.id
-         WHERE s.id IN (${placeholders}) AND s.zone_id = ? AND t.status NOT IN ('cancelled')`,
+         WHERE s.id IN (${placeholders}) AND s.zone_id = ?
+         AND t.status NOT IN ('cancelled', 'reserved')`,
         [...seat_ids, zone_id],
       );
       if (takenCheck.length > 0) {
@@ -66,9 +60,10 @@ export async function checkout(req: AuthRequest, res: Response) {
     const qty = seat_ids?.length > 0 ? seat_ids.length : 1;
     const amount = Number(zone?.price) * qty;
 
-    // 3. Create pending tickets (seat_ids optional)
+    // 3. Create reserved tickets
     const ticketIds: number[] = [];
     if (seat_ids?.length > 0) {
+      // Seat-based booking
       for (const seatId of seat_ids) {
         const qrcode = `MT-${uuidv4()}`;
         const result = await execute(
@@ -77,6 +72,24 @@ export async function checkout(req: AuthRequest, res: Response) {
         );
         ticketIds.push(result.insertId);
       }
+    } else {
+      // Standing zone — find any free active seat
+      const freeSeat = await query<{ id: number }[]>(
+        `SELECT s.id FROM seats s
+         LEFT JOIN tickets t ON t.seat_id = s.id AND t.status NOT IN ('cancelled')
+         WHERE s.zone_id = ? AND s.is_active = 1 AND t.id IS NULL
+         LIMIT 1`,
+        [zone_id],
+      );
+      if (!freeSeat[0]) {
+        return res.status(409).json({ message: "ที่นั่งในโซนนี้เต็มแล้ว" });
+      }
+      const qrcode = `MT-${uuidv4()}`;
+      const result = await execute(
+        "INSERT INTO tickets (qrcode, status, users_id, seat_id) VALUES (?, 'reserved', ?, ?)",
+        [qrcode, userId, freeSeat[0].id],
+      );
+      ticketIds.push(result.insertId);
     }
 
     const paymentIntent = await stripe.paymentIntents.create({
@@ -91,12 +104,7 @@ export async function checkout(req: AuthRequest, res: Response) {
     await execute(
       `INSERT INTO transactions (gross_amount, status, ticket_id, payment_method_id, bank_ref_no)
        VALUES (?, 'pending', ?, ?, ?)`,
-      [
-        amount,
-        ticketIds[0] ?? null,
-        payment_method_id ?? null,
-        paymentIntent.id,
-      ],
+      [amount, ticketIds[0] ?? null, payment_method_id ?? null, paymentIntent.id],
     );
 
     return res.status(201).json({
@@ -105,8 +113,6 @@ export async function checkout(req: AuthRequest, res: Response) {
       amount,
     });
   } catch (err) {
-    console.error(process.env.STRIPE_SECRET_KEY);
-    
     console.error("CHECKOUT ERROR:", err);
     return res.status(500).json({ message: "Checkout failed" });
   }
@@ -129,80 +135,127 @@ export async function confirmPayment(req: AuthRequest, res: Response) {
       return res.status(400).json({ message: "การชำระเงินยังไม่สมบูรณ์" });
     }
 
+    // ticketIds stored in metadata during checkout
+    const ticketIds: number[] = JSON.parse(intent.metadata?.ticketIds ?? "[]");
+
+    // Mark transaction paid
     await execute(
-      "UPDATE transactions SET status = 'paid' WHERE bank_ref_no = ?",
+      "UPDATE transactions SET status = 'paid' WHERE bank_ref_no = ? AND status = 'pending'",
       [intent.id],
     );
-    interface TicketId extends RowDataPacket {
+
+    // Mark all tickets paid + generate QR per ticket
+    const results: {
       ticket_id: number;
-    }
-    const pendingTickets = await query<TicketId[]>(
-      "SELECT ticket_id FROM transactions WHERE bank_ref_no = ?",
-      [intent.id],
-    );
-    const ticketIds = pendingTickets.map((t) => t.ticket_id);
+      qrcode: string;
+      qr_data_url: string;
+      seat_position: string | null;
+    }[] = [];
 
-    if (ticketIds.length > 0) {
-      const placeholders = ticketIds.map(() => "?").join(",");
-      await execute(
-        `UPDATE tickets SET status = 'paid' WHERE id IN (${placeholders})`,
-        ticketIds,
+    for (const ticketId of ticketIds) {
+      await execute("UPDATE tickets SET status = 'paid' WHERE id = ?", [ticketId]);
+
+      const rows = await query<{
+        qrcode: string;
+        seat_position: string | null;
+        event_name: string;
+        zone_name: string;
+      }[]>(
+        `SELECT t.qrcode, s.position AS seat_position,
+                e.name AS event_name, z.name AS zone_name
+         FROM tickets t
+         JOIN seats  s ON s.id = t.seat_id
+         JOIN zones  z ON z.id = s.zone_id
+         JOIN events e ON e.id = z.event_id
+         WHERE t.id = ? LIMIT 1`,
+        [ticketId],
       );
+
+      const info = rows[0];
+      if (!info) continue;
+
+      const qrDataUrl = await QRCode.toDataURL(
+        JSON.stringify({
+          v: 1,
+          id: ticketId,
+          code: info.qrcode,
+          seat: info.seat_position,
+          event: info.event_name,
+          zone: info.zone_name,
+        }),
+        { errorCorrectionLevel: "H", margin: 2, width: 300 },
+      );
+
+      results.push({
+        ticket_id: ticketId,
+        qrcode: info.qrcode,
+        qr_data_url: qrDataUrl,
+        seat_position: info.seat_position,
+      });
     }
 
-    return res.json({ message: "ชำระเงินสำเร็จ", status: "paid" });
+    return res.json({
+      message: "ชำระเงินสำเร็จ",
+      status: "paid",
+      tickets: results,
+    });
   } catch (err) {
     console.error("CONFIRM ERROR:", err);
     return res.status(500).json({ message: "Payment confirmation failed" });
   }
 }
 
-interface Ticket extends RowDataPacket {
-  id: number;
-  qrcode: string;
-  status: string;
-  seat_position: string;
-  zone_name: string;
-  event_name: string;
-}
-
 export async function getMyTickets(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-  const tickets = await query<[]>(
-    `SELECT 
-        t.id, 
-        t.qrcode, 
-        t.status,
-        t.created_at,
-        s.position AS seat_position,
-        z.name AS zone_name,
-        z.type AS zone_type,
-        z.price AS zone_price,
-        e.name AS event_name,
-        e.start_date AS event_start,
-        e.place_name AS place_name
+  try {
+    const tickets = await query<{
+      id: number; qrcode: string; status: string; created_at: string;
+      seat_position: string; zone_name: string; zone_type: string; zone_price: number;
+      event_name: string; event_start: string; place_name: string;
+    }[]>(
+      `SELECT
+         t.id, t.qrcode, t.status, t.created_at,
+         s.position   AS seat_position,
+         z.name       AS zone_name,
+         z.type       AS zone_type,
+         z.price      AS zone_price,
+         e.name       AS event_name,
+         e.start_date AS event_start,
+         e.place_name
        FROM tickets t
-       LEFT JOIN seats s ON s.id = t.seat_id
-       LEFT JOIN zones z ON z.id = s.zone_id
-       LEFT JOIN events e ON e.id = z.event_id
-       WHERE t.users_id = ? 
-       ORDER BY t.id DESC`,
-    [userId],
-  );
+       JOIN seats  s ON s.id  = t.seat_id
+       JOIN zones  z ON z.id  = s.zone_id
+       JOIN events e ON e.id  = z.event_id
+       WHERE t.users_id = ?
+       ORDER BY t.created_at DESC`,
+      [userId],
+    );
 
-  const withQR = await Promise.all(
-    tickets.map(async (t: Ticket) => {
-      let qr_data_url = null;
-      if (t.status === "paid" || t.status === "checked_in") {
-        qr_data_url = await QRCode.toDataURL(
-          JSON.stringify({ id: t.id, code: t.qrcode }),
-        );
-      }
-      return { ...t, qr_data_url };
-    }),
-  );
+    const withQR = await Promise.all(
+      tickets.map(async (t) => {
+        let qr_data_url: string | null = null;
+        if (t.status === "paid" || t.status === "checked_in") {
+          qr_data_url = await QRCode.toDataURL(
+            JSON.stringify({
+              v: 1,
+              id: t.id,
+              code: t.qrcode,
+              seat: t.seat_position,
+              event: t.event_name,
+              zone: t.zone_name,
+            }),
+            { errorCorrectionLevel: "H", margin: 2, width: 300 },
+          );
+        }
+        return { ...t, qr_data_url };
+      }),
+    );
 
-  return res.json({ tickets: withQR });
+    return res.json({ tickets: withQR });
+  } catch (err) {
+    console.error("MY TICKETS ERROR:", err);
+    return res.status(500).json({ message: "Error fetching tickets" });
+  }
 }

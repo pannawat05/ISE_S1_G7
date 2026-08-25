@@ -1,13 +1,4 @@
-/**
- * BookingDrawer — slide-in panel จากด้านขวา
- * เปิดจากหน้า event_detail เมื่อกด "ซื้อบัตร"
- *
- * Flow:
- *   1. เลือกโซน     → แสดง zone list พร้อม available/total seats + ราคา
- *   2. เลือกที่นั่ง  → แสดง seat grid (available / taken / selected)
- *   3. ยืนยัน        → navigate ไป /payment พร้อม state
- */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, ChevronRight, ArrowLeft, Loader2, Users } from "lucide-react";
 import { API_BASE } from "@/api/client";
@@ -30,20 +21,17 @@ function typeColor(type: string) {
 function availabilityColor(available: number, total: number) {
   if (total === 0) return "text-gray-500";
   const ratio = available / total;
-  if (available === 0)   return "text-red-400";
-  if (ratio <= 0.2)      return "text-orange-400";
-  if (ratio <= 0.5)      return "text-yellow-400";
+  if (available === 0) return "text-red-400";
+  if (ratio <= 0.2)    return "text-orange-400";
+  if (ratio <= 0.5)    return "text-yellow-400";
   return "text-green-400";
 }
 
 // ─── Zone Card ────────────────────────────────────────────────────────────────
 function ZoneCard({ zone, selected, onSelect }: {
-  zone: PublicZone;
-  selected: boolean;
-  onSelect: () => void;
+  zone: PublicZone; selected: boolean; onSelect: () => void;
 }) {
   const isSoldOut = zone.total_seats > 0 && zone.available_seats === 0;
-  const hasSeats  = zone.total_seats > 0;
   const imgSrc = zone.images[0]
     ? (zone.images[0].url.startsWith("http") ? zone.images[0].url : `${API_BASE}${zone.images[0].url}`)
     : null;
@@ -62,7 +50,6 @@ function ZoneCard({ zone, selected, onSelect }: {
       }`}
     >
       <div className="flex items-center gap-3">
-        {/* Zone image thumbnail */}
         {imgSrc ? (
           <img src={imgSrc} alt={zone.name}
             className="border border-white/10 rounded-lg w-16 h-12 object-cover shrink-0" />
@@ -71,7 +58,6 @@ function ZoneCard({ zone, selected, onSelect }: {
             <Users size={18} className="text-gray-600" />
           </div>
         )}
-
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
             <span className="font-semibold text-white text-sm">{zone.name}</span>
@@ -80,18 +66,16 @@ function ZoneCard({ zone, selected, onSelect }: {
             </span>
             <span className="text-gray-500 text-xs">{zone.category}</span>
           </div>
-          {hasSeats && (
+          {zone.total_seats > 0 ? (
             <p className={`text-xs ${availabilityColor(zone.available_seats, zone.total_seats)}`}>
               {isSoldOut
                 ? "บัตรหมด"
                 : `เหลือ ${zone.available_seats.toLocaleString()} / ${zone.total_seats.toLocaleString()} ที่นั่ง`}
             </p>
-          )}
-          {!hasSeats && (
+          ) : (
             <p className="text-gray-600 text-xs">ไม่กำหนดที่นั่ง</p>
           )}
         </div>
-
         <div className="text-right shrink-0">
           <p className="font-bold text-violet-300 text-base">
             {zone.price === 0 ? "ฟรี" : `฿${zone.price.toLocaleString()}`}
@@ -118,13 +102,15 @@ function SeatGrid({ seats, selected, onToggle, maxSelect = 10 }: {
     );
   }
 
-  // Group seats by row letter (A, B, C...)
+  // Group by row: strip trailing digits from position → row label
+  // e.g. "A1" → "A", "VIP-L3" → "VIP-L", "FLOOR10" → "FLOOR"
   const rowMap = new Map<string, PublicSeat[]>();
   for (const seat of seats) {
     const row = seat.position.replace(/\d+$/, "") || "?";
     if (!rowMap.has(row)) rowMap.set(row, []);
     rowMap.get(row)!.push(seat);
   }
+  // Sort rows alphabetically
   const rows = Array.from(rowMap.entries()).sort(([a], [b]) => a.localeCompare(b));
 
   return (
@@ -138,22 +124,25 @@ function SeatGrid({ seats, selected, onToggle, maxSelect = 10 }: {
           <span className="inline-block bg-violet-600 border border-violet-500 rounded w-4 h-4" />เลือกแล้ว
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block bg-white/5 border border-white/10 rounded w-4 h-4" />ถูกจองแล้ว
+          <span className="inline-block bg-white/5 border border-white/10 rounded w-4 h-4" />จองแล้ว
         </span>
       </div>
 
-      {/* Stage indicator */}
+      {/* Stage */}
       <div className="flex justify-center">
         <div className="bg-white/5 px-8 py-1.5 border border-white/10 rounded-full text-gray-500 text-xs tracking-widest">
           STAGE
         </div>
       </div>
 
-      {/* Seat rows */}
+      {/* Rows */}
       <div className="space-y-1.5 pb-2 overflow-x-auto">
-        {rows.map(([rowLetter, rowSeats]) => (
-          <div key={rowLetter} className="flex justify-center items-center gap-1.5 mx-auto min-w-max">
-            <span className="w-5 text-gray-600 text-xs text-right shrink-0">{rowLetter}</span>
+        {rows.map(([rowLabel, rowSeats]) => (
+          <div key={rowLabel} className="flex justify-center items-center gap-1.5 mx-auto min-w-max">
+            {/* Row label badge */}
+            <span className="w-8 font-mono text-gray-500 text-xs text-right shrink-0">
+              {rowLabel}
+            </span>
             {rowSeats
               .sort((a, b) => {
                 const na = parseInt(a.position.replace(/\D/g, "")) || 0;
@@ -161,16 +150,17 @@ function SeatGrid({ seats, selected, onToggle, maxSelect = 10 }: {
                 return na - nb;
               })
               .map((seat) => {
-                const isSelected = selected.has(seat.id);
-                const canSelect = seat.is_available || isSelected;
+                const isSelected  = selected.has(seat.id);
+                const canSelect   = seat.is_available || isSelected;
+                const seatNum     = seat.position.replace(/\D/g, "") || seat.position;
                 return (
                   <button
                     key={seat.id}
                     type="button"
                     disabled={!canSelect}
                     onClick={() => canSelect && onToggle(seat.id)}
-                    title={`${seat.position}${!seat.is_available ? " (ถูกจองแล้ว)" : ""}`}
-                    className={`w-7 h-7 rounded text-xs font-medium transition-all ${
+                    title={`${seat.position}${!seat.is_available ? " (จองแล้ว)" : ""}`}
+                    className={`w-7 h-7 rounded text-xs font-medium transition-all select-none ${
                       isSelected
                         ? "bg-violet-600 border border-violet-500 text-white scale-105 shadow-lg shadow-violet-500/30"
                         : seat.is_available
@@ -178,7 +168,7 @@ function SeatGrid({ seats, selected, onToggle, maxSelect = 10 }: {
                           : "bg-white/5 border border-white/10 text-gray-700 cursor-not-allowed"
                     } ${!canSelect ? "opacity-60" : ""}`}
                   >
-                    {parseInt(seat.position.replace(/\D/g, "")) || seat.position.slice(-2)}
+                    {seatNum}
                   </button>
                 );
               })}
@@ -208,57 +198,67 @@ type Step = "zone" | "seat" | "confirm";
 export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: BookingDrawerProps) {
   const navigate = useNavigate();
 
-  const [step, setStep] = useState<Step>("zone");
-  const [zones, setZones] = useState<PublicZone[]>([]);
-  const [zonesLoading, setZonesLoading] = useState(true);
-  const [zonesError, setZonesError] = useState<string | null>(null);
-
+  const [step, setStep]                 = useState<Step>("zone");
+  const [zones, setZones]               = useState<PublicZone[]>([]);
+  const [zonesLoading, setZonesLoading] = useState(false);
+  const [zonesError, setZonesError]     = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState<PublicZone | null>(null);
-  const [seats, setSeats] = useState<PublicSeat[]>([]);
+  const [seats, setSeats]               = useState<PublicSeat[]>([]);
   const [seatsLoading, setSeatsLoading] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<Set<number>>(new Set());
 
-  // Load zones when drawer opens
+  console.log(zones)
+
+  // ── FIX: use ref to prevent double-fetch from StrictMode double-invoke ──
+  const fetchedRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
-    setStep("zone");
-    setSelectedZone(null);
-    setSelectedSeats(new Set());
-    setZonesLoading(true);
-    fetchEventZones(eventId)
-      .then(setZones)
-      .catch((e: Error) => setZonesError(e.message))
-      .finally(() => setZonesLoading(false));
+
+    // Reset state when drawer opens for a new event
+    if (fetchedRef.current !== eventId) {
+      fetchedRef.current = eventId;
+      setStep("zone");
+      setSelectedZone(null);
+      setSelectedSeats(new Set());
+      setSeats([]);
+      setZonesError(null);
+      setZonesLoading(true);
+      fetchEventZones(eventId)
+        .then(setZones)
+        .catch((e: Error) => setZonesError(e.message))
+        .finally(() => setZonesLoading(false));
+    }
   }, [isOpen, eventId]);
 
-  // Load seats when zone selected
-  const handleSelectZone = useCallback(async (zone: PublicZone) => {
+  // Reset fetchedRef when drawer closes so next open re-fetches
+  useEffect(() => {
+    if (!isOpen) fetchedRef.current = null;
+  }, [isOpen]);
+
+  async function handleSelectZone(zone: PublicZone) {
     setSelectedZone(zone);
     setSelectedSeats(new Set());
 
     if (zone.total_seats > 0) {
-      setSeatsLoading(true);
       setStep("seat");
+      setSeatsLoading(true);
       try {
         const data = await fetchZoneSeats(eventId, zone.id);
         setSeats(data);
       } catch { setSeats([]); }
       finally { setSeatsLoading(false); }
     } else {
-      // No specific seats — go straight to confirm
       setSeats([]);
       setStep("confirm");
     }
-  }, [eventId]);
+  }
 
   function toggleSeat(seatId: number) {
     setSelectedSeats((prev) => {
       const next = new Set(prev);
-      if (next.has(seatId)) {
-        next.delete(seatId);
-      } else if (next.size < 10) {
-        next.add(seatId);
-      }
+      if (next.has(seatId)) { next.delete(seatId); }
+      else if (next.size < 10) { next.add(seatId); }
       return next;
     });
   }
@@ -278,20 +278,21 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
     onClose();
   }
 
-  const canConfirm = selectedZone && (
-    selectedZone.total_seats === 0 || selectedSeats.size > 0
-  );
+  function goBack() {
+    if (step === "seat")    { setStep("zone"); }
+    if (step === "confirm") { setStep(selectedZone?.total_seats === 0 ? "zone" : "seat"); }
+  }
 
+  const canConfirm = selectedZone && (selectedZone.total_seats === 0 || selectedSeats.size > 0);
   const totalPrice = selectedZone
     ? selectedZone.price * (selectedSeats.size || (selectedZone.total_seats === 0 ? 1 : 0))
     : 0;
 
-  // ── Render ──
   return (
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-[90] bg-black/70 backdrop-blur-sm transition-opacity ${
+        className={`fixed inset-0 z-[90] bg-black/70 backdrop-blur-sm transition-opacity duration-300 ${
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
@@ -306,16 +307,15 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
         <div className="flex justify-between items-center px-5 py-4 border-white/10 border-b shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             {step !== "zone" && (
-              <button type="button"
-                onClick={() => setStep(step === "confirm" && selectedZone?.total_seats === 0 ? "zone" : step === "seat" ? "zone" : "seat")}
+              <button type="button" onClick={goBack}
                 className="hover:bg-white/10 p-1.5 rounded-lg text-gray-400 hover:text-white transition-colors shrink-0">
                 <ArrowLeft size={18} />
               </button>
             )}
             <div className="min-w-0">
               <p className="font-bold text-white text-base truncate">
-                {step === "zone" && "เลือกโซนที่นั่ง"}
-                {step === "seat" && `โซน ${selectedZone?.name ?? ""}`}
+                {step === "zone"    && "เลือกโซนที่นั่ง"}
+                {step === "seat"    && `โซน ${selectedZone?.name ?? ""}`}
                 {step === "confirm" && "ยืนยันการจอง"}
               </p>
               <p className="text-gray-500 text-xs truncate">{eventName}</p>
@@ -331,7 +331,9 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
         <div className="flex gap-1.5 px-5 py-3 shrink-0">
           {(["zone", "seat", "confirm"] as Step[]).map((s, i) => (
             <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${
-              step === s ? "bg-violet-500" : i < ["zone","seat","confirm"].indexOf(step) ? "bg-violet-500/40" : "bg-white/10"
+              step === s ? "bg-violet-500"
+              : i < ["zone","seat","confirm"].indexOf(step) ? "bg-violet-500/40"
+              : "bg-white/10"
             }`} />
           ))}
         </div>
@@ -339,7 +341,7 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
         {/* Body */}
         <div className="flex-1 space-y-4 px-5 py-4 min-h-0 overflow-y-auto">
 
-          {/* ── STEP 1: Zone list ── */}
+          {/* ── Zone list ── */}
           {step === "zone" && (
             <>
               {zonesLoading && (
@@ -357,20 +359,17 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
                 </div>
               )}
               {!zonesLoading && zones.map((zone) => (
-                <ZoneCard
-                  key={zone.id}
-                  zone={zone}
+                <ZoneCard key={zone.id} zone={zone}
                   selected={selectedZone?.id === zone.id}
-                  onSelect={() => handleSelectZone(zone)}
-                />
+                  onSelect={() => handleSelectZone(zone)} />
               ))}
             </>
           )}
 
-          {/* ── STEP 2: Seat picker ── */}
+          {/* ── Seat picker ── */}
           {step === "seat" && selectedZone && (
             <div className="space-y-4">
-              {/* Zone summary */}
+              {/* Zone summary bar */}
               <div className="flex justify-between items-center bg-white/[0.02] p-4 border border-white/5 rounded-xl">
                 <div>
                   <p className="font-semibold text-white">{selectedZone.name}</p>
@@ -401,24 +400,16 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
                 </div>
               )}
 
-              {seatsLoading && (
+              {seatsLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 size={22} className="text-violet-400 animate-spin" />
                 </div>
-              )}
-              {!seatsLoading && (
+              ) : (
                 <>
-                  <SeatGrid
-                    seats={seats}
-                    selected={selectedSeats}
-                    onToggle={toggleSeat}
-                  />
+                  <SeatGrid seats={seats} selected={selectedSeats} onToggle={toggleSeat} />
                   {selectedSeats.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setStep("confirm")}
-                      className="bg-violet-600 hover:bg-violet-700 py-3 rounded-xl w-full font-semibold text-white text-sm transition-colors"
-                    >
+                    <button type="button" onClick={() => setStep("confirm")}
+                      className="bg-violet-600 hover:bg-violet-700 py-3 rounded-xl w-full font-semibold text-white text-sm transition-colors">
                       ยืนยันที่นั่ง ({selectedSeats.size} ที่) →
                     </button>
                   )}
@@ -427,12 +418,11 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
             </div>
           )}
 
-          {/* ── STEP 3: Confirm ── */}
+          {/* ── Confirm ── */}
           {step === "confirm" && selectedZone && (
             <div className="space-y-4">
               <div className="space-y-4 bg-white/[0.02] p-5 border border-white/5 rounded-xl">
                 <h3 className="font-semibold text-white text-base">สรุปการจอง</h3>
-
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-400">งาน</span>
@@ -446,13 +436,12 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
                     <div className="flex justify-between items-start">
                       <span className="text-gray-400">ที่นั่ง</span>
                       <div className="flex flex-wrap justify-end gap-1 max-w-[60%]">
-                        {seats
-                          .filter((s) => selectedSeats.has(s.id))
-                          .map((s) => (
-                            <span key={s.id} className="bg-violet-500/20 px-2 py-0.5 border border-violet-500/30 rounded-full text-violet-300 text-xs">
-                              {s.position}
-                            </span>
-                          ))}
+                        {seats.filter((s) => selectedSeats.has(s.id)).map((s) => (
+                          <span key={s.id}
+                            className="bg-violet-500/20 px-2 py-0.5 border border-violet-500/30 rounded-full text-violet-300 text-xs">
+                            {s.position}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -469,7 +458,6 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
                     </div>
                   )}
                 </div>
-
                 <div className="flex justify-between items-center pt-3 border-white/10 border-t">
                   <span className="font-semibold text-gray-300">ยอดรวม</span>
                   <span className="font-bold text-violet-300 text-xl">
@@ -477,23 +465,18 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
                   </span>
                 </div>
               </div>
-
               <p className="text-gray-600 text-xs text-center">
-                กดยืนยันเพื่อดำเนินการชำระเงิน — ที่นั่งจะถูกจองเมื่อชำระเสร็จสิ้น
+                กดยืนยันเพื่อดำเนินการชำระเงิน
               </p>
             </div>
           )}
         </div>
 
-        {/* Footer CTA */}
+        {/* Footer */}
         {step === "confirm" && (
           <div className="px-5 py-4 border-white/10 border-t shrink-0">
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={!canConfirm}
-              className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 py-3.5 rounded-xl w-full font-bold text-white text-base transition-colors disabled:cursor-not-allowed"
-            >
+            <button type="button" onClick={handleConfirm} disabled={!canConfirm}
+              className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 py-3.5 rounded-xl w-full font-bold text-white text-base transition-colors disabled:cursor-not-allowed">
               {totalPrice === 0 ? "จองฟรี →" : `ชำระ ฿${totalPrice.toLocaleString()} →`}
             </button>
           </div>

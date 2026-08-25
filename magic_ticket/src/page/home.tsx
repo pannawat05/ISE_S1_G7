@@ -17,5 +17,5 @@ export default function Home() {
       <EventGrid search={search} location={location} />
       <Footer />
     </div>
-  );
+);
 }

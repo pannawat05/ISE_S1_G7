@@ -370,3 +370,35 @@ export async function removeFromWhitelist(
   );
   return data.whitelist ?? [];
 }
+
+// ─── Zone rows ────────────────────────────────────────────────────────────────
+
+export interface RowConfig {
+  label: string;
+  count: number;
+}
+
+export async function fetchZoneRows(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  zoneId: number,
+): Promise<RowConfig[]> {
+  const data = await apiFetch<{ rows: RowConfig[] }>(
+    `/organizer/${organizerId}/events/${eventId}/zones/${zoneId}/rows`,
+    { token },
+  );
+  return data.rows ?? [];
+}
+
+// ─── Soft delete event ────────────────────────────────────────────────────────
+export async function deleteOrganizerEvent(
+  token: string,
+  organizerId: number,
+  eventId: number,
+): Promise<void> {
+  await apiFetch(`/organizer/${organizerId}/events/${eventId}`, {
+    method: "DELETE",
+    token,
+  });
+}

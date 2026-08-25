@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/types.js";
+import { execute } from "../model/query.js";
 import {
   createEvent,
   findEventsByOrganizerId,
@@ -28,6 +29,9 @@ import {
   getMaxZoneImageOrder,
   setSeatCount,
   countSeats,
+  setRowSeats,
+  listRowsByZone,
+  type RowConfig,
 } from "../model/zone.model.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -377,9 +381,17 @@ export async function createZoneHandler(req: AuthRequest, res: Response) {
       price: Number(price) || 0,
     });
 
-    // Auto-generate seats if seat_count provided
-    const seatCount = parseInt(seat_count ?? "0", 10);
-    if (seatCount > 0) await setSeatCount(zoneId, seatCount);
+    // Row-based seat config (preferred) or fallback to flat seat_count
+    const rowsRaw = req.body.rows;
+    if (rowsRaw) {
+      const rows: RowConfig[] = typeof rowsRaw === "string" ? JSON.parse(rowsRaw) : rowsRaw;
+      if (Array.isArray(rows) && rows.length > 0) {
+        await setRowSeats(zoneId, rows);
+      }
+    } else {
+      const seatCount = parseInt(seat_count ?? "0", 10);
+      if (seatCount > 0) await setSeatCount(zoneId, seatCount);
+    }
 
     // Insert zone images
     for (let i = 0; i < zoneImageFiles.length; i++) {
@@ -420,8 +432,12 @@ export async function updateZoneHandler(req: AuthRequest, res: Response) {
       ...(price !== undefined && { price: Number(price) }),
     });
 
-    // Adjust seat count if provided
-    if (seat_count !== undefined) {
+    // Adjust seats: row-based config (preferred) or fallback flat seat_count
+    const rowsRaw = req.body.rows;
+    if (rowsRaw) {
+      const rows: RowConfig[] = typeof rowsRaw === "string" ? JSON.parse(rowsRaw) : rowsRaw;
+      if (Array.isArray(rows)) await setRowSeats(zoneId, rows);
+    } else if (seat_count !== undefined) {
       const target = parseInt(seat_count, 10);
       if (!isNaN(target) && target >= 0) await setSeatCount(zoneId, target);
     }
@@ -617,5 +633,70 @@ export async function getDashboard(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error("DASHBOARD ERROR:", err);
     return res.status(500).json({ message: "Error fetching dashboard" });
+  }
+}
+
+// ─── GET rows config for a zone ───────────────────────────────────────────────
+export async function getZoneRows(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const eventId     = Number(req.params.eventId);
+  const zoneId      = Number(req.params.zoneId);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId) || isNaN(zoneId)) return res.status(400).json({ message: "Invalid ID" });
+
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+    const zone = await findZoneById(zoneId);
+    if (!zone || zone.event_id !== eventId) return res.status(404).json({ message: "Zone not found" });
+    const rows = await listRowsByZone(zoneId);
+    return res.json({ rows });
+  } catch (err) {
+    console.error("GET ZONE ROWS ERROR:", err);
+    return res.status(500).json({ message: "Error fetching rows" });
+  }
+}
+
+// ─── Soft delete event ────────────────────────────────────────────────────────
+export async function deleteEventSoft(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const eventId     = Number(req.params.eventId);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId)) return res.status(400).json({ message: "Invalid ID" });
+
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+
+    const event = await findEventById(eventId);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+    if (event.organizer_id !== organizerId) return res.status(403).json({ message: "Forbidden" });
+
+    const now   = new Date();
+    const start = new Date(event.start_date);
+    const end   = new Date(event.end_date);
+
+    // ลบได้เฉพาะ:
+    //   1. จบไปแล้ว (now > end)
+    //   2. ยังไม่เริ่ม (now < start) AND status ไม่ใช่ approved
+    const isEnded   = now > end;
+    const canDelete = isEnded || (now < start && event.status !== "approved");
+
+    if (!canDelete) {
+      if (now >= start && now <= end) {
+        return res.status(409).json({ message: "ไม่สามารถลบ Event ที่กำลังจัดอยู่ได้" });
+      }
+      return res.status(409).json({ message: "ไม่สามารถลบ Event ที่ได้รับการอนุมัติแล้วและยังไม่ถึงวันงาน" });
+    }
+
+    await execute(
+      "UPDATE events SET status = 'deleted', updated_at = NOW() WHERE id = ?",
+      [eventId],
+    );
+
+    return res.json({ message: "Event ถูกลบแล้ว" });
+  } catch (err) {
+    console.error("DELETE EVENT SOFT ERROR:", err);
+    return res.status(500).json({ message: "Error deleting event" });
   }
 }

@@ -52,7 +52,7 @@ export async function findEventsByOrganizerId(
     `SELECT e.*, et.name AS type_name
      FROM events e
      JOIN event_types et ON et.id = e.type_id
-     WHERE e.organizer_id = ?
+     WHERE e.organizer_id = ? AND e.status != 'deleted'
      ORDER BY e.start_date DESC`,
     [organizerId],
   );
