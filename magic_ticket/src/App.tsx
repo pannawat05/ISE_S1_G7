@@ -51,37 +51,23 @@ function App() {
           <Routes>
 
             <Route path="/" element={<pages.Home />} />
-
             <Route path="/events/:id" element={<pages.EventDetail />} />
-
             <Route path="/payment" element={<pages.Payment />} />
             <Route path="/payment/return" element={<pages.PaymentReturn />} />
-
             <Route path="/admin" element={<pages.AdminPage />} />
-
             <Route path="/my-tickets" element={<pages.MyTickets />} />
-
             <Route path="/signup" element={<pages.SignUp />} />
-
             <Route path="/signin" element={<pages.Signin />} />
-
             <Route path="/otp" element={<pages.Otp />} />
-
             <Route path="/profile" element={<ProfileLayout />}>
-
-              <Route index element={<Navigate to="account" replace />} />
-
-              <Route path="account" element={<pages.Profiles />} />
-
-              <Route path="dashboard/:id" element={<pages.Dashboards />} />
-
-              <Route path="events/:id" element={<pages.Event />} />
-
-              <Route path="events/:id/create" element={<pages.CreateEvent />} />
-
-              <Route path="events/:id/edit/:eventId" element={<pages.EventEdit />} />
-
-              <Route path="organizer/:id" element={<pages.OrganizerSettings />} />
+            <Route index element={<Navigate to="account" replace />} />
+            <Route path="account" element={<pages.Profiles />} />
+            <Route path="dashboard/:id" element={<pages.Dashboards />} />
+            <Route path="events/:id" element={<pages.Event />} />
+            <Route path="events/:id/create" element={<pages.CreateEvent />} />
+            <Route path="events/:id/edit/:eventId" element={<pages.EventEdit />} />
+            <Route path="organizer/:id" element={<pages.OrganizerSettings />} />
+            <Route path="events/:id/attendees/:eventId" element={<pages.Attendees />} />
 
             </Route>
 
