@@ -2,7 +2,6 @@ version: "3.8"
 
 services:
 
-  # --- 1. Node.js Service ---
   web-app:
     build:
       context: ./magic_ticket
@@ -21,10 +20,7 @@ services:
       DB_NAME: mydatabase
 
     volumes:
-      # Sync source code from host to container
       - ./magic_ticket:/app
-
-      # Keep node_modules inside container
       - web_app_node_modules:/app/node_modules
 
     depends_on:
@@ -33,7 +29,6 @@ services:
     restart: unless-stopped
 
 
-  # --- 2. MySQL Database Service ---
   db-mysql:
     image: mysql:8.0
     container_name: mysql_container
@@ -46,13 +41,11 @@ services:
       MYSQL_DATABASE: mydatabase
 
     volumes:
-      # Keep database data persistent
       - mysql_data:/var/lib/mysql
 
     restart: always
 
 
-  # --- 3. phpMyAdmin Service ---
   phpmyadmin:
     image: phpmyadmin:5.2
     container_name: phpmyadmin_container
@@ -70,7 +63,6 @@ services:
     restart: always
 
 
-  # --- 4. API Service ---
   api:
     build:
       context: ./api
@@ -90,10 +82,7 @@ services:
       DB_NAME: mydatabase
 
     volumes:
-      # Sync API source code from host to container
       - ./api:/app
-
-      # Keep API node_modules inside container
       - api_node_modules:/app/node_modules
 
     depends_on:
@@ -102,7 +91,6 @@ services:
     restart: unless-stopped
 
 
-# --- Named Volumes ---
 volumes:
   mysql_data:
   web_app_node_modules:
