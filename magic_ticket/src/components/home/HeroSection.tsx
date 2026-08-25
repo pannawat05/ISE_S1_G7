@@ -5,33 +5,39 @@ interface HeroSectionProps {
   location: string;
   onSearchChange: (v: string) => void;
   onLocationChange: (v: string) => void;
+  onOpenFilter?: () => void;
+  activeFilterCount?: number;
 }
 
 export default function HeroSection({
-  search, location, onSearchChange, onLocationChange,
+  search,
+  location,
+  onSearchChange,
+  onLocationChange,
+  onOpenFilter,
+  activeFilterCount,
 }: HeroSectionProps) {
   return (
-    <section className="relative px-6 pt-16 pb-12 text-center">
-      <h1 className="font-bold text-slate-900 text-4xl md:text-5xl lg:text-6xl leading-tight tracking-tight">
-        ค้นพบเวทมนตร์แห่ง
-        <br />
-          <span className="bg-clip-text bg-gradient-to-r from-violet-600 to-purple-600 text-transparent">
-          กิจกรรมและคอนเสิร์ต
-        </span>
+    /* เพิ่ม relative z-10 เพื่อยกระดับชั้นของ Hero Section */
+    <div className="z-10 relative py-20 text-center">
+      <h1 className="mb-4 font-extrabold text-4xl sm:text-5xl">
+        ค้นพบเวทมนตร์แห่ง<br />กิจกรรมและคอนเสิร์ต
       </h1>
-
-      <p className="mx-auto mt-5 max-w-2xl text-slate-600 text-sm md:text-base leading-relaxed">
+      <p className="mb-8 text-gray-400 text-sm">
         จองตั๋วเข้าร่วมกิจกรรมและคอนเสิร์ตได้อย่างง่ายดาย
       </p>
 
-      <div className="mt-10">
+      {/* ครอบ div เพิ่ม z-index และ pointer-events-auto ชัวร์ๆ */}
+      <div className="z-20 relative pointer-events-auto">
         <SearchBar
           search={search}
           location={location}
           onSearchChange={onSearchChange}
           onLocationChange={onLocationChange}
+          onOpenFilter={onOpenFilter}
+          activeFilterCount={activeFilterCount}
         />
       </div>
-    </section>
+    </div>
   );
 }
