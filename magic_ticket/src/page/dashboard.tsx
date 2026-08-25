@@ -188,6 +188,13 @@ function EventRow({ ev, organizerId }: { ev: DashboardEvent; organizerId: string
             title="ดูหน้า Event">
             <Eye size={15} />
           </Link>
+          
+          <Link to={`/profile/events/${organizerId}/attendees/${ev.id}`}
+            className="hover:bg-white/10 p-1.5 rounded-lg text-blue-400 hover:text-blue-300 transition-colors"
+            title="จัดการผู้เข้าร่วมงาน (Attendees)">
+            <Users size={15} />
+          </Link>
+
           <Link to={`/profile/events/${organizerId}/edit/${ev.id}`}
             className="hover:bg-white/10 p-1.5 rounded-lg text-gray-500 hover:text-white transition-colors"
             title="แก้ไข">
