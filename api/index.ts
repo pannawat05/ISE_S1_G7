@@ -9,6 +9,7 @@ import eventsRouter from "./routes/events.route.js";
 import adminRouter from "./routes/admin.route.js";
 import sysadminRouter from "./routes/sysadmin.route.js";
 import paymentRouter from "./routes/payment.route.js";
+import checkinRouter from "./routes/checkin.route.js";
 import "./middlewares/notificationScheduler.js";
 
 const app = express();
@@ -37,7 +38,7 @@ app.use("/events", eventsRouter);
 app.use("/admin", adminRouter);
 app.use("/sysadmin", sysadminRouter);
 app.use("/payment", paymentRouter);
-
+app.use("/checkin", checkinRouter);
 app.get("/", (_req, res) => {
   res.send("ISE API is running");
 });
