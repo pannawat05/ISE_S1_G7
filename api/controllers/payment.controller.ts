@@ -84,8 +84,8 @@ export async function checkout(req: AuthRequest, res: Response) {
       currency: "thb",
       metadata: {
         userId: String(userId),
-        ticketIds: JSON.stringify(ticketIds),
-      },
+        transactionId: String(transactionId),
+      }
     });
 
     await execute(

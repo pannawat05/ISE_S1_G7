@@ -80,6 +80,8 @@ function App() {
 
               <Route path="events/:id/edit/:eventId" element={<pages.EventEdit />} />
 
+              <Route path="walk-in/:id" element={<pages.WalkIn />} />
+
               <Route path="organizer/:id" element={<pages.OrganizerSettings />} />
 
             </Route>
