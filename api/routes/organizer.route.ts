@@ -1,6 +1,7 @@
 import express from "express";
 import * as organizerController from "../controllers/organizer.controller.js";
 import * as whitelistController from "../controllers/whitelist.controller.js";
+import * as staffController from "../controllers/staff.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { uploadOrganizerLogo, uploadEventImages, uploadZoneImages } from "../middlewares/upload.middleware.js";
 import type { AuthRequest } from "../middlewares/types.js";
@@ -74,5 +75,28 @@ router.post("/:id/events/:eventId/whitelist", authenticate,
 
 router.delete("/:id/events/:eventId/whitelist/:wlId", authenticate,
   (req, res) => whitelistController.removeFromWhitelist(req as AuthRequest, res));
+
+// ─── Staff routes ─────────────────────────────────────────────────────────────
+router.get("/:id/staff", authenticate,
+  (req, res) => staffController.listStaff(req as AuthRequest, res));
+
+router.post("/:id/staff", authenticate,
+  (req, res) => staffController.addStaff(req as AuthRequest, res));
+
+router.patch("/:id/staff/:staffId", authenticate,
+  (req, res) => staffController.updateStaffRole(req as AuthRequest, res));
+
+router.delete("/:id/staff/:staffId", authenticate,
+  (req, res) => staffController.removeStaff(req as AuthRequest, res));
+
+// ─── Event Staff routes ───────────────────────────────────────────────────────
+router.get("/:id/events/:eventId/staff", authenticate,
+  (req, res) => staffController.listEventStaff(req as AuthRequest, res));
+
+router.post("/:id/events/:eventId/staff", authenticate,
+  (req, res) => staffController.assignStaffToEvent(req as AuthRequest, res));
+
+router.delete("/:id/events/:eventId/staff/:staffId", authenticate,
+  (req, res) => staffController.removeStaffFromEvent(req as AuthRequest, res));
 
 export default router;
