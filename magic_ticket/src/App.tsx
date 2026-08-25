@@ -46,7 +46,7 @@ function App() {
 
         <Navbar />
 
-        <div className="flex-1 w-full min-h-0 overflow-hidden">
+        <div className="flex-1 w-full min-h-0 overflow-x-hidden overflow-y-auto">
 
           <Routes>
 
