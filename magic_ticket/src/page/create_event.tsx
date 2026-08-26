@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronDown, Calendar, MapPin, Loader2 } from "lucide-react";
 import Cookies from "js-cookie";
-import { createOrganizerEvent, createZone } from "@/api/organizer";
+import { createOrganizerEvent, createZone, uploadEventDocuments } from "@/api/organizer";
 import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
-import { LeafletMapPicker, ImageUploadZone, ZoneEditor, type ZoneDraft } from "@/components/shared";
+import { LeafletMapPicker, ImageUploadZone, ZoneEditor, DocumentUploader, type ZoneDraft } from "@/components/shared";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CreateEventForm {
@@ -39,6 +39,7 @@ export default function CreateEventPage() {
   const [coverFiles, setCoverFiles] = useState<File[]>([]);
   const [extraFiles, setExtraFiles] = useState<File[]>([]);
   const [zoneDrafts, setZoneDrafts] = useState<ZoneDraft[]>([]);
+  const [docFiles, setDocFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStep, setSubmitStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +111,12 @@ export default function CreateEventPage() {
           draft.imageFiles.forEach((f) => zfd.append("zone_images", f));
           await createZone(token, organizerId, eventId, zfd);
         }
+      }
+
+      // Step 3: Upload documents (if any)
+      if (docFiles.length > 0) {
+        setSubmitStep(`กำลังอัปโหลดเอกสาร (${docFiles.length} ไฟล์)...`);
+        await uploadEventDocuments(token, organizerId, eventId, docFiles);
       }
 
       navigate(`/profile/events/${organizerId}`);

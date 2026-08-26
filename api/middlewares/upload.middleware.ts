@@ -39,3 +39,25 @@ export const uploadZoneImages = multer({
   fileFilter: imageFilter,
   limits: { fileSize: 10 * 1024 * 1024 },
 });
+
+// Documents: accept PDF, Word, Excel, PowerPoint, images
+const documentFilter = (_req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+  const allowed = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "image/png", "image/jpeg", "image/jpg",
+  ];
+  if (allowed.includes(file.mimetype)) cb(null, true);
+  else cb(new Error("Only PDF, Word, Excel, PowerPoint, and image files are allowed"));
+};
+
+export const uploadEventDocuments = multer({
+  storage: makeStorage("uploads/documents", "doc"),
+  fileFilter: documentFilter,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+});

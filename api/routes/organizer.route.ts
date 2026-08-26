@@ -2,8 +2,9 @@ import express from "express";
 import * as organizerController from "../controllers/organizer.controller.js";
 import * as whitelistController from "../controllers/whitelist.controller.js";
 import * as staffController from "../controllers/staff.controller.js";
+import * as documentController from "../controllers/document.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
-import { uploadOrganizerLogo, uploadEventImages, uploadZoneImages } from "../middlewares/upload.middleware.js";
+import { uploadOrganizerLogo, uploadEventImages, uploadZoneImages, uploadEventDocuments } from "../middlewares/upload.middleware.js";
 import type { AuthRequest } from "../middlewares/types.js";
 
 const router = express.Router();
@@ -98,5 +99,16 @@ router.post("/:id/events/:eventId/staff", authenticate,
 
 router.delete("/:id/events/:eventId/staff/:staffId", authenticate,
   (req, res) => staffController.removeStaffFromEvent(req as AuthRequest, res));
+
+// ─── Document routes ──────────────────────────────────────────────────────────
+router.get("/:id/events/:eventId/documents", authenticate,
+  (req, res) => documentController.listDocuments(req as AuthRequest, res));
+
+router.post("/:id/events/:eventId/documents", authenticate,
+  uploadEventDocuments.array("documents", 10),
+  (req, res) => documentController.uploadDocuments(req as AuthRequest, res));
+
+router.delete("/:id/events/:eventId/documents/:docId", authenticate,
+  (req, res) => documentController.removeDocument(req as AuthRequest, res));
 
 export default router;

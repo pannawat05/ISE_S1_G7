@@ -490,3 +490,47 @@ export async function removeStaffFromEvent(
   );
   return d.event_staff ?? [];
 }
+
+// ─── Event Documents ──────────────────────────────────────────────────────────
+
+export interface EventDocument {
+  id: number;
+  event_id: number;
+  name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+  uploaded_by: number;
+  created_at: string;
+}
+
+export async function fetchEventDocuments(
+  token: string, organizerId: number, eventId: number,
+): Promise<EventDocument[]> {
+  const d = await apiFetch<{ documents: EventDocument[] }>(
+    `/organizer/${organizerId}/events/${eventId}/documents`, { token },
+  );
+  return d.documents ?? [];
+}
+
+export async function uploadEventDocuments(
+  token: string, organizerId: number, eventId: number, files: File[],
+): Promise<EventDocument[]> {
+  const fd = new FormData();
+  files.forEach((f) => fd.append("documents", f));
+  const d = await apiFetch<{ documents: EventDocument[] }>(
+    `/organizer/${organizerId}/events/${eventId}/documents`,
+    { method: "POST", token, body: fd },
+  );
+  return d.documents ?? [];
+}
+
+export async function deleteEventDocument(
+  token: string, organizerId: number, eventId: number, docId: number,
+): Promise<EventDocument[]> {
+  const d = await apiFetch<{ documents: EventDocument[] }>(
+    `/organizer/${organizerId}/events/${eventId}/documents/${docId}`,
+    { method: "DELETE", token },
+  );
+  return d.documents ?? [];
+}
