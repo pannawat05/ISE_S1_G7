@@ -60,6 +60,8 @@ function App() {
             <Route path="/admin" element={<pages.AdminPage />} />
 
             <Route path="/my-tickets" element={<pages.MyTickets />} />
+            <Route path="/my-staff" element={<pages.MyStaff />} />
+            <Route path="/scan-qr"  element={<pages.ScanQR />} />
 
             <Route path="/signup" element={<pages.SignUp />} />
 
@@ -82,6 +84,7 @@ function App() {
               <Route path="events/:id/edit/:eventId" element={<pages.EventEdit />} />
 
               <Route path="organizer/:id" element={<pages.OrganizerSettings />} />
+              <Route path="attendees/:id" element={<pages.Attendees />} />
 
             </Route>
 

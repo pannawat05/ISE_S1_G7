@@ -402,3 +402,91 @@ export async function deleteOrganizerEvent(
     token,
   });
 }
+
+// ─── Staff ────────────────────────────────────────────────────────────────────
+
+export type StaffRole = "general_staff" | "manager";
+export type EventStaffRole = "checkin" | "security" | "registration" | "backstage" | "manager";
+
+export interface StaffMember {
+  id: number;
+  role: StaffRole;
+  join_date: string;
+  users_id: number;
+  f_name: string;
+  l_name: string;
+  email: string;
+}
+
+export interface EventStaffMember {
+  event_id: number;
+  staff_id: number;
+  role: EventStaffRole;
+  assigned_at: string;
+  users_id: number;
+  f_name: string;
+  l_name: string;
+  email: string;
+}
+
+export async function fetchStaff(token: string, organizerId: number): Promise<StaffMember[]> {
+  const d = await apiFetch<{ staff: StaffMember[] }>(`/organizer/${organizerId}/staff`, { token });
+  return d.staff ?? [];
+}
+
+export async function addStaff(
+  token: string, organizerId: number,
+  usersId: number, role: StaffRole,
+): Promise<StaffMember[]> {
+  const d = await apiFetch<{ staff: StaffMember[] }>(`/organizer/${organizerId}/staff`, {
+    method: "POST", token, body: JSON.stringify({ users_id: usersId, role }),
+  });
+  return d.staff ?? [];
+}
+
+export async function updateStaffRole(
+  token: string, organizerId: number, staffId: number, role: StaffRole,
+): Promise<void> {
+  await apiFetch(`/organizer/${organizerId}/staff/${staffId}`, {
+    method: "PATCH", token, body: JSON.stringify({ role }),
+  });
+}
+
+export async function removeStaff(
+  token: string, organizerId: number, staffId: number,
+): Promise<StaffMember[]> {
+  const d = await apiFetch<{ staff: StaffMember[] }>(`/organizer/${organizerId}/staff/${staffId}`, {
+    method: "DELETE", token,
+  });
+  return d.staff ?? [];
+}
+
+export async function fetchEventStaff(
+  token: string, organizerId: number, eventId: number,
+): Promise<EventStaffMember[]> {
+  const d = await apiFetch<{ event_staff: EventStaffMember[] }>(
+    `/organizer/${organizerId}/events/${eventId}/staff`, { token },
+  );
+  return d.event_staff ?? [];
+}
+
+export async function assignStaffToEvent(
+  token: string, organizerId: number, eventId: number,
+  staffId: number, role: EventStaffRole,
+): Promise<EventStaffMember[]> {
+  const d = await apiFetch<{ event_staff: EventStaffMember[] }>(
+    `/organizer/${organizerId}/events/${eventId}/staff`,
+    { method: "POST", token, body: JSON.stringify({ staff_id: staffId, role }) },
+  );
+  return d.event_staff ?? [];
+}
+
+export async function removeStaffFromEvent(
+  token: string, organizerId: number, eventId: number, staffId: number,
+): Promise<EventStaffMember[]> {
+  const d = await apiFetch<{ event_staff: EventStaffMember[] }>(
+    `/organizer/${organizerId}/events/${eventId}/staff/${staffId}`,
+    { method: "DELETE", token },
+  );
+  return d.event_staff ?? [];
+}
