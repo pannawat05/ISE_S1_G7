@@ -42,7 +42,7 @@ function App() {
 
     <Router>
 
-      <div className="flex flex-col bg-black w-full h-screen overflow-hidden text-white">
+      <div className="flex flex-col bg-bg w-full h-screen overflow-hidden text-[color:var(--mt-text)]">
 
         <Navbar />
 
