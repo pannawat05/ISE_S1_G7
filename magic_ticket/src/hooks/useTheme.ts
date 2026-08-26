@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 type Theme = "light" | "dark";
 
 function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "light";
-  return (localStorage.getItem("mt-theme") as Theme) ?? "light";
+  if (typeof window === "undefined") return "dark";
+  return (localStorage.getItem("mt-theme") as Theme) ?? "dark";
 }
 
 function applyTheme(theme: Theme) {

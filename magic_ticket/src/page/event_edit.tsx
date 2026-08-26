@@ -8,7 +8,7 @@ import { fetchSingleEvent, updateOrganizerEvent, type OrganizerEvent, type Event
 import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 import { API_BASE } from "@/api/client";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
-import { LeafletMapPicker, ZoneEditor, WhitelistManager } from "@/components/shared";
+import { LeafletMapPicker, ZoneEditor, WhitelistManager, DocumentUploader } from "@/components/shared";
 import { ImageIcon, Trash2 } from "lucide-react";
 
 interface ExistingImage { id: number; url: string; display_order: number }
@@ -475,6 +475,14 @@ export default function EventEditPage() {
             {/* Whitelist */}
             <div className="mt-surface p-5">
               <WhitelistManager
+                organizerId={Number(orgId)}
+                eventId={Number(eventId)}
+              />
+            </div>
+
+            {/* เอกสารประกอบงาน */}
+            <div className="mt-surface p-5">
+              <DocumentUploader
                 organizerId={Number(orgId)}
                 eventId={Number(eventId)}
               />

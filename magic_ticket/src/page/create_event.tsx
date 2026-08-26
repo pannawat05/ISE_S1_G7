@@ -272,6 +272,13 @@ export default function CreateEventPage() {
               onDraftsChange={setZoneDrafts}
             />
 
+            {/* ── เอกสารประกอบงาน ── */}
+            <DocumentUploader
+              organizerId={organizerId}
+              eventId={null}
+              onFilesChange={setDocFiles}
+            />
+
             {/* ── Submit ── */}
             <div className="flex gap-3 pb-8">
               <button type="button"

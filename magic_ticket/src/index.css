@@ -116,6 +116,26 @@ html, body {
 
   /* Table row hover */
   .hover\:bg-white\/\[0\.03\]:hover { background-color: rgb(0 0 0 / 0.03) !important; }
+
+  /* Filter tabs (bg-white/5 background pill) */
+  .bg-white\/\[0\.03\] { background-color: rgb(0 0 0 / 0.03) !important; }
+
+  /* Input/select explicitly */
+  select, input[type="text"], input[type="search"],
+  input[type="email"], input[type="password"],
+  input[type="number"], input[type="datetime-local"],
+  textarea {
+    background-color: var(--mt-input-bg) !important;
+    color: var(--mt-input-text) !important;
+    border-color: var(--mt-border) !important;
+  }
+  select option {
+    background-color: var(--mt-surface) !important;
+    color: var(--mt-text) !important;
+  }
+
+  /* Sidebar */
+  .bg-elevated { background-color: var(--mt-elevated) !important; }
 }
 
 @layer components {

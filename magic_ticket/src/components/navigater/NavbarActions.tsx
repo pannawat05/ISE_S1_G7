@@ -18,7 +18,6 @@ export default function NavbarActions() {
   const [token, setToken] = useState<string | undefined>(() => Cookies.get("authToken"));
   const [user, setUser] = useState<UserProfile | null>(readUserFromStorage);
   const { isDarkMode, toggleTheme } = useTheme();
-
   useEffect(() => {
     function sync() {
       setToken(Cookies.get("authToken"));
@@ -48,7 +47,7 @@ export default function NavbarActions() {
 
   return (
     <div className="flex items-center gap-3">
-      {/* Theme toggle */}
+      {/* Theme toggle — ปิดชั่วคราว
       <button
         onClick={toggleTheme}
         className="p-2 rounded-lg transition-colors"
@@ -58,6 +57,7 @@ export default function NavbarActions() {
       >
         {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
       </button>
+      */}
 
       {/* Admin badge */}
       {(isAdmin || isSysAdmin) && (
@@ -98,8 +98,20 @@ export default function NavbarActions() {
 }
 
 function AuthenNav() {
+  const { isDarkMode, toggleTheme } = useTheme();
   return (
     <div className="flex items-center gap-2 sm:gap-3">
+      {/* Theme toggle — ปิดชั่วคราว
+      <button
+        onClick={toggleTheme}
+        className="p-2 rounded-lg transition-colors"
+        style={{ color: "var(--mt-text-secondary)" }}
+        aria-label="Toggle theme"
+        title={isDarkMode ? "สลับเป็น Light Mode" : "สลับเป็น Dark Mode"}
+      >
+        {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
+      */}
       <Link to="/signin" className="px-3 sm:px-4 py-2 rounded-full mt-btn-outline text-xs sm:text-sm">
         เข้าสู่ระบบ
       </Link>
