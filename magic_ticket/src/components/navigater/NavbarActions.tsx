@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { LogOut, ShieldCheck, Sun, Moon } from "lucide-react";
 import Cookies from "js-cookie";
 import type { UserProfile } from "@/api/user";
+import { useTheme } from "@/hooks/useTheme";
 
 function readUserFromStorage(): UserProfile | null {
   try {
@@ -16,6 +17,7 @@ function readUserFromStorage(): UserProfile | null {
 export default function NavbarActions() {
   const [token, setToken] = useState<string | undefined>(() => Cookies.get("authToken"));
   const [user, setUser] = useState<UserProfile | null>(readUserFromStorage);
+  const { isDarkMode, toggleTheme } = useTheme();
 
   useEffect(() => {
     function sync() {
@@ -46,11 +48,22 @@ export default function NavbarActions() {
 
   return (
     <div className="flex items-center gap-3">
-      {/* Admin badge — visible only for admin role */}
+      {/* Theme toggle */}
+      <button
+        onClick={toggleTheme}
+        className="p-2 rounded-lg transition-colors"
+        style={{ color: "var(--mt-text-secondary)" }}
+        aria-label="Toggle theme"
+        title={isDarkMode ? "สลับเป็น Light Mode" : "สลับเป็น Dark Mode"}
+      >
+        {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
+
+      {/* Admin badge */}
       {(isAdmin || isSysAdmin) && (
         <Link
           to="/admin"
-          className="hidden sm:flex items-center gap-1.5 bg-violet-600/10 hover:bg-violet-600/20 px-3 py-1.5 border border-violet-500/40 rounded-full font-semibold text-violet-300 text-xs transition-colors"
+          className="hidden sm:flex items-center gap-1.5 bg-violet-600/10 hover:bg-violet-600/20 px-3 py-1.5 border border-violet-500/40 rounded-full font-semibold text-violet-500 text-xs transition-colors"
         >
           <ShieldCheck size={14} />
           {user?.role}
