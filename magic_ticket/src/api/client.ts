@@ -1,7 +1,7 @@
 
 const API_BASE =
   import.meta.env.BASE_API?.replace(/\/$/, "") || "http://localhost:5001";
-=======
+
 const API_BASE =  import.meta.env.VITE_BASE_API?.replace(/\/$/, "") || "https://35.247.179.98:5001";
 
 type RequestOptions = Omit<RequestInit, "headers"> & {
