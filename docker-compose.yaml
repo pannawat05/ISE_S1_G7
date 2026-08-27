@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
 
-  # ==========================================
+ # ==========================================
   # FRONTEND
   # ==========================================
   web-app:
@@ -12,14 +12,15 @@ services:
 
     container_name: node_app_container
 
-    # เปิดไว้สำหรับพัฒนา/เข้าตรงจากเครื่อง
-    # Production สามารถเอาออกได้ เพราะ Nginx จะเป็นตัวรับแทน
     ports:
       - "3000:3000"
 
     environment:
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "true"
+
+      # เพิ่มตัวแปรนี้เพื่อให้ Frontend ยิง API ผ่าน Nginx (Port 443)
+      VITE_API_BASE_URL: /api
 
       DB_HOST: db-mysql
       DB_USER: root
@@ -34,7 +35,6 @@ services:
       - db-mysql
 
     restart: unless-stopped
-
 
   # ==========================================
   # BACKEND API
