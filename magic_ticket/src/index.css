@@ -313,11 +313,10 @@ html, body {
 
   .mt-icon-accent { color: var(--mt-accent); flex-shrink: 0; }
 }
-<<<<<<< HEAD
-=======
+
 
 /* บังคับไม่ให้ iframe ของ Stripe มาบังการคลิกบนหน้าเว็บ 
 iframe[name^="__privateStripe"] {
   pointer-events: none !important;
 }*/
->>>>>>> 0086274 (latest)
+
