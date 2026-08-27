@@ -21,10 +21,19 @@ export async function getMe(req: AuthRequest, res: Response) {
       lastname: profile.lastname,
       email: profile.email,
       role: profile.role,
+
+      // Organizer = organizers.owner_id = users.id
+      organizer_id: profile.organizer_id,
+      is_organizer: Boolean(profile.is_organizer),
+
+      // Staff = staff.users_id = users.id
+      is_staff: Boolean(profile.is_staff),
     });
   } catch (err) {
     console.error("GET ME ERROR:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({
+      error: "Internal server error",
+    });
   }
 }
 
@@ -79,14 +88,19 @@ export async function updateMe(req: AuthRequest, res: Response) {
     const profile = await getUserProfile(req.user.id);
     if (!profile) return res.status(404).json({ message: "User not found" });
 
-    return res.json({
-      id: profile.id,
-      name: `${profile.firstname} ${profile.lastname}`.trim(),
-      firstname: profile.firstname,
-      lastname: profile.lastname,
-      email: profile.email,
-      role: profile.role,
-    });
+return res.json({
+  id: profile.id,
+  name: `${profile.firstname} ${profile.lastname}`.trim(),
+  firstname: profile.firstname,
+  lastname: profile.lastname,
+  email: profile.email,
+  role: profile.role,
+
+  organizer_id: profile.organizer_id,
+  is_organizer: Boolean(profile.is_organizer),
+  is_staff: Boolean(profile.is_staff),
+});    
+
   } catch (err) {
     console.error("UPDATE ME ERROR:", err);
     return res.status(500).json({ error: "Internal server error" });

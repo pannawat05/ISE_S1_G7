@@ -2,18 +2,25 @@ version: "3.8"
 
 services:
 
+  # ==========================================
+  # FRONTEND
+  # ==========================================
   web-app:
     build:
       context: ./magic_ticket
       dockerfile: Dockerfile
+
     container_name: node_app_container
 
+    # เปิดไว้สำหรับพัฒนา/เข้าตรงจากเครื่อง
+    # Production สามารถเอาออกได้ เพราะ Nginx จะเป็นตัวรับแทน
     ports:
       - "3000:3000"
 
     environment:
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "true"
+
       DB_HOST: db-mysql
       DB_USER: root
       DB_PASSWORD: secretpassword
@@ -29,53 +36,26 @@ services:
     restart: unless-stopped
 
 
-  db-mysql:
-    image: mysql:8.0
-    container_name: mysql_container
-
-    ports:
-      - "3306:3306"
-
-    environment:
-      MYSQL_ROOT_PASSWORD: secretpassword
-      MYSQL_DATABASE: mydatabase
-
-    volumes:
-      - mysql_data:/var/lib/mysql
-
-    restart: always
-
-
-  phpmyadmin:
-    image: phpmyadmin:5.2
-    container_name: phpmyadmin_container
-
-    ports:
-      - "8080:80"
-
-    environment:
-      PMA_HOST: db-mysql
-      PMA_PORT: 3306
-
-    depends_on:
-      - db-mysql
-
-    restart: always
-
-
+  # ==========================================
+  # BACKEND API
+  # ==========================================
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
+
     container_name: api_container
 
     command: npm run dev
 
+    # เปิดไว้สำหรับ debug
+    # ถ้า deploy จริงสามารถเอาออกได้
     ports:
       - "5001:5001"
 
     environment:
       NODE_ENV: development
+
       DB_HOST: db-mysql
       DB_USER: root
       DB_PASSWORD: secretpassword
@@ -91,6 +71,77 @@ services:
     restart: unless-stopped
 
 
+  # ==========================================
+  # NGINX REVERSE PROXY + HTTPS
+  # ==========================================
+  nginx:
+    image: nginx:alpine
+
+    container_name: nginx_container
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      # Nginx configuration
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+      # SSL certificates
+      - ./nginx/certs:/etc/nginx/certs:ro
+
+    depends_on:
+      - web-app
+      - api
+
+    restart: unless-stopped
+
+
+  # ==========================================
+  # MYSQL
+  # ==========================================
+  db-mysql:
+    image: mysql:8.0
+
+    container_name: mysql_container
+
+    ports:
+      - "3306:3306"
+
+    environment:
+      MYSQL_ROOT_PASSWORD: secretpassword
+      MYSQL_DATABASE: mydatabase
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    restart: always
+
+
+  # ==========================================
+  # PHPMYADMIN
+  # ==========================================
+  phpmyadmin:
+    image: phpmyadmin:5.2
+
+    container_name: phpmyadmin_container
+
+    ports:
+      - "8080:80"
+
+    environment:
+      PMA_HOST: db-mysql
+      PMA_PORT: 3306
+
+    depends_on:
+      - db-mysql
+
+    restart: always
+
+
+# ==========================================
+# VOLUMES
+# ==========================================
 volumes:
   mysql_data:
   web_app_node_modules:

@@ -20,7 +20,11 @@ app.use(express.json());
 // Cors
 app.use(
   cors({
+<<<<<<< HEAD
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
+=======
+    origin: process.env.FRONTEND_URL || "https://35.247.179.98/:3000",
+>>>>>>> 0086274 (latest)
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization", "token"],
   }),
