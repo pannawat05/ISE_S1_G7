@@ -44,7 +44,7 @@ services:
       context: ./api
       dockerfile: Dockerfile
 
-    container_name: api_container
+    container_name: api
 
     command: npm run dev
 
