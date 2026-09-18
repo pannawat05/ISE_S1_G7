@@ -56,6 +56,8 @@ function App() {
 
             <Route path="/payment" element={<pages.Payment />} />
 
+            <Route path="/payment/return" element={<pages.PaymentReturnPage />} />
+
             <Route path="/admin" element={<pages.AdminPage />} />
 
             <Route path="/my-tickets" element={<pages.MyTickets />} />

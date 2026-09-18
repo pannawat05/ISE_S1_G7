@@ -1,6 +1,8 @@
 import { apiFetch } from "./client";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ============================================================
+// Types
+// ============================================================
 
 export interface CheckoutRequest {
   event_id: number;
@@ -9,14 +11,19 @@ export interface CheckoutRequest {
   payment_method_id?: number;
 }
 
-export interface CheckoutResponse {
+interface CheckoutResponse {
   client_secret: string;
-  payment_intent_id?: string;
-  session_id?: string;
+  payment_intent_id: string;
   amount: number;
-  currency?: string;
-  ticket_count?: number;
-  mock?: boolean;
+
+  // Stripe Connected Account
+  stripe_account_id: string;
+
+  // Platform fee
+  platform_fee?: number;
+  platform_fee_percent?: number;
+
+  ticket_ids?: number[];
 }
 
 export interface TicketResult {
@@ -34,78 +41,135 @@ export interface ConfirmRequest {
 
 export interface ConfirmResponse {
   message: string;
+
   status: "paid" | "failed";
+
   payment_intent_id?: string;
+
   session_id?: string;
+
   amount?: number;
+
   tickets?: TicketResult[];
 }
 
 export interface SessionStatus {
   session_id: string;
-  status: "pending" | "paid" | "failed";
+
+  status:
+    | "pending"
+    | "paid"
+    | "failed";
+
   amount: number;
+
   ticket_count: number;
 }
 
 export interface MyTicket {
   id: number;
+
   qrcode: string;
-  status: "reserved" | "paid" | "checked_in" | "cancelled";
+
+  status:
+    | "reserved"
+    | "paid"
+    | "checked_in"
+    | "cancelled";
+
   created_at: string;
-  seat_position: string;
+
+  seat_position: string | null;
+
   zone_name: string;
+
   zone_type: string;
+
   zone_price: number;
+
   event_name: string;
+
   event_start: string;
+
   place_name: string;
+
   qr_data_url: string | null;
 }
 
-// ─── API calls ────────────────────────────────────────────────────────────────
+// ============================================================
+// Checkout
+// ============================================================
 
 export async function checkout(
   token: string,
   body: CheckoutRequest,
 ): Promise<CheckoutResponse> {
-  return apiFetch("/payment/checkout", {
-    method: "POST",
-    token,
-    body: JSON.stringify(body),
-  });
+  return apiFetch<CheckoutResponse>(
+    "/payment/checkout",
+    {
+      method: "POST",
+
+      token,
+
+      body: JSON.stringify(body),
+    },
+  );
 }
 
-/**
- * รองรับการส่งทั้ง payment_intent_id (Stripe Real) หรือ session_id (Mock/Session)
- */
+// ============================================================
+// Confirm Payment
+// ============================================================
+
 export async function confirmPayment(
   token: string,
-  paymentIntentOrSessionId: string,
-  simulateFailure = false,
+  intentId: string,
 ): Promise<ConfirmResponse> {
-  // เช็คว่า id ขึ้นต้นด้วย pi_ (Stripe Intent) หรือไม่
-  const isStripeIntent = paymentIntentOrSessionId.startsWith("pi_");
+  return apiFetch<ConfirmResponse>(
+    "/payment/confirm",
+    {
+      method: "POST",
 
-  const body: ConfirmRequest = isStripeIntent
-    ? { payment_intent_id: paymentIntentOrSessionId }
-    : { session_id: paymentIntentOrSessionId, simulate_failure: simulateFailure };
+      token,
 
-  return apiFetch("/payment/confirm", {
-    method: "POST",
-    token,
-    body: JSON.stringify(body),
-  });
+      body: JSON.stringify({
+        payment_intent_id: intentId,
+      }),
+    },
+  );
 }
+
+// ============================================================
+// Get Session
+// ============================================================
 
 export async function getPaymentSession(
   token: string,
   sessionId: string,
 ): Promise<SessionStatus> {
-  return apiFetch(`/payment/session/${sessionId}`, { token });
+  return apiFetch<SessionStatus>(
+    `/payment/session/${sessionId}`,
+    {
+      token,
+    },
+  );
 }
 
-export async function getMyTickets(token: string): Promise<MyTicket[]> {
-  const data = await apiFetch<{ tickets: MyTicket[] }>("/payment/my-tickets", { token });
+// ============================================================
+// My Tickets
+// ============================================================
+
+export async function getMyTickets(
+  token: string,
+): Promise<MyTicket[]> {
+  const data =
+    await apiFetch<{
+      tickets: MyTicket[];
+    }>(
+      "/payment/my-tickets",
+      {
+        token,
+      },
+    );
+
   return data.tickets ?? [];
 }

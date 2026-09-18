@@ -27,6 +27,7 @@ export interface OrganizerDetail {
   logo_url: string | null;
   description: string | null;
   owner_id: number;
+  stripe_account_id: string | null;
   created_at: string;
   updated_at: string;
 }

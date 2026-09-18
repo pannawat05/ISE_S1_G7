@@ -18,6 +18,7 @@ export interface OrganizerRow extends RowDataPacket {
   name: string;
   description: string | null;
   logo_url: string | null;
+  stripe_id: string;
   owner_id: number;
   created_at: Date;
   updated_at: Date;
