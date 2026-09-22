@@ -4,14 +4,8 @@ import NavbarNav from "./NavbarNav";
 
 export const Navbar = () => {
   return (
-    <nav
-      className="top-0 z-50 sticky backdrop-blur-md px-6 py-4 border-b-2 w-full"
-      style={{
-        backgroundColor: "var(--mt-navbar-bg)",
-        borderColor: "var(--mt-border)",
-      }}
-    >
-      <div className="flex justify-between items-center gap-4 mx-auto max-w-7xl">
+    <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b-2 border-purple-100 px-6 py-4">
+      <div className="max-w-7xl mx-auto flex justify-between items-center gap-4">
         <NavbarBrand />
         <NavbarNav />
         <NavbarActions />
@@ -19,5 +13,3 @@ export const Navbar = () => {
     </nav>
   );
 };
-
-export default Navbar;

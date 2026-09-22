@@ -9,7 +9,6 @@ import eventsRouter from "./routes/events.route.js";
 import adminRouter from "./routes/admin.route.js";
 import sysadminRouter from "./routes/sysadmin.route.js";
 import paymentRouter from "./routes/payment.route.js";
-import checkinRouter from "./routes/checkin.route.js";
 import "./middlewares/notificationScheduler.js";
 
 const app = express();
