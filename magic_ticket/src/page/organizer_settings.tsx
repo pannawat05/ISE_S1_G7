@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Menu, ArrowLeft, ImageIcon, Trash2, Save, AlertTriangle, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Menu, ArrowLeft, ImageIcon, Trash2, Save, AlertTriangle, X } from "lucide-react";
 import Cookies from "js-cookie";
 import {
   fetchOrganizer,
   updateOrganizer,
   deleteOrganizer,
   getLogoUrl,
-  generateStripeOnboardingLink,
   type OrganizerDetail,
 } from "@/api/organizer";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
@@ -42,18 +41,16 @@ function DeleteConfirmDialog({
         </p>
         <div className="flex gap-3">
           <button
-            type="button"
             onClick={onCancel}
             disabled={isDeleting}
-            className="flex-1 hover:bg-white/5 disabled:opacity-50 px-4 py-2.5 border border-white/10 rounded-xl font-semibold text-white text-sm transition-colors cursor-pointer"
+            className="flex-1 hover:bg-white/5 disabled:opacity-50 px-4 py-2.5 border border-white/10 rounded-xl font-semibold text-white text-sm transition-colors"
           >
             ยกเลิก
           </button>
           <button
-            type="button"
             onClick={onConfirm}
             disabled={isDeleting}
-            className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 px-4 py-2.5 rounded-xl font-semibold text-white text-sm transition-colors disabled:cursor-not-allowed cursor-pointer"
+            className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 px-4 py-2.5 rounded-xl font-semibold text-white text-sm transition-colors disabled:cursor-not-allowed"
           >
             {isDeleting ? "กำลังลบ..." : "ลบ Organizer"}
           </button>
@@ -89,20 +86,7 @@ export default function OrganizerSettingsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Stripe Onboarding States
-  const [isConnectingStripe, setIsConnectingStripe] = useState(false);
-  const [stripeError, setStripeError] = useState<string | null>(null);
-
   const MAX_DESC = 300;
-
-  // Revoke object URL on cleanup to prevent memory leak
-  useEffect(() => {
-    return () => {
-      if (logoPreview && logoPreview.startsWith("blob:")) {
-        URL.revokeObjectURL(logoPreview);
-      }
-    };
-  }, [logoPreview]);
 
   // ── Fetch organizer ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -132,10 +116,6 @@ export default function OrganizerSettingsPage() {
     setSaveError(null);
     setLogoFile(file);
     setRemoveExistingLogo(false);
-
-    if (logoPreview && logoPreview.startsWith("blob:")) {
-      URL.revokeObjectURL(logoPreview);
-    }
     setLogoPreview(URL.createObjectURL(file));
   }
 
@@ -144,12 +124,9 @@ export default function OrganizerSettingsPage() {
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) handleFileSelect(file);
-  }, [logoPreview]);
+  }, []);
 
   function clearLogo() {
-    if (logoPreview && logoPreview.startsWith("blob:")) {
-      URL.revokeObjectURL(logoPreview);
-    }
     setLogoFile(null);
     setLogoPreview(null);
     setRemoveExistingLogo(true);
@@ -180,7 +157,7 @@ export default function OrganizerSettingsPage() {
       if (removeExistingLogo) formData.append("remove_logo", "1");
 
       const { organizer: updated } = await updateOrganizer(token, Number(id), formData);
-      setOrganizer((prev) => (prev ? { ...prev, ...updated } : prev));
+      setOrganizer((prev) => prev ? { ...prev, ...updated } : prev);
       setLogoFile(null);
       setLogoPreview(null);
       setRemoveExistingLogo(false);
@@ -200,6 +177,7 @@ export default function OrganizerSettingsPage() {
       const token = Cookies.get("authToken");
       if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อน");
       await deleteOrganizer(token, Number(id));
+      // Reload full page so sidebar re-fetches organizer list
       window.location.href = "/profile/account";
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "ลบไม่สำเร็จ กรุณาลองใหม่");
@@ -208,51 +186,18 @@ export default function OrganizerSettingsPage() {
     }
   }
 
-  // ── Trigger Stripe Connect Onboarding Flow ──────────────────────────────
-  async function handleConnectStripe() {
-    setIsConnectingStripe(true);
-    setStripeError(null);
-
-    try {
-      const token = Cookies.get("authToken");
-      if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อน");
-      if (!id) throw new Error("ไม่พบไอดี Organizer");
-
-      const result = await generateStripeOnboardingLink(token, Number(id));
-
-      if (result && result.onboarding_url) {
-        window.location.href = result.onboarding_url;
-      } else {
-        throw new Error("เซิร์ฟเวอร์ไม่ได้ส่ง onboarding_url กลับมา");
-      }
-    } catch (err: any) {
-      console.error("Stripe Connection Setup Failed:", err);
-      setStripeError(err.message || "เชื่อมต่อกับระบบ Stripe ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-    } finally {
-      setIsConnectingStripe(false);
-    }
-  }
-
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden text-white">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       {/* Header */}
-      <header className="shrink-0 pb-4">
+      <header className="mt-dashboard-header shrink-0">
         <div className="flex items-center space-x-3">
           <button
-            type="button"
             onClick={() => setIsOpen(true)}
             className="md:hidden text-gray-400 hover:text-white cursor-pointer"
             aria-label="Open menu"
           >
             <Menu size={24} />
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="text-gray-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
-            aria-label="Back"
-          >
-            <ArrowLeft size={20} />
           </button>
           <h1 className="font-semibold text-white text-2xl">
             {isLoading ? "..." : (organizer?.name ?? "Organizer Settings")}
@@ -261,7 +206,7 @@ export default function OrganizerSettingsPage() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto pr-2 pb-12">
+      <main className="mt-dashboard-main">
         {isLoading && (
           <div className="space-y-4 w-full max-w-4xl">
             {[1, 2, 3].map((i) => (
@@ -271,81 +216,85 @@ export default function OrganizerSettingsPage() {
         )}
 
         {fetchError && (
-          <div className="bg-red-500/10 p-4 border border-red-500/30 rounded-xl w-full max-w-4xl text-red-400">
+          <div className="bg-red-500/10 mt-surface p-4 border border-red-500/30 rounded-xl w-full max-w-4xl text-red-400">
             {fetchError}
           </div>
         )}
 
         {!isLoading && !fetchError && organizer && (
           <div className="space-y-6 w-full max-w-4xl">
-            {/* Main Form */}
-            <form onSubmit={handleSave} className="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6 space-y-6 shadow-2xl">
-              <h3 className="text-md font-bold text-gray-200 border-b border-white/5 pb-2">ข้อมูล Organizer</h3>
+            {/* Edit form */}
+            <form onSubmit={handleSave} className="space-y-5 mt-surface p-6 rounded-xl">
+              <h2 className="font-semibold text-white text-base">ข้อมูล Organizer</h2>
 
-              {saveError && (
-                <div className="bg-red-500/15 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
-                  <AlertCircle size={16} className="shrink-0" />
-                  <span>{saveError}</span>
-                </div>
-              )}
-
+              {/* Success banner */}
               {saveSuccess && (
-                <div className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
-                  <CheckCircle2 size={16} className="shrink-0" />
-                  <span>✨ บันทึกการเปลี่ยนแปลงข้อมูลเรียบร้อยแล้ว</span>
+                <div className="flex justify-between items-center bg-green-500/10 px-4 py-3 border border-green-500/30 rounded-lg text-green-400 text-sm">
+                  <span>บันทึกข้อมูลสำเร็จ</span>
+                  <button onClick={() => setSaveSuccess(false)}><X size={16} /></button>
                 </div>
               )}
 
-              {/* Name Field */}
+              {/* Error banner */}
+              {saveError && (
+                <div className="flex justify-between items-center bg-red-500/10 px-4 py-3 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                  <span>{saveError}</span>
+                  <button onClick={() => setSaveError(null)}><X size={16} /></button>
+                </div>
+              )}
+
+              {/* Name */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">
+                <label className="text-gray-300 text-sm">
                   ชื่อ Organizer <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg bg-[#0d0d1a] border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-violet-500 transition-colors"
-                  placeholder="เช่น Rock Concert Organizer"
+                  placeholder="เช่น Magic Ticket Events Co."
+                  className="bg-black/30 px-4 py-3 border border-white/10 focus:border-violet-500 rounded-lg outline-none focus:ring-1 focus:ring-violet-500/40 w-full text-white text-sm transition-colors placeholder-gray-500"
                 />
               </div>
 
-              {/* Description Field */}
+              {/* Description */}
               <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium text-gray-300">รายละเอียดเกี่ยวกับ Organizer</label>
-                  <span className="text-xs text-gray-400">{description.length}/{MAX_DESC}</span>
-                </div>
+                <label className="text-gray-300 text-sm">คำอธิบาย</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESC))}
+                  placeholder="อธิบายสั้นๆ ว่า organizer นี้จัดงานประเภทไหน"
                   rows={4}
-                  className="w-full resize-none rounded-lg bg-[#0d0d1a] border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-violet-500 transition-colors"
-                  placeholder="เขียนอธิบายบทบาทหรือแนวทางงานอีเวนต์..."
+                  className="bg-black/30 px-4 py-3 border border-white/10 focus:border-violet-500 rounded-lg outline-none focus:ring-1 focus:ring-violet-500/40 w-full text-white text-sm transition-colors resize-y placeholder-gray-500"
                 />
+                <p className="text-gray-500 text-xs text-right">
+                  {description.length}/{MAX_DESC}
+                </p>
               </div>
 
-              {/* Logo Field */}
+              {/* Logo */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">โลโก้ Organizer</label>
+                <label className="text-gray-300 text-sm">โลโก้</label>
+
                 {displayedLogo ? (
-                  <div className="flex items-center gap-4 p-4 rounded-lg border border-white/10 bg-[#0d0d1a]">
-                    <img
-                      src={displayedLogo}
-                      alt="Organizer Logo"
-                      className="w-16 h-16 rounded-lg object-cover border border-white/10"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-300 font-medium">โลโก้ปัจจุบัน</p>
-                      <p className="text-xs text-gray-500">รองรับไฟล์ PNG, JPG ขนาดไม่เกิน 2MB</p>
+                  <div className="flex justify-between items-center bg-black/30 px-4 py-3 border border-white/10 rounded-lg">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <img
+                        src={displayedLogo}
+                        alt="logo"
+                        className="rounded-lg w-10 h-10 object-cover shrink-0"
+                      />
+                      <span className="text-gray-300 text-sm truncate">
+                        {logoFile ? logoFile.name : "โลโก้ปัจจุบัน"}
+                      </span>
                     </div>
                     <button
                       type="button"
                       onClick={clearLogo}
-                      className="p-2 text-gray-400 hover:text-red-400 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                      title="ลบรูปภาพ"
+                      className="hover:bg-white/10 ml-2 p-1.5 rounded text-gray-400 hover:text-red-400 transition-colors shrink-0"
+                      aria-label="ลบโลโก้"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 ) : (
@@ -354,19 +303,24 @@ export default function OrganizerSettingsPage() {
                     onDragLeave={() => setIsDragging(false)}
                     onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
-                      isDragging ? "border-violet-500 bg-violet-500/10" : "border-white/10 bg-[#0d0d1a] hover:border-violet-500/50"
+                    className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 transition-colors ${
+                      isDragging
+                        ? "border-violet-500 bg-violet-500/10"
+                        : "border-white/10 bg-black/30 hover:border-violet-500/50 hover:bg-violet-500/5"
                     }`}
                   >
-                    <ImageIcon size={28} className="text-gray-400" />
-                    <span className="text-sm text-gray-300">ลากไฟล์มาวาง หรือคลิกเพื่อเลือกรูป</span>
-                    <span className="text-xs text-gray-500">PNG, JPG ขนาดไม่เกิน 2MB</span>
+                    <ImageIcon size={28} className="text-gray-500" />
+                    <p className="text-gray-400 text-sm text-center">
+                      ลากไฟล์มาวาง หรือคลิกเพื่อเลือกรูป
+                    </p>
+                    <p className="text-gray-500 text-xs">PNG/JPG ไม่เกิน 2MB</p>
                   </div>
                 )}
+
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -375,75 +329,30 @@ export default function OrganizerSettingsPage() {
                 />
               </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-end pt-2">
+              {/* Save button */}
+              <div className="flex justify-end pt-1">
                 <button
                   type="submit"
                   disabled={isSaving || !name.trim()}
-                  className="flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50 cursor-pointer"
+                  className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-6 py-2.5 rounded-xl font-semibold text-white text-sm transition-colors disabled:cursor-not-allowed"
                 >
                   <Save size={16} />
-                  <span>{isSaving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}</span>
+                  {isSaving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
                 </button>
               </div>
             </form>
 
-            {/* Stripe Connect Panel */}
-            <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6 space-y-4 shadow-2xl">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-md font-bold text-gray-200">💳 ระบบรับเงินผ่าน Stripe Connect</h3>
-                  <p className="text-xs text-gray-400 mt-1">
-                    จำเป็นต้องระบุข้อมูลธนาคารเพื่อรับรายได้จากการขายตั๋วเข้างานโดยตรงเข้าบัญชีคุณ
-                  </p>
-                </div>
-                {organizer.stripe_account_id ? (
-                  <span className="px-3 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs rounded-full font-medium">
-                    เชื่อมต่อสำเร็จ
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs rounded-full font-medium">
-                    ยังไม่ได้เชื่อมต่อ
-                  </span>
-                )}
-              </div>
-
-              {stripeError && (
-                <div className="bg-red-500/15 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
-                  <AlertCircle size={16} className="shrink-0" />
-                  <span>{stripeError}</span>
-                </div>
-              )}
-
-              {!organizer.stripe_account_id ? (
-                <button
-                  type="button"
-                  onClick={handleConnectStripe}
-                  disabled={isConnectingStripe}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-[#635BFF] hover:bg-[#5349e4] disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer"
-                >
-                  {isConnectingStripe ? "กำลังติดต่อเซิร์ฟเวอร์ Stripe..." : "🔗 เชื่อมต่อบัญชี Stripe Express"}
-                </button>
-              ) : (
-                <p className="text-sm text-gray-300 bg-[#0d0d1a] border border-white/5 p-3 rounded-xl">
-                  🎉 ตรวจพบรหัสประจำตัวร้านค้า Stripe: <span className="font-mono text-violet-400">{organizer.stripe_account_id}</span> บัญชีนี้พร้อมเปิดใช้งานสำหรับการรับยอดชำระเงินในระบบ Checkout แล้ว
-                </p>
-              )}
-            </div>
-
-            {/* Danger Zone */}
-            <div className="bg-[#1a1a2e] border border-red-500/20 rounded-2xl p-6 space-y-4 shadow-2xl">
-              <div>
-                <h3 className="text-md font-bold text-red-400">Danger Zone</h3>
-                <p className="text-xs text-gray-400 mt-1">
-                  การลบ Organizer จะลบข้อมูลทั้งหมดที่เกี่ยวข้อง รวมถึงงานกิจกรรม (events) ทั้งหมดอย่างถาวร
-                </p>
-              </div>
+            {/* Danger zone */}
+            <div className="bg-red-500/5 p-6 border border-red-500/20 rounded-xl">
+              <h2 className="mb-1 font-semibold text-red-400 text-base">Danger Zone</h2>
+              <p className="mb-4 text-gray-500 text-sm">
+                การลบ organizer จะลบข้อมูลทั้งหมดที่เกี่ยวข้อง รวมถึง events ทั้งหมด
+              </p>
               <button
-                type="button"
                 onClick={() => setShowDeleteDialog(true)}
-                className="border border-red-500/30 text-red-400 hover:bg-red-500/10 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors cursor-pointer"
+                className="flex items-center gap-2 hover:bg-red-500/10 px-4 py-2.5 border border-red-500/40 rounded-xl font-semibold text-red-400 text-sm transition-colors"
               >
+                <Trash2 size={16} />
                 ลบ Organizer
               </button>
             </div>
@@ -451,7 +360,7 @@ export default function OrganizerSettingsPage() {
         )}
       </main>
 
-      {/* Delete confirmation dialog */}
+      {/* Delete confirm dialog */}
       {showDeleteDialog && organizer && (
         <DeleteConfirmDialog
           organizerName={organizer.name}
