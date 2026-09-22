@@ -4,15 +4,17 @@ export function useTheme(defaultDark = false) {
   const [isDarkMode, setIsDarkMode] = useState(defaultDark);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    if (isDarkMode) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-  }, [isDarkMode]);
+    applyTheme(theme);
+    localStorage.setItem("mt-theme", theme);
+  }, [theme]);
 
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
+  // Apply on first render without waiting for effect
+  useEffect(() => { applyTheme(getStoredTheme()); }, []);
 
-  return { isDarkMode, toggleTheme };
+  const isDarkMode = theme === "dark";
+  const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  const setDark  = () => setTheme("dark");
+  const setLight = () => setTheme("light");
+
+  return { theme, isDarkMode, toggleTheme, setDark, setLight };
 }

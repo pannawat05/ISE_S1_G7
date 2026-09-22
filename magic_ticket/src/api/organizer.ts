@@ -308,6 +308,8 @@ export interface WhitelistEntry {
   l_name: string;
   email: string;
   note: string | null;
+  ticket_id: number | null;
+  ticket_qrcode: string | null;
 }
 
 export interface UserSearchResult {
@@ -340,15 +342,14 @@ export async function fetchWhitelist(
   );
   return data.whitelist ?? [];
 }
-
 export async function addToWhitelist(
   token: string,
   organizerId: number,
   eventId: number,
   usersId: number,
   note?: string,
-): Promise<WhitelistEntry[]> {
-  const data = await apiFetch<{ whitelist: WhitelistEntry[] }>(
+): Promise<{ whitelist: WhitelistEntry[]; ticket?: { ticket_id: number; qrcode: string; qr_data_url: string } }> {
+  return apiFetch(
     `/organizer/${organizerId}/events/${eventId}/whitelist`,
     {
       method: "POST",
@@ -356,7 +357,6 @@ export async function addToWhitelist(
       body: JSON.stringify({ users_id: usersId, note }),
     },
   );
-  return data.whitelist ?? [];
 }
 
 export async function removeFromWhitelist(

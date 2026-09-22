@@ -10,16 +10,6 @@ import BookingDrawer from "@/components/booking";
 
 const PLACEHOLDER = "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&q=80";
 
-const TYPE_COLORS: Record<string, string> = {
-  Concert: "bg-violet-500/20 text-violet-300 border-violet-500/30",
-  Conference: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  Exhibition: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
-  Party: "bg-pink-500/20 text-pink-300 border-pink-500/30",
-  Festival: "bg-orange-500/20 text-orange-300 border-orange-500/30",
-  Sport: "bg-green-500/20 text-green-300 border-green-500/30",
-  Other: "bg-gray-500/20 text-gray-300 border-gray-500/30",
-};
-
 // ─── Image Gallery ────────────────────────────────────────────────────────────
 function ImageGallery({ cover, images, name }: {
   cover: string;
@@ -165,7 +155,6 @@ export default function EventDetailPage() {
   }
 
   const coverSrc = getCoverUrl(event.cover_image) ?? PLACEHOLDER;
-  const typeColor = TYPE_COLORS[event.type_name] ?? TYPE_COLORS.Other;
   const start = new Date(event.start_date);
   const end = new Date(event.end_date);
   const lat = parseFloat(event.latitude);
@@ -207,7 +196,7 @@ export default function EventDetailPage() {
             {/* Title + type + theme */}
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${typeColor}`}>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border `}>
                   <Tag size={11} />
                   {event.type_name}
                 </span>

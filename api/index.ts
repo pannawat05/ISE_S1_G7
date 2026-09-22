@@ -37,7 +37,7 @@ app.use("/events", eventsRouter);
 app.use("/admin", adminRouter);
 app.use("/sysadmin", sysadminRouter);
 app.use("/payment", paymentRouter);
-
+app.use("/checkin", checkinRouter);
 app.get("/", (_req, res) => {
   res.send("ISE API is running");
 });

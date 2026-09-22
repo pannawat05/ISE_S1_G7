@@ -18,8 +18,12 @@ export interface ZoneImageRow {
   display_order: number;
 }
 
-// ─── Queries ──────────────────────────────────────────────────────────────────
+export interface RowConfig {
+  label: string;
+  count: number;
+}
 
+// ─── List zones for an event (with seat count + images) ───────────────────────
 export async function listZonesByEvent(eventId: number): Promise<ZoneRow[]> {
   const zones = await query<(Omit<ZoneRow, "images" | "seat_count"> & { seat_count: number })[]>(
     `SELECT z.id, z.name, z.category, z.type, z.price, z.event_id,
@@ -94,14 +98,11 @@ export async function findZoneById(zoneId: number): Promise<{ id: number; event_
 // ─── Zone Images ──────────────────────────────────────────────────────────────
 
 export async function insertZoneImage(
-  zoneId: number,
-  url: string,
-  name: string | undefined,
-  displayOrder: number,
+  zoneId: number, url: string, name: string, displayOrder: number,
 ): Promise<number> {
   const result = await execute(
     "INSERT INTO zone_images (zone_id, url, name, display_order) VALUES (?, ?, ?, ?)",
-    [zoneId, url, name || "-", displayOrder],
+    [zoneId, url, name, displayOrder],
   );
   return result.insertId;
 }
@@ -142,27 +143,86 @@ export async function countSeatsByEvent(eventId: number): Promise<Record<number,
   return map;
 }
 
-/** Auto-generate seats for a zone. Position format: row letter + number (A1, A2, B1 ...) */
+// ─── setRowSeats: row-based seat config ──────────────────────────────────────
+/**
+ * กำหนดที่นั่งตาม row config
+ * position format: {label}{number} เช่น A1, A2, VIP-L1, FLOOR3
+ * ลบเฉพาะที่นั่งที่ไม่มี ticket linked (safe delete)
+ */
+export async function setRowSeats(zoneId: number, rows: RowConfig[]): Promise<void> {
+  // Build target positions
+  const target = new Map<string, string>(); // position → label
+  for (const row of rows) {
+    const label = row.label.trim();
+    if (!label || row.count <= 0) continue;
+    for (let i = 1; i <= row.count; i++) {
+      target.set(`${label}${i}`, label);
+    }
+  }
+
+  // Fetch existing
+  const existing = await query<{ id: number; position: string }[]>(
+    "SELECT id, position FROM seats WHERE zone_id = ?",
+    [zoneId],
+  );
+  const existingMap = new Map(existing.map((s) => [s.position, s.id]));
+
+  // Delete seats not in target (only if no ticket)
+  for (const { id, position } of existing) {
+    if (!target.has(position)) {
+      await execute(
+        `DELETE FROM seats WHERE id = ?
+         AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.seat_id = ?)`,
+        [id, id],
+      );
+    }
+  }
+
+  // Insert new seats
+  for (const [position] of target.entries()) {
+    if (!existingMap.has(position)) {
+      await execute(
+        "INSERT INTO seats (zone_id, name, position, is_active) VALUES (?, ?, ?, 1)",
+        [zoneId, position, position],
+      );
+    }
+  }
+}
+
+// ─── listRowsByZone ───────────────────────────────────────────────────────────
+export async function listRowsByZone(zoneId: number): Promise<RowConfig[]> {
+  const seats = await query<{ position: string }[]>(
+    "SELECT position FROM seats WHERE zone_id = ? ORDER BY position ASC",
+    [zoneId],
+  );
+
+  // Derive label from position string (strip trailing digits)
+  const rowMap = new Map<string, number>();
+  for (const { position } of seats) {
+    const label = position.replace(/\d+$/, "") || position;
+    rowMap.set(label, (rowMap.get(label) ?? 0) + 1);
+  }
+
+  return Array.from(rowMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, count]) => ({ label, count }));
+}
+
+// ─── setSeatCount (legacy flat count) ────────────────────────────────────────
 export async function setSeatCount(zoneId: number, targetCount: number): Promise<void> {
   const current = await countSeats(zoneId);
   if (targetCount === current) return;
 
   if (targetCount > current) {
-    // Add seats
     const toAdd = targetCount - current;
-    // Get max existing position number to continue from
     const existing = await query<{ position: string }[]>(
       "SELECT position FROM seats WHERE zone_id = ? ORDER BY id ASC",
       [zoneId],
     );
-    // Generate new positions A1..Z99 etc.
     const used = new Set(existing.map((s) => s.position));
-    let added = 0;
-    let row = 0;
-    let col = 1;
+    let added = 0, row = 0, col = 1;
     while (added < toAdd) {
-      const rowLetter = rowLabel(row);
-      const position = `${rowLetter}${col}`;
+      const position = `${rowLabel(row)}${col}`;
       if (!used.has(position)) {
         await execute(
           "INSERT INTO seats (zone_id, name, position, is_active) VALUES (?, ?, ?, 1)",
@@ -174,14 +234,12 @@ export async function setSeatCount(zoneId: number, targetCount: number): Promise
       if (col > 50) { col = 1; row++; }
     }
   } else {
-    // Remove seats from the end (only inactive/unticket-linked seats)
     const toRemove = current - targetCount;
     const seats = await query<{ id: number }[]>(
       `SELECT s.id FROM seats s
        LEFT JOIN tickets t ON t.seat_id = s.id
        WHERE s.zone_id = ? AND t.id IS NULL
-       ORDER BY s.id DESC
-       LIMIT ?`,
+       ORDER BY s.id DESC LIMIT ?`,
       [zoneId, toRemove],
     );
     for (const seat of seats) {

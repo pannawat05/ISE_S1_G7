@@ -20,16 +20,19 @@ export async function listEventZones(req: Request, res: Response) {
       id: number; name: string; category: string; type: string; price: number;
       total_seats: number; available_seats: number;
     }[]>(
-      `SELECT
-         z.id, z.name, z.category, z.type, z.price,
-         COUNT(s.id)                                                      AS total_seats,
-         COUNT(CASE WHEN s.is_active = 1 AND t.id IS NULL THEN 1 END)   AS available_seats
-       FROM zones z
-       LEFT JOIN seats   s ON s.zone_id = z.id
-       LEFT JOIN tickets t ON t.seat_id = s.id AND t.status NOT IN ('cancelled')
-       WHERE z.event_id = ?
-       GROUP BY z.id
-       ORDER BY z.id ASC`,
+      `SELECT z.id, z.name, z.category, z.type, z.price,
+        COUNT(s.id) AS total_seats,
+        COUNT(CASE WHEN t.seat_id IS NULL THEN 1 END) AS available_seats
+      FROM zones z
+      LEFT JOIN seats s ON s.zone_id = z.id AND s.is_active = 1
+      LEFT JOIN (
+        SELECT DISTINCT seat_id
+        FROM tickets
+        WHERE status IN ('paid', 'reserved') 
+      ) t ON t.seat_id = s.id
+      WHERE z.event_id = ?
+      GROUP BY z.id, z.name, z.category, z.type, z.price
+      ORDER BY z.id ASC;`,
       [eventId],
     );
 
@@ -68,7 +71,7 @@ export async function listEventZones(req: Request, res: Response) {
 // ─── Public seats for a specific zone ────────────────────────────────────────
 export async function listZoneSeats(req: Request, res: Response) {
   const eventId = Number(req.params.id);
-  const zoneId  = Number(req.params.zoneId);
+  const zoneId = Number(req.params.zoneId);
   if (isNaN(eventId) || isNaN(zoneId)) return res.status(400).json({ message: "Invalid ID" });
 
   try {
@@ -76,13 +79,16 @@ export async function listZoneSeats(req: Request, res: Response) {
       id: number; name: string; position: string;
       is_active: number; is_taken: number;
     }[]>(
-      `SELECT
-         s.id, s.name, s.position, s.is_active,
-         CASE WHEN t.id IS NOT NULL THEN 1 ELSE 0 END AS is_taken
-       FROM seats s
-       LEFT JOIN tickets t ON t.seat_id = s.id AND t.status NOT IN ('cancelled')
-       WHERE s.zone_id = ?
-       ORDER BY s.position ASC`,
+      `SELECT s.id, s.name, s.position, s.is_active,
+        CASE WHEN EXISTS (
+          SELECT 1 
+          FROM tickets t 
+          WHERE t.seat_id = s.id 
+            AND t.status IN ('paid', 'reserved') -- กำหนดเฉพาะ status ที่ถือว่าจองแล้ว
+        ) THEN 1 ELSE 0 END AS is_taken
+      FROM seats s
+      WHERE s.zone_id = ?
+      ORDER BY s.position ASC`,
       [zoneId],
     );
 
@@ -129,8 +135,7 @@ export async function getPublicEvent(req: Request, res: Response) {
        FROM events e
        JOIN event_types et ON et.id = e.type_id
        JOIN organizers  o  ON o.id  = e.organizer_id
-       WHERE e.id = ? AND e.status = 'approved' AND e.is_active = 1`,
-      [eventId],
+       WHERE e.id = ? AND e.status = 'approved' AND e.is_active = 1`,      [eventId],
     );
 
     if (!rows.length) return res.status(404).json({ message: "Event not found" });
@@ -149,16 +154,15 @@ export async function getPublicEvent(req: Request, res: Response) {
 }
 
 export async function listPublicEvents(req: Request, res: Response) {
-  const search   = String(req.query.search   ?? "").trim();
+  const search = String(req.query.search ?? "").trim();
   const location = String(req.query.location ?? "").trim();
-  const type     = String(req.query.type     ?? "").trim();
-  const limit    = Math.min(Number(req.query.limit  ?? 20), 100);
-  const offset   = Math.max(Number(req.query.offset ?? 0),  0);
+  const type = String(req.query.type ?? "").trim();
+  const limit = Math.min(Number(req.query.limit ?? 20), 100);
+  const offset = Math.max(Number(req.query.offset ?? 0), 0);
 
   try {
     // Show only approved and active events for public
-    const conditions: string[] = ["e.status = 'approved'", "e.is_active = 1"];
-    const params: unknown[] = [];
+    const conditions: string[] = ["e.status = 'approved'", "e.is_active = 1"];    const params: unknown[] = [];
 
     if (search) {
       conditions.push("(e.name LIKE ? OR o.name LIKE ?)");
