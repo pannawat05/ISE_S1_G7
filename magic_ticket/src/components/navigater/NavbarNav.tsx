@@ -40,8 +40,8 @@ export default function NavbarNav() {
             to={to}
             className={`flex items-center gap-2 px-4 py-2 text-sm rounded-xl border transition-all ${
               isActive
-                ? "text-#ffffff bg-hsl(218, 100%, 60%)/10 border-hsl(216, 100%, 55%)/20"
-                : "text-gray-300 border-none hover:text-black"
+                ? "border-[color:var(--mt-border)] bg-[color:var(--mt-elevated)] text-[color:var(--mt-text)]"
+                : "border-transparent text-[color:var(--mt-text-secondary)] hover:text-[color:var(--mt-text)]"
             }`}
           >
             <Icon size={16} />
