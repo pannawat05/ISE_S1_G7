@@ -34,12 +34,6 @@ import {
   type RowConfig,
 } from "../model/zone.model.js";
 
-import Stripe from "stripe";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-06-20" // หรือเวอร์ชันล่าสุดที่ติดตั้ง
-});
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Verify that the authenticated user owns the organizer. Returns organizer or sends error. */
@@ -106,7 +100,6 @@ export async function getOrganizer(req: AuthRequest, res: Response) {
       logo_url: organizer.logo_url,
       description: organizer.description ?? null,
       owner_id: organizer.owner_id,
-      stripe_account_id: organizer.stripe_id || null,
       created_at: organizer.created_at,
       updated_at: organizer.updated_at,
     });
@@ -643,65 +636,67 @@ export async function getDashboard(req: AuthRequest, res: Response) {
   }
 }
 
-// ─── Stripe Connect Onboarding ────────────────────────────────────────────────
-
-export async function createStripeOnboardLinkHandler(req: AuthRequest, res: Response) {
+// ─── GET rows config for a zone ───────────────────────────────────────────────
+export async function getZoneRows(req: AuthRequest, res: Response) {
   const organizerId = Number(req.params.id);
-  const userId = req.user?.id;
-
-  if (!userId) return res.status(401).json({ message: "Unauthorized" });
-  if (isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
+  const eventId     = Number(req.params.eventId);
+  const zoneId      = Number(req.params.zoneId);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId) || isNaN(zoneId)) return res.status(400).json({ message: "Invalid ID" });
 
   try {
     const organizer = await resolveOrganizerOwner(req, res, organizerId);
-    if (!organizer) return; // resolveOrganizerOwner จัดการ response 403/404 ให้แล้ว
+    if (!organizer) return;
+    const zone = await findZoneById(zoneId);
+    if (!zone || zone.event_id !== eventId) return res.status(404).json({ message: "Zone not found" });
+    const rows = await listRowsByZone(zoneId);
+    return res.json({ rows });
+  } catch (err) {
+    console.error("GET ZONE ROWS ERROR:", err);
+    return res.status(500).json({ message: "Error fetching rows" });
+  }
+}
 
-    let accountId = organizer.stripe_id;
+// ─── Soft delete event ────────────────────────────────────────────────────────
+export async function deleteEventSoft(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const eventId     = Number(req.params.eventId);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId)) return res.status(400).json({ message: "Invalid ID" });
 
-    // 1. ถ้ายังไม่มี Stripe Account ให้สร้างบัญชี Custom / Express Account ใหม่
-    if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: "standard",
-        country: "TH", // หรือประเทศที่รองรับ เช่น TH, US
-        capabilities: {
-          card_payments: { requested: true },
-          transfers: { requested: true },
-        },
-        business_profile: {
-          name: organizer.name,
-        },
-      });
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
 
-      accountId = account.id;
+    const event = await findEventById(eventId);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+    if (event.organizer_id !== organizerId) return res.status(403).json({ message: "Forbidden" });
 
-      // บันทึก stripe_account_id ลง Database ของ organizer
-      await updateOrganizer(organizerId, {
-        stripe_id: accountId,
-      } as Parameters<typeof updateOrganizer>[1]);
+    const now   = new Date();
+    const start = new Date(event.start_date);
+    const end   = new Date(event.end_date);
+
+    // ลบได้เฉพาะ:
+    //   1. จบไปแล้ว (now > end)
+    //   2. ยังไม่เริ่ม (now < start) AND status ไม่ใช่ approved
+    const isEnded   = now > end;
+    const canDelete = isEnded || (now < start && event.status !== "approved");
+
+    if (!canDelete) {
+      if (now >= start && now <= end) {
+        return res.status(409).json({ message: "ไม่สามารถลบ Event ที่กำลังจัดอยู่ได้" });
+      }
+      return res.status(409).json({ message: "ไม่สามารถลบ Event ที่ได้รับการอนุมัติแล้วและยังไม่ถึงวันงาน" });
     }
 
-    // 2. กำหนด URL สำหรับ Redirect กลับเมื่อกรอกเสร็จ หรือเมื่อกดยกเลิก
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    const refreshUrl = `${frontendUrl}/profile/organizers/${organizerId}/settings`;
-    const returnUrl = `${frontendUrl}/profile/organizers/${organizerId}/settings?stripe_status=return`;
+    await execute(
+      "UPDATE events SET status = 'deleted', updated_at = NOW() WHERE id = ?",
+      [eventId],
+    );
 
-    // 3. สร้าง Account Link สำหรับกระบวนการ Onboarding
-    const accountLink = await stripe.accountLinks.create({
-      account: accountId,
-      refresh_url: refreshUrl,
-      return_url: returnUrl,
-      type: "account_onboarding",
-    });
-
-    // 4. ส่ง onboarding_url กลับไปให้ Frontend
-    return res.json({
-      onboarding_url: accountLink.url,
-      stripe_account_id: accountId,
-    });
-  } catch (err: any) {
-    console.error("STRIPE ONBOARD ERROR:", err);
-    return res.status(500).json({
-      message: err.message || "Error generating Stripe onboarding link",
-    });
+    return res.json({ message: "Event ถูกลบแล้ว" });
+  } catch (err) {
+    console.error("DELETE EVENT SOFT ERROR:", err);
+    return res.status(500).json({ message: "Error deleting event" });
   }
 }

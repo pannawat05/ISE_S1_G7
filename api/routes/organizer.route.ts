@@ -96,11 +96,7 @@ router.get("/:id/events/:eventId/staff", authenticate,
 router.post("/:id/events/:eventId/staff", authenticate,
   (req, res) => staffController.assignStaffToEvent(req as AuthRequest, res));
 
-router.delete("/:id/events/:eventId/whitelist/:wlId", authenticate, (req, res) =>
-  whitelistController.removeFromWhitelist(req as AuthRequest, res),
-);
-router.post("/:id/stripe/onboard", authenticate, (req, res) =>
-  organizerController.createStripeOnboardLinkHandler(req as AuthRequest, res),
-);
+router.delete("/:id/events/:eventId/staff/:staffId", authenticate,
+  (req, res) => staffController.removeStaffFromEvent(req as AuthRequest, res));
 
 export default router;

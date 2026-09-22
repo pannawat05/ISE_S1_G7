@@ -7,7 +7,7 @@ export default function Home() {
   const [location, setLocation] = useState("");
 
   return (
-    <div className="bg-slate-50 w-full h-full overflow-y-auto font-sans text-slate-900">
+    <div className="bg-black w-full h-full overflow-y-auto font-sans text-white">
       <HeroSection
         search={search}
         location={location}

@@ -1,7 +1,20 @@
 import { useEffect, useState } from "react";
 
-export function useTheme(defaultDark = false) {
-  const [isDarkMode, setIsDarkMode] = useState(defaultDark);
+type Theme = "light" | "dark";
+
+function getStoredTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  return (localStorage.getItem("mt-theme") as Theme) ?? "light";
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  // ใช้ bg-black เป็น fallback ของ body
+  document.body.style.backgroundColor = theme === "dark" ? "#000000" : "#f5f5f7";
+}
+
+export function useTheme() {
+  const [theme, setTheme] = useState<Theme>(getStoredTheme);
 
   useEffect(() => {
     applyTheme(theme);
