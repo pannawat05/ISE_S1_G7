@@ -615,17 +615,17 @@ export default function PaymentPage() {
                 clientSecret,
 
                 appearance: {
-                  theme: "night",
+                  theme: "stripe",
 
                   variables: {
                     colorPrimary:
                       "#7c3aed",
 
                     colorBackground:
-                      "#111111",
+                      "#ffffff",
 
                     colorText:
-                      "#ffffff",
+                      "#172033",
 
                     colorDanger:
                       "#f87171",

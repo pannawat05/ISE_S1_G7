@@ -132,5 +132,8 @@ router.post("/:id/events/:eventId/whitelist", authenticate, (req, res) =>
 router.delete("/:id/events/:eventId/whitelist/:wlId", authenticate, (req, res) =>
   whitelistController.removeFromWhitelist(req as AuthRequest, res),
 );
+router.post("/:id/stripe/onboard", authenticate, (req, res) =>
+  organizerController.createStripeOnboardLinkHandler(req as AuthRequest, res),
+);
 
 export default router;

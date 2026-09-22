@@ -30,6 +30,12 @@ import {
   countSeats,
 } from "../model/zone.model.js";
 
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2024-06-20" // หรือเวอร์ชันล่าสุดที่ติดตั้ง
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Verify that the authenticated user owns the organizer. Returns organizer or sends error. */
@@ -96,6 +102,7 @@ export async function getOrganizer(req: AuthRequest, res: Response) {
       logo_url: organizer.logo_url,
       description: organizer.description ?? null,
       owner_id: organizer.owner_id,
+      stripe_account_id: organizer.stripe_id || null,
       created_at: organizer.created_at,
       updated_at: organizer.updated_at,
     });
@@ -617,5 +624,68 @@ export async function getDashboard(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error("DASHBOARD ERROR:", err);
     return res.status(500).json({ message: "Error fetching dashboard" });
+  }
+}
+
+// ─── Stripe Connect Onboarding ────────────────────────────────────────────────
+
+export async function createStripeOnboardLinkHandler(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const userId = req.user?.id;
+
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
+
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return; // resolveOrganizerOwner จัดการ response 403/404 ให้แล้ว
+
+    let accountId = organizer.stripe_id;
+
+    // 1. ถ้ายังไม่มี Stripe Account ให้สร้างบัญชี Custom / Express Account ใหม่
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: "standard",
+        country: "TH", // หรือประเทศที่รองรับ เช่น TH, US
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        business_profile: {
+          name: organizer.name,
+        },
+      });
+
+      accountId = account.id;
+
+      // บันทึก stripe_account_id ลง Database ของ organizer
+      await updateOrganizer(organizerId, {
+        stripe_id: accountId,
+      } as Parameters<typeof updateOrganizer>[1]);
+    }
+
+    // 2. กำหนด URL สำหรับ Redirect กลับเมื่อกรอกเสร็จ หรือเมื่อกดยกเลิก
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const refreshUrl = `${frontendUrl}/profile/organizers/${organizerId}/settings`;
+    const returnUrl = `${frontendUrl}/profile/organizers/${organizerId}/settings?stripe_status=return`;
+
+    // 3. สร้าง Account Link สำหรับกระบวนการ Onboarding
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: refreshUrl,
+      return_url: returnUrl,
+      type: "account_onboarding",
+    });
+
+    // 4. ส่ง onboarding_url กลับไปให้ Frontend
+    return res.json({
+      onboarding_url: accountLink.url,
+      stripe_account_id: accountId,
+    });
+  } catch (err: any) {
+    console.error("STRIPE ONBOARD ERROR:", err);
+    return res.status(500).json({
+      message: err.message || "Error generating Stripe onboarding link",
+    });
   }
 }

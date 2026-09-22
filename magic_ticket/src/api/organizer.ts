@@ -371,3 +371,22 @@ export async function removeFromWhitelist(
   );
   return data.whitelist ?? [];
 }
+
+// ─── Stripe Connect ──────────────────────────────────────────────────────────
+
+export interface StripeOnboardingResponse {
+  onboarding_url: string;
+}
+
+export async function generateStripeOnboardingLink(
+  token: string,
+  organizerId: number,
+): Promise<StripeOnboardingResponse> {
+  return apiFetch<StripeOnboardingResponse>(
+    `/organizer/${organizerId}/stripe/onboard`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+}
