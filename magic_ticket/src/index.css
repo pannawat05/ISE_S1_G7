@@ -9,6 +9,7 @@
   --color-accent-strong: #7c3aed;
   --color-accent-mid: #a855f7;
   --color-accent-deep: #9333ea;
+
   --color-logo: #7c3aed;
 }
 
@@ -119,12 +120,22 @@ html, body {
 }
 
 @layer components {
+
+  /* ========================================
+     PAGE
+  ======================================== */
+
   .mt-page {
     min-height: 100vh;
     background-color: var(--mt-bg);
     color: var(--mt-text);
     font-family: sans-serif;
   }
+
+
+  /* ========================================
+     SURFACE / CARD
+  ======================================== */
 
   .mt-surface {
     background-color: var(--mt-surface);
@@ -136,6 +147,11 @@ html, body {
     background-color: var(--mt-elevated);
     border: 1px solid var(--mt-border);
   }
+
+
+  /* ========================================
+     INPUT
+  ======================================== */
 
   .mt-input {
     width: 100%;
@@ -159,6 +175,11 @@ html, body {
     color: var(--mt-text);
   }
 
+
+  /* ========================================
+     LABEL
+  ======================================== */
+
   .mt-label {
     display: block;
     font-size: 0.75rem;
@@ -167,12 +188,22 @@ html, body {
     margin-bottom: 0.25rem;
   }
 
+
+  /* ========================================
+     HEADING
+  ======================================== */
+
   .mt-heading {
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
     background-image: linear-gradient(to right, #7c3aed, #a855f7);
   }
+
+
+  /* ========================================
+     PRIMARY BUTTON
+  ======================================== */
 
   .mt-btn-primary {
     background-image: linear-gradient(to right, #7c3aed, #9333ea);
@@ -185,6 +216,11 @@ html, body {
   .mt-btn-primary:hover {
     background-image: linear-gradient(to right, #6d28d9, #7c3aed);
   }
+
+
+  /* ========================================
+     OUTLINE BUTTON
+  ======================================== */
 
   .mt-btn-outline {
     padding: 0.5rem 1rem;
@@ -200,6 +236,11 @@ html, body {
     border-color: var(--mt-border-focus);
     color: var(--mt-text);
   }
+
+
+  /* ========================================
+     LINK
+  ======================================== */
 
   .mt-link {
     color: var(--mt-accent);
@@ -219,6 +260,11 @@ html, body {
     z-index: 10;
   }
 
+
+  /* ========================================
+     AUTH PAGE
+  ======================================== */
+
   .mt-auth-page {
     height: 100%;
     display: flex;
@@ -229,6 +275,11 @@ html, body {
     overflow-y: auto;
   }
 
+
+  /* ========================================
+     DASHBOARD
+  ======================================== */
+
   .mt-dashboard-shell {
     display: flex;
     height: 100%;
@@ -236,6 +287,7 @@ html, body {
     color: var(--mt-text);
     overflow: hidden;
   }
+
 
   .mt-dashboard-header {
     display: flex;
@@ -246,6 +298,7 @@ html, body {
     border-bottom: 1px solid var(--mt-border-subtle);
   }
 
+
   .mt-dashboard-main {
     flex: 1;
     overflow-x: hidden;
@@ -254,12 +307,22 @@ html, body {
     padding: 1.5rem;
   }
 
+
+  /* ========================================
+     STAT CARD
+  ======================================== */
+
   .mt-stat-card {
     background-color: var(--mt-surface);
     padding: 1.5rem;
     border-radius: 0.75rem;
     border: 1px solid var(--mt-border-subtle);
   }
+
+
+  /* ========================================
+     SIDEBAR
+  ======================================== */
 
   .mt-sidebar {
     position: fixed;
@@ -277,6 +340,11 @@ html, body {
     .mt-sidebar { position: relative; transform: none; }
   }
 
+
+  /* ========================================
+     BADGES
+  ======================================== */
+
   .mt-badge {
     display: inline-flex;
     align-items: center;
@@ -286,6 +354,7 @@ html, body {
     font-weight: 500;
     border-width: 1px;
   }
+
 
   .mt-badge-success { color: #a78bfa; background-color: rgb(167 139 250 / 0.1); border-color: rgb(167 139 250 / 0.2); }
   .mt-badge-warning { color: #c084fc; background-color: rgb(192 132 252 / 0.1); border-color: rgb(192 132 252 / 0.2); }

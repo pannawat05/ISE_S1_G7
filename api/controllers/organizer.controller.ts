@@ -34,6 +34,12 @@ import {
   type RowConfig,
 } from "../model/zone.model.js";
 
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2024-06-20" // หรือเวอร์ชันล่าสุดที่ติดตั้ง
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Verify that the authenticated user owns the organizer. Returns organizer or sends error. */
@@ -100,6 +106,7 @@ export async function getOrganizer(req: AuthRequest, res: Response) {
       logo_url: organizer.logo_url,
       description: organizer.description ?? null,
       owner_id: organizer.owner_id,
+      stripe_account_id: organizer.stripe_id || null,
       created_at: organizer.created_at,
       updated_at: organizer.updated_at,
     });
