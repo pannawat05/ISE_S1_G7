@@ -7,7 +7,8 @@ import {
 } from "../model/email.model.js";
 
 export async function sendOtp(req: Request, res: Response) {
-  const { email } = req.body;
+  const { email, purpose } = req.body;
+  const isPasswordReset = purpose === "password-reset";
 
   if (!email) {
     return res.status(400).json({
@@ -26,7 +27,7 @@ export async function sendOtp(req: Request, res: Response) {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: "Magic Ticket - รหัส OTP ของคุณ",
+      subject: `Magic Ticket - ${isPasswordReset ? "รหัส OTP สำหรับเปลี่ยนรหัสผ่าน" : "รหัส OTP ของคุณ"}`,
       html: `
         <div
           style="
@@ -40,7 +41,7 @@ export async function sendOtp(req: Request, res: Response) {
           </h2>
 
           <p>
-            รหัส OTP สำหรับยืนยันการสมัครสมาชิก:
+            ${isPasswordReset ? "รหัส OTP สำหรับเปลี่ยนรหัสผ่านของคุณ:" : "รหัส OTP สำหรับยืนยันการสมัครสมาชิก:"}
           </p>
 
           <div
@@ -73,7 +74,7 @@ export async function sendOtp(req: Request, res: Response) {
               font-size: 12px;
             "
           >
-            หากคุณไม่ได้สมัครสมาชิก
+            หากคุณไม่ได้ส่งคำขอนี้
             กรุณาเพิกเฉยต่ออีเมลนี้
           </p>
         </div>

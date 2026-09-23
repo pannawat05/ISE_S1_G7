@@ -48,6 +48,8 @@ function App() {
 
             <Route path="/signin" element={<pages.Signin />} />
 
+            <Route path="/forgot-password" element={<pages.ForgotPassword />} />
+
             <Route path="/otp" element={<pages.Otp />} />
 
             <Route path="/profile" element={<ProfileLayout />}>

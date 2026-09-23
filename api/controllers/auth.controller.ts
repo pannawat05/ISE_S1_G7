@@ -6,7 +6,9 @@ import {
   createUser,
   findUserByEmail,
   getUserProfile,
+  updateUserPassword,
 } from "../model/user.model.js";
+import { verifyOtp } from "../model/email.model.js";
 import {
   createOrganizer,
   findOrganizerByOwnerId,
@@ -76,6 +78,45 @@ export async function login(req: Request, res: Response) {
     });
   } catch (err) {
     console.error("LOGIN ERROR:", err);
+    return res.status(500).json({ error: "Internal server error", status: 500 });
+  }
+}
+
+export async function resetPassword(req: Request, res: Response) {
+  const { email, otp, password } = req.body;
+
+  if (!email || !otp || !password) {
+    return res.status(400).json({
+      message: "Email, OTP, and password are required",
+      status: 400,
+    });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({
+      message: "Password must be at least 8 characters",
+      status: 400,
+    });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+
+    if (!user) {
+      return res.status(400).json({ message: "Unable to reset password", status: 400 });
+    }
+
+    const otpError = await verifyOtp(email, otp.toString());
+    if (otpError) {
+      return res.status(400).json({ error: otpError, status: 400 });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await updateUserPassword(user.id, hashedPassword);
+
+    return res.json({ message: "Password reset successfully", status: 200 });
+  } catch (err) {
+    console.error("RESET PASSWORD ERROR:", err);
     return res.status(500).json({ error: "Internal server error", status: 500 });
   }
 }
