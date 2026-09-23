@@ -19,38 +19,53 @@ export default function SearchBar({
 }: SearchBarProps) {
   return (
     <div className="z-10 relative flex items-center gap-2 mx-auto px-4 w-full max-w-3xl">
-      <div className="flex sm:flex-row flex-col flex-1 items-stretch sm:items-center bg-gray-900 border border-white/10 rounded-full overflow-hidden">
-        <div className="flex flex-1 items-center gap-3 px-5 py-3.5 border-white/10 sm:border-r border-b sm:border-b-0">
-          <Search size={18} className="text-gray-500 shrink-0" />
+      {/* Search input wrapper */}
+      <div
+        className="flex sm:flex-row flex-col flex-1 items-stretch sm:items-center border rounded-full overflow-hidden"
+        style={{
+          backgroundColor: "var(--mt-surface)",
+          borderColor: "var(--mt-border)",
+        }}
+      >
+        {/* ค้นหาชื่อ */}
+        <div
+          className="flex flex-1 items-center gap-3 px-5 py-3.5 sm:border-r border-b sm:border-b-0"
+          style={{ borderColor: "var(--mt-border)" }}
+        >
+          <Search size={18} style={{ color: "var(--mt-text-muted)" }} className="shrink-0" />
           <input
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="ค้นหาชื่อกิจกรรม หรือผู้จัดงาน..."
-            className="bg-transparent outline-none w-full text-white placeholder:text-gray-500 text-sm"
+            className="bg-transparent outline-none w-full text-sm"
+            style={{ color: "var(--mt-text)", caretColor: "var(--mt-accent)" }}
           />
         </div>
+        {/* ค้นหาสถานที่ */}
         <div className="flex flex-1 items-center gap-3 px-5 py-3.5">
-          <MapPin size={18} className="text-gray-500 shrink-0" />
+          <MapPin size={18} style={{ color: "var(--mt-text-muted)" }} className="shrink-0" />
           <input
             type="text"
             value={location}
             onChange={(e) => onLocationChange(e.target.value)}
             placeholder="ค้นหาสถานที่จัดงาน..."
-            className="bg-transparent outline-none w-full text-white placeholder:text-gray-500 text-sm"
+            className="bg-transparent outline-none w-full text-sm"
+            style={{ color: "var(--mt-text)", caretColor: "var(--mt-accent)" }}
           />
         </div>
       </div>
 
-      {/* เพิ่ม relative z-20 และ pointer-events-auto เพื่อป้องกันโดนบัง */}
+      {/* Filter button */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          console.log("Filter button clicked directly!");
-          onOpenFilter?.();
+        onClick={(e) => { e.stopPropagation(); onOpenFilter?.(); }}
+        className="z-20 relative flex justify-center items-center hover:opacity-80 p-4 border rounded-full transition cursor-pointer pointer-events-auto shrink-0"
+        style={{
+          backgroundColor: "var(--mt-surface)",
+          borderColor: "var(--mt-border)",
+          color: "var(--mt-text)",
         }}
-        className="z-20 relative flex justify-center items-center bg-gray-900 hover:bg-gray-800 p-4 border border-white/10 rounded-full text-white transition cursor-pointer pointer-events-auto shrink-0"
       >
         <SlidersHorizontal size={18} />
         {activeFilterCount > 0 && (

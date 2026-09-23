@@ -11,6 +11,8 @@ import {
   createOrganizer,
   findOrganizerByOwnerId,
 } from "../model/organizer.model.js";
+import { query, execute } from "../model/query.js";
+import { saveOtp, verifyOtp, deleteOtp } from "../model/email.model.js";
 import fs from "fs";
 
 export async function signup(req: Request, res: Response) {
@@ -181,4 +183,80 @@ export async function getUserId(req: AuthRequest, res: Response) {
     return res.status(401).json({ message: "Unauthorized" });
   }
   return res.json({ userId: req.user.id });
+}
+
+// ─── Forgot Password — ส่ง OTP ไปยัง email ──────────────────────────────────
+export async function forgotPassword(req: Request, res: Response) {
+  const { email } = req.body as { email: string };
+  if (!email?.trim()) return res.status(400).json({ message: "กรุณาระบุ email" });
+
+  try {
+    // ตรวจสอบว่า email มีในระบบ
+    const users = await query<{ id: number; f_name: string }[]>(
+      "SELECT id, f_name FROM users WHERE email = ? LIMIT 1",
+      [email.trim()],
+    );
+    // ไม่บอกว่าไม่มี email เพื่อความปลอดภัย
+    if (!users.length) {
+      return res.json({ message: "ถ้ามี account อยู่ระบบจะส่ง OTP ไปให้" });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    await saveOtp(email.trim(), otp);
+
+    const { transporter } = await import("../lib/mailer.js");
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email.trim(),
+      subject: "Magic Ticket — รีเซ็ตรหัสผ่าน",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+          <h2 style="color:#7c3aed">🎫 Magic Ticket</h2>
+          <p>คุณ ${users[0].f_name} ได้ขอรีเซ็ตรหัสผ่าน</p>
+          <p>รหัส OTP สำหรับรีเซ็ตรหัสผ่าน:</p>
+          <div style="background:#f3f4f6;padding:20px;text-align:center;font-size:32px;font-weight:bold;color:#7c3aed;border-radius:8px;margin:20px 0">
+            ${otp}
+          </div>
+          <p style="color:#666;font-size:14px">รหัสนี้จะหมดอายุใน 5 นาที</p>
+          <p style="color:#999;font-size:12px">หากคุณไม่ได้ขอรีเซ็ต กรุณาเพิกเฉยต่ออีเมลนี้</p>
+        </div>
+      `.trim(),
+    });
+
+    return res.json({ message: "ส่ง OTP ไปยัง email แล้ว" });
+  } catch (err) {
+    console.error("FORGOT PASSWORD ERROR:", err);
+    return res.status(500).json({ message: "ส่ง OTP ไม่สำเร็จ" });
+  }
+}
+
+// ─── Reset Password — ตรวจสอบ OTP แล้วเปลี่ยนรหัสผ่าน ──────────────────────
+export async function resetPassword(req: Request, res: Response) {
+  const { email, otp, new_password } = req.body as {
+    email: string; otp: string; new_password: string;
+  };
+  if (!email || !otp || !new_password) {
+    return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบ" });
+  }
+  if (new_password.length < 8) {
+    return res.status(400).json({ message: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร" });
+  }
+
+  try {
+    const isValid = await verifyOtp(email.trim(), otp.trim());
+    if (!isValid) {
+      return res.status(400).json({ message: "OTP ไม่ถูกต้องหรือหมดอายุ" });
+    }
+
+    const bcrypt = await import("bcrypt");
+    const hashed = await bcrypt.hash(new_password, 10);
+
+    await execute("UPDATE users SET password = ? WHERE email = ?", [hashed, email.trim()]);
+    await deleteOtp(email.trim());
+
+    return res.json({ message: "เปลี่ยนรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบใหม่" });
+  } catch (err) {
+    console.error("RESET PASSWORD ERROR:", err);
+    return res.status(500).json({ message: "เปลี่ยนรหัสผ่านไม่สำเร็จ" });
+  }
 }

@@ -103,3 +103,19 @@ export async function scanTicket(
     return { status: "invalid", message: "เกิดข้อผิดพลาด" };
   }
 }
+
+// ─── Change password ──────────────────────────────────────────────────────────
+export async function changePassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await apiFetch("/users/me/password", {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+}

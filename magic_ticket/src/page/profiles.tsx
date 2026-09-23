@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import Cookies from "js-cookie";
 import {
   Menu, Mail, User, Building2, Plus, Settings,
-  ChevronRight, Pencil, X, Check, Loader2,
+  ChevronRight, Pencil, X, Check, Loader2, KeyRound, Eye, EyeOff,
 } from "lucide-react";
-import { fetchUser, updateProfile, type UserProfile } from "@/api/user";
+import { fetchUser, updateProfile, changePassword, type UserProfile } from "@/api/user";
 import { fetchMyOrganizers, getLogoUrl, type UserOrganizer } from "@/api/organizer";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 import CreateOrganizerModal from "@/components/organizer/CreateOrganizerModal";

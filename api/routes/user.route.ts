@@ -21,4 +21,8 @@ router.get("/my-staff-assignments", authenticate, (req, res) =>
   userController.getMyStaffAssignments(req as AuthRequest, res),
 );
 
+router.patch("/me/password", authenticate, (req, res) =>
+  userController.changePassword(req as AuthRequest, res),
+);
+
 export default router;

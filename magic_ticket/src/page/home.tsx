@@ -30,7 +30,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="bg-black min-h-screen text-white">
+    <div style={{ backgroundColor: "var(--mt-bg)", color: "var(--mt-text)" }} className="min-h-screen">
       {/* Hero Section + SearchBar */}
       <HeroSection
         search={search}

@@ -117,6 +117,17 @@ html, body {
 
   /* Table row hover */
   .hover\:bg-white\/\[0\.03\]:hover { background-color: rgb(0 0 0 / 0.03) !important; }
+
+  /* Violet buttons — เข้มขึ้นใน light mode เพื่อ contrast */
+  .bg-violet-600              { background-color: #5b21b6 !important; }
+  .hover\:bg-violet-700:hover { background-color: #4c1d95 !important; }
+  .bg-violet-600\/20          { background-color: rgb(91 33 182 / 0.12) !important; }
+  .bg-violet-600\/10          { background-color: rgb(91 33 182 / 0.07) !important; }
+  .bg-violet-500\/5           { background-color: rgb(91 33 182 / 0.05) !important; }
+  .text-violet-300            { color: #5b21b6 !important; }
+  .text-violet-400            { color: #6d28d9 !important; }
+  .border-violet-500\/30      { border-color: rgb(91 33 182 / 0.3) !important; }
+  .border-violet-500\/40      { border-color: rgb(91 33 182 / 0.4) !important; }
 }
 
 @layer components {

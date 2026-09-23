@@ -146,3 +146,47 @@ export async function getMyStaffAssignments(req: AuthRequest, res: Response) {
     return res.status(500).json({ message: "Error fetching assignments" });
   }
 }
+
+// ─── PATCH /users/me/password ─────────────────────────────────────────────────
+export async function changePassword(req: AuthRequest, res: Response) {
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+  const { current_password, new_password } = req.body as {
+    current_password: string;
+    new_password: string;
+  };
+
+  if (!current_password || !new_password) {
+    return res.status(400).json({ message: "กรุณากรอกข้อมูลให้ครบ" });
+  }
+  if (new_password.length < 8) {
+    return res.status(400).json({ message: "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร" });
+  }
+
+  try {
+    const { query, execute } = await import("../model/query.js");
+    const bcrypt = await import("bcrypt");
+
+    // ดึง hash ปัจจุบัน
+    const rows = await query<{ password: string }[]>(
+      "SELECT password FROM users WHERE id = ? LIMIT 1",
+      [req.user.id],
+    );
+    if (!rows.length) return res.status(404).json({ message: "User not found" });
+
+    // ตรวจสอบ current password
+    const match = await bcrypt.compare(current_password, rows[0].password);
+    if (!match) {
+      return res.status(400).json({ message: "รหัสผ่านปัจจุบันไม่ถูกต้อง" });
+    }
+
+    // Hash และบันทึกรหัสผ่านใหม่
+    const hashed = await bcrypt.hash(new_password, 10);
+    await execute("UPDATE users SET password = ? WHERE id = ?", [hashed, req.user.id]);
+
+    return res.json({ message: "เปลี่ยนรหัสผ่านสำเร็จ" });
+  } catch (err) {
+    console.error("CHANGE PASSWORD ERROR:", err);
+    return res.status(500).json({ message: "เปลี่ยนรหัสผ่านไม่สำเร็จ" });
+  }
+}
