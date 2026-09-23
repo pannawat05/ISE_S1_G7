@@ -44,6 +44,10 @@ function App() {
 
             <Route path="/my-tickets" element={<pages.MyTickets />} />
 
+            <Route path="/my-staff" element={<pages.MyStaff />} />
+
+            <Route path="/scan-qr" element={<pages.ScanQR />} />
+
             <Route path="/signup" element={<pages.SignUp />} />
 
             <Route path="/signin" element={<pages.Signin />} />
