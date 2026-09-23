@@ -69,6 +69,16 @@ function App() {
               />
 
               <Route
+                path="analytics/:id"
+                element={<pages.Analytics />}
+              />
+
+              <Route
+                path="attendees/:id"
+                element={<pages.Attendees />}
+              />
+
+              <Route
                 path="events/:id"
                 element={<pages.Event />}
               />

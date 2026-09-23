@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS event_views (
+    event_id INT PRIMARY KEY,
+    view_count INT NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_event_views_event FOREIGN KEY (event_id)
+        REFERENCES events(id) ON DELETE CASCADE
+);

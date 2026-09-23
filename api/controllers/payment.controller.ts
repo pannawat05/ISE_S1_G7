@@ -22,7 +22,21 @@ const stripe = new Stripe(
 // Platform fee
 // ============================================================
 
-const PLATFORM_FEE_PERCENT = 10;
+const DEFAULT_PLATFORM_FEE_PERCENT = 10;
+
+async function getPlatformFeePercent(): Promise<number> {
+  try {
+    const rows = await query<{ setting_value: number }[]>(
+      "SELECT setting_value FROM platform_settings WHERE setting_key = 'platform_fee_percent' LIMIT 1",
+    );
+    const value = Number(rows[0]?.setting_value);
+    return Number.isFinite(value) && value >= 0 && value <= 100
+      ? value
+      : DEFAULT_PLATFORM_FEE_PERCENT;
+  } catch {
+    return DEFAULT_PLATFORM_FEE_PERCENT;
+  }
+}
 
 
 // ============================================================
@@ -238,9 +252,8 @@ export async function checkout(
     // 5. Calculate platform fee
     // ========================================================
 
-    const applicationFeeSatang = Math.round(
-      amountSatang * (PLATFORM_FEE_PERCENT / 100)
-    );
+    const platformFeePercent = await getPlatformFeePercent();
+    const applicationFeeSatang = Math.round(amountSatang * (platformFeePercent / 100));
 
     // ========================================================
     // 6. Create reserved tickets

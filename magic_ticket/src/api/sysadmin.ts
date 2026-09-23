@@ -62,6 +62,18 @@ export async function deletePaymentMethod(token: string, id: number): Promise<vo
   await apiFetch(`/sysadmin/payment-methods/${id}`, { method: "DELETE", token });
 }
 
+export async function fetchPlatformFee(token: string): Promise<number> {
+  const data = await apiFetch<{ platform_fee_percent: number }>("/sysadmin/platform-fee", { token });
+  return Number(data.platform_fee_percent ?? 10);
+}
+
+export async function updatePlatformFee(token: string, value: number): Promise<number> {
+  const data = await apiFetch<{ platform_fee_percent: number }>("/sysadmin/platform-fee", {
+    method: "PATCH", token, body: JSON.stringify({ platform_fee_percent: value }),
+  });
+  return Number(data.platform_fee_percent);
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 export interface SysUser {
   id: number;
@@ -107,4 +119,19 @@ export async function fetchSysOrganizers(
   const q = search ? `?search=${encodeURIComponent(search)}` : "";
   const d = await apiFetch<{ organizers: SysOrganizer[] }>(`/sysadmin/organizers${q}`, { token });
   return d.organizers ?? [];
+}
+
+export interface PlatformAnalytics {
+  users: number;
+  organizers: number;
+  events: number;
+  transactions: number;
+  transaction_amount: number;
+  views: number;
+  checkins: number;
+  checkin_rate: number;
+}
+
+export async function fetchPlatformAnalytics(token: string): Promise<PlatformAnalytics> {
+  return apiFetch<PlatformAnalytics>("/sysadmin/analytics", { token });
 }

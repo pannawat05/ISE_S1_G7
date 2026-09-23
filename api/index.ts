@@ -9,6 +9,7 @@ import eventsRouter from "./routes/events.route.js";
 import adminRouter from "./routes/admin.route.js";
 import sysadminRouter from "./routes/sysadmin.route.js";
 import paymentRouter from "./routes/payment.route.js";
+import { execute } from "./model/query.js";
 import "./middlewares/notificationScheduler.js";
 
 const app = express();
@@ -42,6 +43,30 @@ app.get("/", (_req, res) => {
   res.send("ISE API is running");
 });
 
-app.listen(port, () => {
-  console.log(`API listening on port ${port}`);
-});
+async function start() {
+  try {
+    await execute(`
+      CREATE TABLE IF NOT EXISTS event_views (
+        event_id INT PRIMARY KEY,
+        view_count INT NOT NULL DEFAULT 0,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_event_views_event FOREIGN KEY (event_id)
+          REFERENCES events(id) ON DELETE CASCADE
+      )
+    `);
+    await execute(`
+      CREATE TABLE IF NOT EXISTS platform_settings (
+        setting_key VARCHAR(100) PRIMARY KEY,
+        setting_value DECIMAL(5,2) NOT NULL
+      )
+    `);
+    await execute(
+      "INSERT IGNORE INTO platform_settings (setting_key, setting_value) VALUES ('platform_fee_percent', 10.00)",
+    );
+  } catch (err) {
+    console.error("ANALYTICS SCHEMA ERROR:", err);
+  }
+  app.listen(port, () => console.log(`API listening on port ${port}`));
+}
+
+start();

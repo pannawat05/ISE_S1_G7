@@ -135,6 +135,12 @@ export async function getPublicEvent(req: Request, res: Response) {
 
     if (!rows.length) return res.status(404).json({ message: "Event not found" });
 
+    try {
+      await query("INSERT INTO event_views (event_id, view_count) VALUES (?, 1) ON DUPLICATE KEY UPDATE view_count = view_count + 1", [eventId]);
+    } catch (viewError) {
+      console.error("EVENT VIEW TRACKING ERROR:", viewError);
+    }
+
     // Fetch extra images
     const images = await query<EventImages[]>(
       "SELECT id, url, display_order FROM event_images WHERE event_id = ? ORDER BY display_order ASC",

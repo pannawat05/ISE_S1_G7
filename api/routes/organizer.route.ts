@@ -1,6 +1,8 @@
 import express from "express";
 import * as organizerController from "../controllers/organizer.controller.js";
 import * as whitelistController from "../controllers/whitelist.controller.js";
+import * as analyticsController from "../controllers/analytics.controller.js";
+import * as staffController from "../controllers/staff.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { uploadOrganizerLogo, uploadEventImages, uploadZoneImages } from "../middlewares/upload.middleware.js";
 import type { AuthRequest } from "../middlewares/types.js";
@@ -61,6 +63,12 @@ router.delete("/:id", authenticate, (req, res) =>
 // Dashboard stats
 router.get("/:id/dashboard", authenticate, (req, res) =>
   organizerController.getDashboard(req as AuthRequest, res),
+);
+router.get("/:id/analytics", authenticate, (req, res) =>
+  analyticsController.getOrganizerAnalytics(req as AuthRequest, res),
+);
+router.get("/:id/analytics/export", authenticate, (req, res) =>
+  analyticsController.exportOrganizerAnalytics(req as AuthRequest, res),
 );
 
 // ─── User search (for whitelist) ──────────────────────────────────────────────
@@ -123,6 +131,15 @@ router.delete("/:id/events/:eventId/zones/:zoneId", authenticate, (req, res) =>
 // ─── Whitelist routes ─────────────────────────────────────────────────────────
 router.get("/:id/events/:eventId/whitelist", authenticate, (req, res) =>
   whitelistController.listWhitelist(req as AuthRequest, res),
+);
+router.get("/:id/events/:eventId/staff", authenticate, (req, res) =>
+  staffController.listEventStaff(req as AuthRequest, res),
+);
+router.post("/:id/events/:eventId/staff", authenticate, (req, res) =>
+  staffController.assignEventStaff(req as AuthRequest, res),
+);
+router.delete("/:id/events/:eventId/staff/:assignmentId", authenticate, (req, res) =>
+  staffController.removeEventStaff(req as AuthRequest, res),
 );
 
 router.post("/:id/events/:eventId/whitelist", authenticate, (req, res) =>

@@ -15,9 +15,11 @@ import {
   fetchEventTypes, createEventType, updateEventType, deleteEventType,
   fetchPaymentMethods, createPaymentMethod, updatePaymentMethod,
   togglePaymentMethod, deletePaymentMethod,
+  fetchPlatformFee, updatePlatformFee,
   fetchUsers, updateUserRole,
   fetchSysOrganizers,
-  type EventType, type PaymentMethod, type SysUser, type SysOrganizer, type PaymentCategory,
+  fetchPlatformAnalytics,
+  type EventType, type PaymentMethod, type SysUser, type SysOrganizer, type PaymentCategory, type PlatformAnalytics,
 } from "@/api/sysadmin";
 import { API_BASE } from "@/api/client";
 
@@ -326,7 +328,7 @@ function EventsDashboard({ token, events, isLoading, error, search, setSearch, s
 }
 // ─── System Dashboard ─────────────────────────────────────────────────────────
 function SystemDashboard({ token, isSysAdmin }: { token: string; isSysAdmin: boolean }) {
-  const [sysTab, setSysTab] = useState<"types" | "payments" | "users" | "organizers">("types");
+  const [sysTab, setSysTab] = useState<"overview" | "types" | "payments" | "users" | "organizers">("overview");
 
   if (!isSysAdmin) {
     return (
@@ -339,6 +341,7 @@ function SystemDashboard({ token, isSysAdmin }: { token: string; isSysAdmin: boo
   }
 
   const tabs = [
+    { key: "overview" as const, label: "Platform Overview", icon: LayoutDashboard },
     { key: "types" as const, label: "Event Types", icon: Tag },
     { key: "payments" as const, label: "Payment Methods", icon: CreditCard },
     { key: "users" as const, label: "Users", icon: Users },
@@ -364,6 +367,7 @@ function SystemDashboard({ token, isSysAdmin }: { token: string; isSysAdmin: boo
         ))}
       </div>
       <div className="mt-surface p-6 rounded-2xl">
+        {sysTab === "overview" && <PlatformOverview token={token} />}
         {sysTab === "types" && <EventTypesManager token={token} />}
         {sysTab === "payments" && <PaymentMethodsManager token={token} />}
         {sysTab === "users" && <UsersManager token={token} />}
@@ -371,6 +375,24 @@ function SystemDashboard({ token, isSysAdmin }: { token: string; isSysAdmin: boo
       </div>
     </div>
   );
+}
+
+function PlatformOverview({ token }: { token: string }) {
+  const [data, setData] = useState<PlatformAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { fetchPlatformAnalytics(token).then(setData).catch(console.error).finally(() => setLoading(false)); }, [token]);
+  if (loading) return <div className="py-12 text-gray-500 text-center">กำลังโหลดข้อมูลภาพรวม...</div>;
+  if (!data) return <div className="py-12 text-red-400 text-center">ไม่สามารถโหลดข้อมูลภาพรวมได้</div>;
+  const cards = [
+    ["ผู้ใช้ทั้งหมด", data.users.toLocaleString(), Users],
+    ["Organizer", data.organizers.toLocaleString(), Building2],
+    ["Events", data.events.toLocaleString(), Calendar],
+    ["ธุรกรรม", data.transactions.toLocaleString(), CreditCard],
+    ["ยอดธุรกรรม", `฿${data.transaction_amount.toLocaleString()}`, Tag],
+    ["ยอดเข้าชม", data.views.toLocaleString(), Eye],
+    ["อัตราเช็กอิน", `${data.checkin_rate}%`, Check],
+  ] as const;
+  return <div className="space-y-5"><div><h3 className="font-semibold text-white text-lg">Platform Overview</h3><p className="mt-1 text-gray-500 text-sm">สถิติรวมทั้งแพลตฟอร์มสำหรับ sysadmin</p></div><div className="gap-3 grid grid-cols-2 md:grid-cols-4">{cards.map(([label, value, Icon]) => <div key={label} className="bg-white/[0.03] p-4 border border-white/5 rounded-xl"><Icon size={17} className="mb-3 text-violet-400" /><p className="font-bold text-white text-2xl">{value}</p><p className="mt-1 text-gray-500 text-xs">{label}</p></div>)}</div><div className="bg-violet-500/10 p-4 border border-violet-500/20 rounded-xl text-violet-200 text-sm">เช็กอินแล้ว {data.checkins.toLocaleString()} ใบ จากบัตรที่ชำระแล้วและใช้งานได้</div></div>;
 }
 // ─── Event Types Manager ──────────────────────────────────────────────────────
 function EventTypesManager({ token }: { token: string }) {
@@ -497,9 +519,35 @@ function PaymentMethodsManager({ token }: { token: string }) {
   // edit state
   const [editId, setEditId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ ...EMPTY_PM });
+  const [platformFee, setPlatformFee] = useState(10);
+  const [feeInput, setFeeInput] = useState("10");
+  const [feeLoading, setFeeLoading] = useState(true);
+  const [feeSaving, setFeeSaving] = useState(false);
 
   function load() { fetchPaymentMethods(token).then(setMethods).catch(console.error).finally(() => setLoading(false)); }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetchPlatformFee(token)
+      .then((value) => { setPlatformFee(value); setFeeInput(String(value)); })
+      .catch(console.error)
+      .finally(() => setFeeLoading(false));
+  }, []);
+
+  async function handleFeeSave() {
+    const value = Number(feeInput);
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      flash("❌ ค่าธรรมเนียมต้องอยู่ระหว่าง 0-100%");
+      return;
+    }
+    setFeeSaving(true);
+    try {
+      const updated = await updatePlatformFee(token, value);
+      setPlatformFee(updated);
+      setFeeInput(String(updated));
+      flash("✅ อัปเดต Platform Fee สำเร็จ");
+    } catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+    finally { setFeeSaving(false); }
+  }
 
   async function handleAdd() {
     if (!form.channel.trim()) { flash("❌ กรุณากรอกชื่อช่องทาง"); return; }
@@ -554,6 +602,32 @@ function PaymentMethodsManager({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-4 bg-violet-500/10 p-4 border border-violet-500/20 rounded-xl">
+        <div>
+          <h3 className="font-semibold text-white">Platform Fee</h3>
+          <p className="mt-1 text-gray-500 text-xs">ค่าธรรมเนียมที่หักจากยอดชำระเงินของทุก transaction</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={feeInput}
+              onChange={(event) => setFeeInput(event.target.value)}
+              disabled={feeLoading || feeSaving}
+              className="mt-input pr-8 w-28 text-right"
+              aria-label="Platform fee percentage"
+            />
+            <span className="top-1/2 right-3 absolute text-gray-400 text-sm -translate-y-1/2">%</span>
+          </div>
+          <button onClick={handleFeeSave} disabled={feeLoading || feeSaving || Number(feeInput) === platformFee}
+            className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-4 py-2 rounded-lg font-semibold text-white text-sm">
+            {feeSaving ? "กำลังบันทึก..." : "บันทึก"}
+          </button>
+        </div>
+      </div>
       {/* Header */}
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-white text-lg">Payment Methods</h3>
