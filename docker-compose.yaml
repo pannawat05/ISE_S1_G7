@@ -92,6 +92,25 @@ services:
     restart: unless-stopped
 
 
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_container
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+
+    depends_on:
+      - web-app
+      - api
+
+    restart: unless-stopped
+
+
 volumes:
   mysql_data:
   web_app_node_modules:

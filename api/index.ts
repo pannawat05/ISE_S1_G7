@@ -9,6 +9,7 @@ import eventsRouter from "./routes/events.route.js";
 import adminRouter from "./routes/admin.route.js";
 import sysadminRouter from "./routes/sysadmin.route.js";
 import paymentRouter from "./routes/payment.route.js";
+import checkinRouter from "./routes/checkin.route.js";
 import { execute } from "./model/query.js";
 import "./middlewares/notificationScheduler.js";
 
@@ -17,11 +18,11 @@ const port: number = Number(process.env.PORT) || 5001;
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
 // Cors
 app.use(
   cors({
-<<<<<<< HEAD
-    origin: process.env.FRONTEND_URL || "http://web-app:3000",
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization", "token"],
   }),
@@ -39,6 +40,7 @@ app.use("/events", eventsRouter);
 app.use("/admin", adminRouter);
 app.use("/sysadmin", sysadminRouter);
 app.use("/payment", paymentRouter);
+app.use("/checkin", checkinRouter);
 
 app.get("/", (_req, res) => {
   res.send("ISE API is running");
