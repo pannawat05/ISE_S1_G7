@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/types.js";
+import { execute } from "../model/query.js";
 import {
   createEvent,
   findEventsByOrganizerId,
@@ -28,6 +29,9 @@ import {
   getMaxZoneImageOrder,
   setSeatCount,
   countSeats,
+  setRowSeats,
+  listRowsByZone,
+  type RowConfig,
 } from "../model/zone.model.js";
 
 import Stripe from "stripe";
@@ -384,9 +388,17 @@ export async function createZoneHandler(req: AuthRequest, res: Response) {
       price: Number(price) || 0,
     });
 
-    // Auto-generate seats if seat_count provided
-    const seatCount = parseInt(seat_count ?? "0", 10);
-    if (seatCount > 0) await setSeatCount(zoneId, seatCount);
+    // Row-based seat config (preferred) or fallback to flat seat_count
+    const rowsRaw = req.body.rows;
+    if (rowsRaw) {
+      const rows: RowConfig[] = typeof rowsRaw === "string" ? JSON.parse(rowsRaw) : rowsRaw;
+      if (Array.isArray(rows) && rows.length > 0) {
+        await setRowSeats(zoneId, rows);
+      }
+    } else {
+      const seatCount = parseInt(seat_count ?? "0", 10);
+      if (seatCount > 0) await setSeatCount(zoneId, seatCount);
+    }
 
     // Insert zone images
     for (let i = 0; i < zoneImageFiles.length; i++) {
@@ -427,8 +439,12 @@ export async function updateZoneHandler(req: AuthRequest, res: Response) {
       ...(price !== undefined && { price: Number(price) }),
     });
 
-    // Adjust seat count if provided
-    if (seat_count !== undefined) {
+    // Adjust seats: row-based config (preferred) or fallback flat seat_count
+    const rowsRaw = req.body.rows;
+    if (rowsRaw) {
+      const rows: RowConfig[] = typeof rowsRaw === "string" ? JSON.parse(rowsRaw) : rowsRaw;
+      if (Array.isArray(rows)) await setRowSeats(zoneId, rows);
+    } else if (seat_count !== undefined) {
       const target = parseInt(seat_count, 10);
       if (!isNaN(target) && target >= 0) await setSeatCount(zoneId, target);
     }

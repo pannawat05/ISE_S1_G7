@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Menu, Plus, Search, Calendar, MapPin, ChevronDown, Pencil } from "lucide-react";
+import { Menu, Plus, Search, Calendar, MapPin, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import Cookies from "js-cookie";
-import { fetchOrganizerEventsList, type OrganizerEvent } from "@/api/organizer";
+import { fetchOrganizerEventsList, deleteOrganizerEvent, type OrganizerEvent } from "@/api/organizer";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 import { API_BASE } from "@/api/client";
 
@@ -22,8 +22,25 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Event Card ───────────────────────────────────────────────────────────────
-function EventCard({ event }: { event: OrganizerEvent }) {
+function EventCard({ event, onDelete }: { event: OrganizerEvent; onDelete: (id: number) => void }) {
+  const [deleting, setDeleting] = useState(false);
+
   const start = new Date(event.start_date);
+  const end   = new Date(event.end_date);
+  const now   = new Date();
+
+  // ลบได้เฉพาะ:
+  //   1. จบไปแล้ว (now > end)
+  //   2. ยังไม่เริ่ม (now < start) AND ยังไม่ approved
+  const isEnded   = now > end;
+  const canDelete = isEnded || (now < start && event.status !== "approved");
+
+  const deleteDisabledReason = !canDelete
+    ? now >= start && now <= end
+      ? "ไม่สามารถลบ Event ที่กำลังจัดอยู่"
+      : "ไม่สามารถลบ Event ที่ approved แล้วและยังไม่ถึงวันงาน"
+    : undefined;
+
   const dateStr = start.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
   const timeStr = start.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
   const lat = parseFloat(event.latitude);
@@ -32,6 +49,21 @@ function EventCard({ event }: { event: OrganizerEvent }) {
   const coverSrc = event.cover_image
     ? (event.cover_image.startsWith("http") ? event.cover_image : `${API_BASE}${event.cover_image}`)
     : null;
+
+  async function handleDelete() {
+    if (!canDelete) return;
+    if (!confirm(`ลบ "${event.name}"?\n\nEvent จะถูกซ่อนออกจากระบบ (ข้อมูลยังอยู่ใน DB)`)) return;
+    const token = Cookies.get("authToken");
+    if (!token) return;
+    setDeleting(true);
+    try {
+      await deleteOrganizerEvent(token, event.organizer_id, event.id);
+      onDelete(event.id);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="flex flex-col mt-surface overflow-hidden">
@@ -66,6 +98,16 @@ function EventCard({ event }: { event: OrganizerEvent }) {
             >
               <Pencil size={14} />
             </Link>
+            {/* ลบได้เฉพาะงานยังไม่เริ่ม หรือจบแล้ว */}
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={!canDelete || deleting}
+              title={deleteDisabledReason ?? "ลบ Event"}
+              className="hover:bg-red-500/10 disabled:opacity-30 p-1.5 border border-white/10 rounded-lg text-gray-400 hover:text-red-400 transition-colors disabled:cursor-not-allowed"
+            >
+              <Trash2 size={14} />
+            </button>
           </div>
         </div>
         <div className="space-y-1.5 text-gray-400 text-xs">
@@ -190,7 +232,13 @@ export default function EventPage() {
         )}
         {!isLoading && filtered.length > 0 && (
           <div className="gap-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((event) => <EventCard key={event.id} event={event} />)}
+            {filtered.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                onDelete={(id) => setEvents((prev) => prev.filter((e) => e.id !== id))}
+              />
+            ))}
           </div>
         )}
       </main>

@@ -14,7 +14,9 @@
   --color-logo: #7c3aed;
 }
 
-:root {
+/* ─── Dark theme (default) ───────────────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
   --logo-color: #7c3aed;
 
   /* Background */
@@ -149,6 +151,7 @@
       hover:text-purple-600
       transition-colors;
   }
+  .mt-link:hover { color: var(--mt-accent-mid); }
 
 
   /* ========================================

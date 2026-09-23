@@ -34,6 +34,7 @@ function App() {
             <Route path="/events/:id" element={<pages.EventDetail />} />
 
             <Route path="/payment" element={<pages.Payment />} />
+            <Route path="/payment/return" element={<pages.PaymentReturn />} />
 
             <Route
               path="/payment/return"
@@ -43,6 +44,8 @@ function App() {
             <Route path="/admin" element={<pages.AdminPage />} />
 
             <Route path="/my-tickets" element={<pages.MyTickets />} />
+            <Route path="/my-staff" element={<pages.MyStaff />} />
+            <Route path="/scan-qr"  element={<pages.ScanQR />} />
 
             <Route path="/signup" element={<pages.SignUp />} />
 

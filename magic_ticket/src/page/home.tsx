@@ -1,10 +1,33 @@
-import { useState } from "react";
-import { HeroSection, EventGrid } from "@/components/home";
-import { Footer } from "@/components/navigater";
+import { useState, useEffect } from "react";
+import HeroSection from "@/components/home/HeroSection";
+import EventGrid from "@/components/home/EventGrid";
+import FilterModal from "@/components/home/FilterModal";
+import type { FilterState } from "@/components/home/FilterModal";
+import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 
-export default function Home() {
+export default function HomePage() {
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // State เก็บรายการประเภทกิจกรรมที่ดึงมาจาก DB
+  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
+
+  // ค่า Filter เริ่มต้น
+  const [filters, setFilters] = useState<FilterState>({
+    types: [],
+    sortBy: "start_date",
+    order: "ASC",
+  });
+
+  // Fetch ดึงประเภทกิจกรรมจาก Database เมื่อ Component โหลด
+  useEffect(() => {
+    fetchEventTypes()
+      .then((types) => {
+        setEventTypes(types);
+      })
+      .catch(console.error);
+  }, []);
 
   return (
     <div className="bg-slate-50 w-full h-full overflow-y-auto font-sans text-slate-900">
@@ -13,9 +36,24 @@ export default function Home() {
         location={location}
         onSearchChange={setSearch}
         onLocationChange={setLocation}
+        onOpenFilter={() => setIsFilterOpen(true)}
+        activeFilterCount={filters.types.length}
       />
-      <EventGrid search={search} location={location} />
-      <Footer />
+
+      {/* Grid แสดงกิจกรรม */}
+      <EventGrid search={search} location={location} filters={filters} />
+
+      {/* Pop-up Modal ตัวกรอง */}
+      <FilterModal
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        initialFilters={filters}
+        eventTypes={eventTypes}
+        onApply={(newFilters) => {
+          // 📌 ใช้ Spread operator เพื่อสร้าง Object reference ใหม่เสมอ
+          setFilters({ ...newFilters });
+        }}
+      />
     </div>
   );
 }

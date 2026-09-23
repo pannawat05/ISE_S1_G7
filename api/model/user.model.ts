@@ -42,15 +42,50 @@ export async function updateUserPassword(
 
 export async function getUserProfile(id: number) {
   const rows = await query<
-    (UserRow & { organizer_id?: number | null })[]
+    (UserRow & {
+      organizer_id: number | null;
+      is_organizer: number;
+      is_staff: number;
+    })[]
   >(
-    `SELECT u.id, u.f_name AS firstname, u.l_name AS lastname, u.email, u.role, o.id AS organizer_id
+    `SELECT
+       u.id,
+       u.f_name AS firstname,
+       u.l_name AS lastname,
+       u.email,
+       u.role,
+
+       -- Organizer:
+       -- organizers.owner_id = users.id
+       o.id AS organizer_id,
+
+       CASE
+         WHEN o.id IS NOT NULL THEN 1
+         ELSE 0
+       END AS is_organizer,
+
+       -- Staff:
+       -- staff.users_id = users.id
+       CASE
+         WHEN EXISTS (
+           SELECT 1
+           FROM staff s
+           WHERE s.users_id = u.id
+         )
+         THEN 1
+         ELSE 0
+       END AS is_staff
+
      FROM users u
-     LEFT JOIN organizers o ON o.owner_id = u.id
+
+     LEFT JOIN organizers o
+       ON o.owner_id = u.id
+
      WHERE u.id = ?
      LIMIT 1`,
     [id],
   );
+
   return rows[0] ?? null;
 }
 

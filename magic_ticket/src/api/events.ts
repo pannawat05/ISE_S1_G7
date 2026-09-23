@@ -24,6 +24,9 @@ export interface FetchEventsParams {
   type?: string;
   limit?: number;
   offset?: number;
+  // 📌 1. เพิ่ม 2 ฟิลด์นี้ใน interface
+  sortBy?: string;
+  order?: string;
 }
 
 export async function fetchPublicEvents(
@@ -35,6 +38,10 @@ export async function fetchPublicEvents(
   if (params.type)     qs.set("type",     params.type);
   if (params.limit)    qs.set("limit",    String(params.limit));
   if (params.offset)   qs.set("offset",   String(params.offset));
+
+  // 📌 2. แนบ sortBy และ order ส่งไปกับ Query String
+  if (params.sortBy)   qs.set("sortBy",   params.sortBy);
+  if (params.order)    qs.set("order",    params.order);
 
   const query = qs.toString() ? `?${qs.toString()}` : "";
   return apiFetch<{ events: PublicEvent[]; total: number }>(`/events${query}`);

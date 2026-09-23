@@ -17,4 +17,8 @@ router.get("/my-organizers", authenticate, (req, res) =>
   userController.getMyOrganizers(req as AuthRequest, res),
 );
 
+router.get("/my-staff-assignments", authenticate, (req, res) =>
+  userController.getMyStaffAssignments(req as AuthRequest, res),
+);
+
 export default router;

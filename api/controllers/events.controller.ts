@@ -20,16 +20,19 @@ export async function listEventZones(req: Request, res: Response) {
       id: number; name: string; category: string; type: string; price: number;
       total_seats: number; available_seats: number;
     }[]>(
-      `SELECT
-         z.id, z.name, z.category, z.type, z.price,
-         COUNT(s.id)                                                      AS total_seats,
-         COUNT(CASE WHEN s.is_active = 1 AND t.id IS NULL THEN 1 END)   AS available_seats
-       FROM zones z
-       LEFT JOIN seats   s ON s.zone_id = z.id
-       LEFT JOIN tickets t ON t.seat_id = s.id AND t.status NOT IN ('cancelled')
-       WHERE z.event_id = ?
-       GROUP BY z.id
-       ORDER BY z.id ASC`,
+      `SELECT z.id, z.name, z.category, z.type, z.price,
+        COUNT(s.id) AS total_seats,
+        COUNT(CASE WHEN t.seat_id IS NULL THEN 1 END) AS available_seats
+      FROM zones z
+      LEFT JOIN seats s ON s.zone_id = z.id AND s.is_active = 1
+      LEFT JOIN (
+        SELECT DISTINCT seat_id
+        FROM tickets
+        WHERE status IN ('paid', 'reserved') 
+      ) t ON t.seat_id = s.id
+      WHERE z.event_id = ?
+      GROUP BY z.id, z.name, z.category, z.type, z.price
+      ORDER BY z.id ASC;`,
       [eventId],
     );
 
@@ -68,7 +71,7 @@ export async function listEventZones(req: Request, res: Response) {
 // ─── Public seats for a specific zone ────────────────────────────────────────
 export async function listZoneSeats(req: Request, res: Response) {
   const eventId = Number(req.params.id);
-  const zoneId  = Number(req.params.zoneId);
+  const zoneId = Number(req.params.zoneId);
   if (isNaN(eventId) || isNaN(zoneId)) return res.status(400).json({ message: "Invalid ID" });
 
   try {
@@ -76,13 +79,16 @@ export async function listZoneSeats(req: Request, res: Response) {
       id: number; name: string; position: string;
       is_active: number; is_taken: number;
     }[]>(
-      `SELECT
-         s.id, s.name, s.position, s.is_active,
-         CASE WHEN t.id IS NOT NULL THEN 1 ELSE 0 END AS is_taken
-       FROM seats s
-       LEFT JOIN tickets t ON t.seat_id = s.id AND t.status NOT IN ('cancelled')
-       WHERE s.zone_id = ?
-       ORDER BY s.position ASC`,
+      `SELECT s.id, s.name, s.position, s.is_active,
+        CASE WHEN EXISTS (
+          SELECT 1 
+          FROM tickets t 
+          WHERE t.seat_id = s.id 
+            AND t.status IN ('paid', 'reserved') -- กำหนดเฉพาะ status ที่ถือว่าจองแล้ว
+        ) THEN 1 ELSE 0 END AS is_taken
+      FROM seats s
+      WHERE s.zone_id = ?
+      ORDER BY s.position ASC`,
       [zoneId],
     );
 
@@ -129,8 +135,7 @@ export async function getPublicEvent(req: Request, res: Response) {
        FROM events e
        JOIN event_types et ON et.id = e.type_id
        JOIN organizers  o  ON o.id  = e.organizer_id
-       WHERE e.id = ? AND e.status = 'approved' AND e.is_active = 1`,
-      [eventId],
+       WHERE e.id = ? AND e.status = 'approved' AND e.is_active = 1`,      [eventId],
     );
 
     if (!rows.length) return res.status(404).json({ message: "Event not found" });
@@ -155,14 +160,25 @@ export async function getPublicEvent(req: Request, res: Response) {
 }
 
 export async function listPublicEvents(req: Request, res: Response) {
-  const search   = String(req.query.search   ?? "").trim();
+  const search = String(req.query.search ?? "").trim();
   const location = String(req.query.location ?? "").trim();
   const type     = String(req.query.type     ?? "").trim();
-  const limit    = Math.min(Number(req.query.limit  ?? 20), 100);
-  const offset   = Math.max(Number(req.query.offset ?? 0),  0);
+  const sortBy   = String(req.query.sortBy   ?? "start_date").trim();
+
+  // 📌 1. บังคับดัก check "DESC" ให้ชัวร์ 100%
+  const reqOrder = String(req.query.order ?? "").trim().toUpperCase();
+  const order    = reqOrder === "DESC" ? "DESC" : "ASC";
+
+  // 1. ป้องกัน NaN บั๊กจาก query params
+  const rawLimit  = Number(req.query.limit);
+  const rawOffset = Number(req.query.offset);
+  const limit  = Math.min(isNaN(rawLimit) || rawLimit <= 0 ? 20 : rawLimit, 100);
+  const offset = Math.max(isNaN(rawOffset) ? 0 : rawOffset, 0);
+
+  // 📌 Console Log เพื่อดีบั๊กดูค่าจริงที่เข้ามา
+  console.log(`[DEBUG QUERY] sortBy="${sortBy}" | parsedOrder="${order}" (raw="${req.query.order}")`);
 
   try {
-    // Show only approved and active events for public
     const conditions: string[] = ["e.status = 'approved'", "e.is_active = 1"];
     const params: unknown[] = [];
 
@@ -170,17 +186,35 @@ export async function listPublicEvents(req: Request, res: Response) {
       conditions.push("(e.name LIKE ? OR o.name LIKE ?)");
       params.push(`%${search}%`, `%${search}%`);
     }
+
     if (location) {
       conditions.push("(e.place_name LIKE ? OR e.address LIKE ?)");
       params.push(`%${location}%`, `%${location}%`);
     }
+    
     if (type) {
-      conditions.push("et.name = ?");
-      params.push(type);
+      const typeList = type.split(",").map((t) => t.trim()).filter(Boolean);
+      if (typeList.length === 1) {
+        conditions.push("et.name = ?");
+        params.push(typeList[0]);
+      } else if (typeList.length > 1) {
+        conditions.push(`et.name IN (${typeList.map(() => "?").join(",")})`);
+        params.push(...typeList);
+      }
     }
 
     const where = `WHERE ${conditions.join(" AND ")}`;
 
+    // 📌 2. Map คอลัมน์สำหรับ ORDER BY ให้มี table prefix ชัดเจน
+    const allowedSortFields: Record<string, string> = {
+      name: "e.name",
+      start_date: "e.start_date",
+      end_date: "e.end_date",
+    };
+    
+    const sortColumn = allowedSortFields[sortBy] || "e.start_date";
+
+    // 📌 3. นำ sortColumn และ order ต่อกันโดยตรง
     const rows = await query<PublicEventList[]>(
       `SELECT e.id, e.name, e.place_name, e.address, e.description,
               e.cover_image, e.start_date, e.end_date,
@@ -190,9 +224,9 @@ export async function listPublicEvents(req: Request, res: Response) {
        JOIN event_types et ON et.id = e.type_id
        JOIN organizers o   ON o.id  = e.organizer_id
        ${where}
-       ORDER BY e.start_date ASC
+       ORDER BY ${sortColumn} ${order}
        LIMIT ? OFFSET ?`,
-      [...params, limit, offset],
+      [...params, limit, offset]
     );
 
     const countRows = await query<Total[]>(
@@ -201,10 +235,13 @@ export async function listPublicEvents(req: Request, res: Response) {
        JOIN event_types et ON et.id = e.type_id
        JOIN organizers o   ON o.id  = e.organizer_id
        ${where}`,
-      params,
+      [...params]
     );
 
-    return res.json({ events: rows, total: countRows[0]?.total ?? 0 });
+    return res.json({ 
+      events: rows, 
+      total: Number(countRows[0]?.total ?? 0) 
+    });
   } catch (err) {
     console.error("PUBLIC EVENTS ERROR:", err);
     return res.status(500).json({ message: "Error fetching events" });

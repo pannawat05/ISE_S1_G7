@@ -11,10 +11,7 @@ import {
 } from "@stripe/stripe-js";
 
 import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
+  Elements, PaymentElement, useStripe, useElements,
 } from "@stripe/react-stripe-js";
 
 import {
@@ -39,6 +36,7 @@ import {
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface PaymentState {
   eventId: number;
   eventName: string;

@@ -5,10 +5,17 @@ interface HeroSectionProps {
   location: string;
   onSearchChange: (v: string) => void;
   onLocationChange: (v: string) => void;
+  onOpenFilter?: () => void;
+  activeFilterCount?: number;
 }
 
 export default function HeroSection({
-  search, location, onSearchChange, onLocationChange,
+  search,
+  location,
+  onSearchChange,
+  onLocationChange,
+  onOpenFilter,
+  activeFilterCount,
 }: HeroSectionProps) {
   return (
     <section className="relative px-6 pt-16 pb-12 text-center">
@@ -24,14 +31,17 @@ export default function HeroSection({
         จองตั๋วเข้าร่วมกิจกรรมและคอนเสิร์ตได้อย่างง่ายดาย
       </p>
 
-      <div className="mt-10">
+      {/* ครอบ div เพิ่ม z-index และ pointer-events-auto ชัวร์ๆ */}
+      <div className="relative z-20 pointer-events-auto">
         <SearchBar
           search={search}
           location={location}
           onSearchChange={onSearchChange}
           onLocationChange={onLocationChange}
+          onOpenFilter={onOpenFilter}
+          activeFilterCount={activeFilterCount}
         />
       </div>
-    </section>
+    </div>
   );
 }

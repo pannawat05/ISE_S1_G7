@@ -21,6 +21,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: process.env.FRONTEND_URL || "https://35.247.179.98/:3000",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization", "token"],
   }),
@@ -38,7 +39,7 @@ app.use("/events", eventsRouter);
 app.use("/admin", adminRouter);
 app.use("/sysadmin", sysadminRouter);
 app.use("/payment", paymentRouter);
-
+app.use("/checkin", checkinRouter);
 app.get("/", (_req, res) => {
   res.send("ISE API is running");
 });
