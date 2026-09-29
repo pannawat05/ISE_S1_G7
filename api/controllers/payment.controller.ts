@@ -226,7 +226,8 @@ export async function checkout(
         JOIN tickets t ON t.seat_id = s.id
         WHERE s.id IN (${placeholders})
           AND s.zone_id = ?
-          AND t.status IN ('reserved', 'paid', 'checked_in')
+          AND t.status IN ('paid', 'checked_in')
+          OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE))
         `,
         [...seat_ids, zone_id]
       );
@@ -265,7 +266,7 @@ export async function checkout(
       for (const seatId of seat_ids) {
         const qrcode = `MT-${uuidv4()}`;
         const result = await execute(
-          `INSERT INTO tickets (qrcode, status, users_id, seat_id) VALUES (?, 'reserved', ?, ?)`,
+          `INSERT INTO tickets (qrcode, status, users_id, seat_id, reserved_at) VALUES (?, 'reserved', ?, ?, NOW())`,
           [qrcode, userId, seatId]
         );
         ticketIds.push(result.insertId);
@@ -276,7 +277,9 @@ export async function checkout(
         `
         SELECT s.id
         FROM seats s
-        LEFT JOIN tickets t ON t.seat_id = s.id AND t.status IN ('reserved', 'paid', 'checked_in')
+        LEFT JOIN tickets t ON t.seat_id = s.id
+          AND t.status IN ('reserved', 'paid', 'checked_in')
+          AND (t.status != 'reserved' OR t.reserved_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE))
         WHERE s.zone_id = ? AND s.is_active = 1 AND t.id IS NULL
         LIMIT 1
         `,
@@ -291,7 +294,7 @@ export async function checkout(
 
       const qrcode = `MT-${uuidv4()}`;
       const result = await execute(
-        `INSERT INTO tickets (qrcode, status, users_id, seat_id) VALUES (?, 'reserved', ?, ?)`,
+        `INSERT INTO tickets (qrcode, status, users_id, seat_id, reserved_at) VALUES (?, 'reserved', ?, ?, NOW())`,
         [qrcode, userId, freeSeat[0].id]
       );
       ticketIds.push(result.insertId);

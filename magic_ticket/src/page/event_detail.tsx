@@ -168,6 +168,7 @@ export default function EventDetailPage() {
   const typeColor = TYPE_COLORS[event.type_name] ?? TYPE_COLORS.Other;
   const start = new Date(event.start_date);
   const end = new Date(event.end_date);
+  const isEnded = new Date() > end;
   const lat = parseFloat(event.latitude);
   const lng = parseFloat(event.longitude);
   const hasCoords = !isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0);
@@ -292,12 +293,19 @@ export default function EventDetailPage() {
             {/* CTA */}
             <button
               onClick={() => setBookingOpen(true)}
-              className="flex justify-center items-center gap-2 bg-violet-600 hover:bg-violet-700 py-3 rounded-xl w-full font-semibold text-white text-sm transition-colors"
+              disabled={isEnded}
+              className={`flex justify-center items-center gap-2 py-3 rounded-xl w-full font-semibold text-sm transition-colors ${
+                isEnded
+                  ? "bg-white/10 text-gray-500 cursor-not-allowed"
+                  : "bg-violet-600 hover:bg-violet-700 text-white"
+              }`}
             >
               <Ticket size={18} />
-              ซื้อบัตร
+              {isEnded ? "งานนี้จบแล้ว" : "ซื้อบัตร"}
             </button>
-            <p className="text-gray-600 text-xs text-center">เลือกโซนและที่นั่งที่ต้องการ</p>
+            <p className="text-gray-600 text-xs text-center">
+              {isEnded ? "ไม่สามารถซื้อบัตรได้เนื่องจากงานสิ้นสุดแล้ว" : "เลือกโซนและที่นั่งที่ต้องการ"}
+            </p>
           </div>
         </div>
 
