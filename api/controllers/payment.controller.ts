@@ -257,78 +257,83 @@ export async function confirmPayment(req: AuthRequest, res: Response) {
   if (!payment_intent_id) return res.status(400).json({ message: "payment_intent_id is required" });
 
   try {
-    // Get ticket IDs from PaymentIntent metadata
-    const ticketRows = await query<{ id: number; seat_id: number; users_id: number }[]>(
-      `SELECT id, seat_id, users_id FROM tickets
-       WHERE status = 'reserved' AND users_id = ?
-         AND reserved_at > DATE_SUB(NOW(), INTERVAL ${RESERVATION_MINUTES} MINUTE)`,
-      [userId],
-    );
-
-    if (!ticketRows.length) {
-      return res.status(404).json({ message: "ไม่พบตั๋วที่รอชำระเงิน" });
-    }
-
-    // Verify PaymentIntent status with Stripe
-    // We need the stripe account — get it from the ticket's zone's event's organizer
-    const firstTicket = ticketRows[0];
-    const orgRows = await query<{ stripe_id: string }[]>(
-      `SELECT o.stripe_id
+    // ── 1. Get organizer stripe_id from any reserved ticket of this user ──
+    const anyTicket = await query<{ id: number; stripe_id: string }[]>(
+      `SELECT t.id, o.stripe_id
        FROM tickets t
        JOIN seats s ON s.id = t.seat_id
        JOIN zones z ON z.id = s.zone_id
        JOIN events e ON e.id = z.event_id
        JOIN organizers o ON o.id = e.organizer_id
-       WHERE t.id = ? LIMIT 1`,
-      [firstTicket.id],
+       WHERE t.users_id = ? AND t.status = 'reserved'
+       ORDER BY t.id DESC
+       LIMIT 1`,
+      [userId],
     );
 
-    if (!orgRows.length || !orgRows[0].stripe_id) {
-      return res.status(400).json({ message: "ไม่พบข้อมูล Stripe ของผู้จัด" });
+    if (!anyTicket.length || !anyTicket[0].stripe_id) {
+      return res.status(404).json({ message: "ไม่พบตั๋วที่รอชำระเงิน" });
     }
 
-    const stripeAccountId = orgRows[0].stripe_id.trim();
+    const stripeAccountId = anyTicket[0].stripe_id.trim();
 
+    // ── 2. Verify PaymentIntent with Stripe ──
     let paymentIntent;
     try {
-      paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id, {}, { stripeAccount: stripeAccountId });
+      paymentIntent = await stripe.paymentIntents.retrieve(
+        payment_intent_id, {}, { stripeAccount: stripeAccountId },
+      );
     } catch {
       return res.status(400).json({ message: "ไม่พบ PaymentIntent" });
     }
 
+    // ── 3. Get ticket IDs from PaymentIntent metadata ──
+    const metaTicketIds = (paymentIntent.metadata?.ticketIds ?? "")
+      .split(",")
+      .map((s) => parseInt(s.trim()))
+      .filter((n) => !isNaN(n));
+
+    if (!metaTicketIds.length) {
+      return res.status(400).json({ message: "ไม่พบข้อมูลตั๋วใน PaymentIntent" });
+    }
+
+    const placeholders = metaTicketIds.map(() => "?").join(",");
+    const ticketRows = await query<{ id: number; qrcode: string; position: string | null }[]>(
+      `SELECT t.id, t.qrcode, s.position
+       FROM tickets t
+       LEFT JOIN seats s ON s.id = t.seat_id
+       WHERE t.id IN (${placeholders}) AND t.users_id = ?`,
+      [...metaTicketIds, userId],
+    );
+
+    if (!ticketRows.length) {
+      return res.status(404).json({ message: "ไม่พบตั๋ว" });
+    }
+
     if (paymentIntent.status !== "succeeded") {
-      // Cancel reserved tickets since payment failed
-      const ids = ticketRows.map((t) => t.id);
+      // Cancel reserved tickets
       await execute(
-        `UPDATE tickets SET status = 'cancelled' WHERE id IN (${ids.map(() => "?").join(",")})`,
-        ids,
+        `UPDATE tickets SET status = 'cancelled' WHERE id IN (${placeholders})`,
+        metaTicketIds,
       );
       return res.status(400).json({ message: "การชำระเงินไม่สำเร็จ", status: "failed" });
     }
 
-    // Update tickets to paid
-    const ids = ticketRows.map((t) => t.id);
+    // ── 4. Update tickets to paid ──
     await execute(
-      `UPDATE tickets SET status = 'paid' WHERE id IN (${ids.map(() => "?").join(",")})`,
-      ids,
+      `UPDATE tickets SET status = 'paid' WHERE id IN (${placeholders}) AND status = 'reserved'`,
+      metaTicketIds,
     );
 
-    // Generate QR codes
+    // ── 5. Generate QR codes ──
     const tickets = [];
     for (const ticket of ticketRows) {
-      const qrRow = await query<{ qrcode: string; position: string | null }[]>(
-        `SELECT t.qrcode, s.position FROM tickets t
-         LEFT JOIN seats s ON s.id = t.seat_id
-         WHERE t.id = ? LIMIT 1`,
-        [ticket.id],
-      );
-      if (!qrRow.length) continue;
-      const qrDataUrl = await QRCode.toDataURL(qrRow[0].qrcode);
+      const qrDataUrl = await QRCode.toDataURL(ticket.qrcode);
       tickets.push({
         ticket_id: ticket.id,
-        qrcode: qrRow[0].qrcode,
+        qrcode: ticket.qrcode,
         qr_data_url: qrDataUrl,
-        seat_position: qrRow[0].position,
+        seat_position: ticket.position,
       });
     }
 

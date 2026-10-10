@@ -33,10 +33,20 @@ import {
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-06-20" // หรือเวอร์ชันล่าสุดที่ติดตั้ง
+  apiVersion: "2024-06-20"
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+async function getPlatformFeePercent(): Promise<number> {
+  try {
+    const rows = await query<{ setting_value: number }[]>(
+      "SELECT setting_value FROM platform_settings WHERE setting_key = 'platform_fee_percent' LIMIT 1",
+    );
+    const value = Number(rows[0]?.setting_value);
+    return Number.isFinite(value) && value >= 0 && value <= 100 ? value : 10;
+  } catch {
+    return 10;
+  }
+}
 
 /** Verify that the authenticated user owns the organizer. Returns organizer or sends error. */
 async function resolveOrganizerOwner(
@@ -571,6 +581,9 @@ export async function getDashboard(req: AuthRequest, res: Response) {
     const totalRevenue = events.reduce((s, e) => s + Number(e.revenue), 0);
     const totalCheckin = events.reduce((s, e) => s + Number(e.checkins), 0);
 
+    const platformFeePercent = await getPlatformFeePercent();
+    const totalNetRevenue = Math.round(totalRevenue * (1 - platformFeePercent / 100) * 100) / 100;
+
     const attendanceRate = totalSold > 0 ? Math.round((totalCheckin / totalSold) * 100) : 0;
     const capacityRate   = totalSeats > 0 ? Math.round((totalSold / totalSeats) * 100) : 0;
 
@@ -600,6 +613,8 @@ export async function getDashboard(req: AuthRequest, res: Response) {
         total_seats: Number(e.total_seats),
         sold_tickets: Number(e.sold_tickets),
         revenue: Number(e.revenue),
+        net_revenue: Math.round(Number(e.revenue) * (1 - platformFeePercent / 100) * 100) / 100,
+        platform_fee_percent: platformFeePercent,
         checkins: Number(e.checkins),
         sales_pct: salesPct,
         checkin_pct: checkinPct,
@@ -615,6 +630,8 @@ export async function getDashboard(req: AuthRequest, res: Response) {
         total_seats: totalSeats,
         total_sold: totalSold,
         total_revenue: totalRevenue,
+        total_net_revenue: totalNetRevenue,
+        platform_fee_percent: platformFeePercent,
         total_checkins: totalCheckin,
         attendance_rate: attendanceRate,
         capacity_rate: capacityRate,
