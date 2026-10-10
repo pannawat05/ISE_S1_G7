@@ -103,7 +103,7 @@ export async function getOrganizerAnalytics(req: AuthRequest, res: Response) {
     const filters = filtersFromRequest(req);
     const { where, params } = buildWhere(organizerId, filters);
     const rows = await query<AnalyticsRow[]>(
-      `${rowSelect} WHERE ${where} ORDER BY COALESCE(tx.payment_time, t.created_at) DESC`,
+      `${rowSelect} WHERE ${where} ORDER BY t.created_at DESC`,
       params,
     );
     const views = await query<{ views: number }[]>(
@@ -144,7 +144,7 @@ export async function exportOrganizerAnalytics(req: AuthRequest, res: Response) 
     if (!await resolveOwner(req, res, organizerId)) return;
     const { where, params } = buildWhere(organizerId, filtersFromRequest(req));
     const rows = await query<AnalyticsRow[]>(
-      `${rowSelect} WHERE ${where} ORDER BY COALESCE(tx.payment_time, t.created_at) DESC`,
+      `${rowSelect} WHERE ${where} ORDER BY t.created_at DESC`,
       params,
     );
     const csvRows = [
