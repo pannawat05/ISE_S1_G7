@@ -269,6 +269,8 @@ export interface DashboardEvent {
   total_seats: number;
   sold_tickets: number;
   revenue: number;
+  net_revenue: number;
+  platform_fee_percent: number;
   checkins: number;
   sales_pct: number | null;
   checkin_pct: number;
@@ -282,6 +284,8 @@ export interface DashboardKPI {
   total_seats: number;
   total_sold: number;
   total_revenue: number;
+  total_net_revenue: number;
+  platform_fee_percent: number;
   total_checkins: number;
   attendance_rate: number;
   capacity_rate: number;

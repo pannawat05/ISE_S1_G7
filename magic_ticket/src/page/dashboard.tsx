@@ -178,6 +178,7 @@ function EventRow({ ev, organizerId }: { ev: DashboardEvent; organizerId: string
       {/* Revenue */}
       <td className="hidden md:table-cell px-4 py-3 text-right">
         <p className="font-semibold text-white text-sm">{fmtMoney(ev.revenue)}</p>
+        <p className="text-gray-500 text-xs">สุทธิ {fmtMoney(ev.net_revenue)}</p>
       </td>
 
       {/* Actions */}
@@ -319,7 +320,7 @@ export default function Dashboards() {
                   icon={BadgeDollarSign}
                   label="รายได้รวม"
                   value={fmtMoney(kpi.total_revenue)}
-                  sub={`จาก ${fmtNum(kpi.total_sold)} ตั๋ว`}
+                  sub={`ยอดสุทธิ ${fmtMoney(kpi.total_net_revenue)} (หัก ${kpi.platform_fee_percent}%)`}
                   accent="green"
                 />
 
