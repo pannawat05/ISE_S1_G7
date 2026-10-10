@@ -323,6 +323,7 @@ export default function PaymentPage() {
   const [ticketIds, setTicketIds] = useState<number[]>([]);
   const [cancelling, setCancelling] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const checkoutCalledRef = useRef(false); // prevent StrictMode double-invoke
 
   // ───────────────────────────────────────────────────────────────────────────
   // Initialize checkout
@@ -339,6 +340,9 @@ export default function PaymentPage() {
     }
 
     async function init() {
+
+      if (checkoutCalledRef.current) return;
+      checkoutCalledRef.current = true;
 
       const token =
         Cookies.get("authToken");
