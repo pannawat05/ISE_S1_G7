@@ -41,16 +41,21 @@ function buildWhere(organizerId: number, filters: AnalyticsFilters) {
   const params: unknown[] = [organizerId];
 
   if (filters.eventId) { conditions.push("e.id = ?"); params.push(filters.eventId); }
-  if (filters.from) { conditions.push("COALESCE(tx.payment_time, t.created_at) >= ?"); params.push(filters.from); }
+  if (filters.from) { conditions.push("COALESCE(t.created_at, t.created_at) >= ?"); params.push(filters.from); }
   if (filters.to) {
-    conditions.push("COALESCE(tx.payment_time, t.created_at) < DATE_ADD(?, INTERVAL 1 DAY)");
+    conditions.push("t.created_at < DATE_ADD(?, INTERVAL 1 DAY)");
     params.push(filters.to);
   }
   if (filters.ticketType) { conditions.push("z.type = ?"); params.push(filters.ticketType); }
   if (filters.zoneId) { conditions.push("z.id = ?"); params.push(filters.zoneId); }
   if (filters.paymentStatus) {
-    conditions.push("COALESCE(tx.payment_status, 'unpaid') = ?");
-    params.push(filters.paymentStatus);
+    if (filters.paymentStatus === "paid") {
+      conditions.push("t.status IN ('paid', 'checked_in')");
+    } else if (filters.paymentStatus === "pending") {
+      conditions.push("t.status = 'reserved'");
+    } else if (filters.paymentStatus === "unpaid") {
+      conditions.push("t.status NOT IN ('paid', 'checked_in', 'reserved')");
+    }
   }
   if (filters.ticketStatus) { conditions.push("t.status = ?"); params.push(filters.ticketStatus); }
   if (filters.whitelist === "whitelisted") { conditions.push("wl.id IS NOT NULL"); }
@@ -65,9 +70,13 @@ const rowSelect = `
          z.name AS zone_name, z.type AS ticket_type, u.email,
          CONCAT(u.f_name, ' ', u.l_name) AS attendee_name,
          CASE WHEN wl.id IS NULL THEN 0 ELSE 1 END AS is_whitelisted,
-         COALESCE(tx.payment_status, 'unpaid') AS payment_status,
-         COALESCE(tx.paid_amount, 0) AS paid_amount,
-         tx.payment_time,
+         CASE
+           WHEN t.status IN ('paid', 'checked_in') THEN 'paid'
+           WHEN t.status = 'reserved' THEN 'pending'
+           ELSE 'unpaid'
+         END AS payment_status,
+         CASE WHEN t.status IN ('paid', 'checked_in') THEN z.price ELSE 0 END AS paid_amount,
+         NULL AS payment_time,
          (SELECT MAX(ci.time_stamp) FROM check_in_history ci WHERE ci.ticket_id = t.id) AS checked_in_at
     FROM tickets t
     JOIN seats s ON s.id = t.seat_id
@@ -75,13 +84,6 @@ const rowSelect = `
     JOIN events e ON e.id = z.event_id
     JOIN users u ON u.id = t.users_id
     LEFT JOIN white_list wl ON wl.event_id = e.id AND wl.users_id = t.users_id
-    LEFT JOIN (
-      SELECT ticket_id, MAX(status) AS payment_status,
-             SUM(CASE WHEN status = 'paid' THEN gross_amount ELSE 0 END) AS paid_amount,
-             MAX(time_stamp) AS payment_time
-        FROM transactions
-       GROUP BY ticket_id
-    ) tx ON tx.ticket_id = t.id
 `;
 
 async function resolveOwner(req: AuthRequest, res: Response, organizerId: number) {
