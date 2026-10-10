@@ -354,7 +354,7 @@ async function cancelExpiredReservations(): Promise<void> {
          SET status = 'cancelled'
          WHERE status = 'reserved'
            AND reserved_at IS NOT NULL
-           AND reserved_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)`,
+           AND reserved_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`,
         (err, res: any) => {
           if (err) reject(err);
           else resolve(res);

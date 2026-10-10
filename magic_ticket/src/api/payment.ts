@@ -173,3 +173,18 @@ export async function getMyTickets(
 
   return data.tickets ?? [];
 }
+
+// ============================================================
+// Cancel Payment (release reserved seats)
+// ============================================================
+
+export async function cancelReservation(
+  token: string,
+  ticketIds: number[],
+): Promise<{ message: string; cancelled: number }> {
+  return apiFetch("/payment/cancel", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ ticket_ids: ticketIds }),
+  });
+}

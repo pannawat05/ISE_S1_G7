@@ -28,7 +28,7 @@ export async function listEventZones(req: Request, res: Response) {
        LEFT JOIN seats   s ON s.zone_id = z.id
        LEFT JOIN tickets t ON t.seat_id = s.id
          AND t.status NOT IN ('cancelled')
-         AND (t.status != 'reserved' OR t.reserved_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE))
+         AND (t.status != 'reserved' OR t.reserved_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE))
        WHERE z.event_id = ?
        GROUP BY z.id
        ORDER BY z.id ASC`,
@@ -84,7 +84,7 @@ export async function listZoneSeats(req: Request, res: Response) {
        FROM seats s
        LEFT JOIN tickets t ON t.seat_id = s.id
          AND t.status NOT IN ('cancelled')
-         AND (t.status != 'reserved' OR t.reserved_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE))
+         AND (t.status != 'reserved' OR t.reserved_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE))
        WHERE s.zone_id = ?
        ORDER BY s.position ASC`,
       [zoneId],

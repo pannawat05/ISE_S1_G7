@@ -8,21 +8,18 @@ import type { RowDataPacket } from "mysql2";
 
 import { query, execute } from "../model/query.js";
 
-
 // ============================================================
 // Stripe
 // ============================================================
 
-const stripe = new Stripe(
-  process.env.STRIPE_SECRET_KEY || ""
-);
-
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 // ============================================================
 // Platform fee
 // ============================================================
 
 const DEFAULT_PLATFORM_FEE_PERCENT = 10;
+const RESERVATION_MINUTES = 5;
 
 async function getPlatformFeePercent(): Promise<number> {
   try {
@@ -37,7 +34,6 @@ async function getPlatformFeePercent(): Promise<number> {
     return DEFAULT_PLATFORM_FEE_PERCENT;
   }
 }
-
 
 // ============================================================
 // Types
@@ -60,37 +56,25 @@ interface OrganizerQuery extends RowDataPacket {
   stripe_id: string | null;
 }
 
-
 // ============================================================
 // ORGANIZER STRIPE GENERATOR (Express Method)
 // ============================================================
 
-export async function setupOrganizerStripe(
-  req: AuthRequest,
-  res: Response
-) {
-  // Assuming req.user contains the authenticated organizer details
-  const organizerId = req.user?.id; 
-
-  if (!organizerId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+export async function setupOrganizerStripe(req: AuthRequest, res: Response) {
+  const organizerId = req.user?.id;
+  if (!organizerId) return res.status(401).json({ message: "Unauthorized" });
 
   try {
-    // 1. Fetch current organizer details from MySQL
     const organizers = await query<OrganizerQuery[]>(
       `SELECT id, email, stripe_id FROM organizers WHERE id = ? LIMIT 1`,
-      [organizerId]
+      [organizerId],
     );
 
-    if (!organizers.length) {
-      return res.status(404).json({ message: "Organizer not found" });
-    }
+    if (!organizers.length) return res.status(404).json({ message: "Organizer not found" });
 
     const organizer = organizers[0];
     let stripeAccountId = organizer.stripe_id?.trim();
 
-    // 2. If they don't have a Stripe Account ID yet, auto-generate one
     if (!stripeAccountId || !stripeAccountId.startsWith("acct_")) {
       const account = await stripe.accounts.create({
         type: "express",
@@ -100,166 +84,101 @@ export async function setupOrganizerStripe(
           transfers: { requested: true },
         },
       });
-
       stripeAccountId = account.id;
-
-      // Persist the newly generated Account ID to the database immediately
-      await execute(
-        `UPDATE organizers SET stripe_id = ? WHERE id = ?`,
-        [stripeAccountId, organizerId]
-      );
+      await execute(`UPDATE organizers SET stripe_id = ? WHERE id = ?`, [stripeAccountId, organizerId]);
     }
 
-    // 3. Generate a single-use onboarding URL for the Express account
     const accountLink = await stripe.accountLinks.create({
       account: stripeAccountId,
-      refresh_url: `${process.env.FRONTEND_URL}/stripe/refresh`, // Link fallback if it expires
-      return_url: `${process.env.FRONTEND_URL}/stripe/return`,   // Success callback destination
+      refresh_url: `${process.env.FRONTEND_URL}/stripe/refresh`,
+      return_url: `${process.env.FRONTEND_URL}/stripe/return`,
       type: "account_onboarding",
     });
 
-    // 4. Return the onboarding link to the client app
     return res.status(200).json({
       stripe_account_id: stripeAccountId,
       onboarding_url: accountLink.url,
     });
-
   } catch (error: any) {
     console.error("Stripe Connection Setup Failed:", error);
-    return res.status(500).json({
-      message: "Internal Server Error during Stripe onboarding creation",
-      error: error.message,
-    });
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 }
-
 
 // ============================================================
 // CHECKOUT
 // ============================================================
 
-export async function checkout(
-  req: AuthRequest,
-  res: Response
-) {
+export async function checkout(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-  if (!userId) {
-    return res.status(401).json({
-      message: "Unauthorized",
-    });
-  }
-
-  const {
-    event_id,
-    zone_id,
-    seat_ids,
-  } = req.body as {
+  const { event_id, zone_id, seat_ids } = req.body as {
     event_id: number;
     zone_id: number;
     seat_ids: number[];
   };
 
-  // ----------------------------------------------------------
-  // Validate input
-  // ----------------------------------------------------------
-
   if (!event_id || !zone_id) {
-    return res.status(400).json({
-      message: "event_id and zone_id are required",
-    });
+    return res.status(400).json({ message: "event_id and zone_id are required" });
   }
 
   try {
-
-    // ========================================================
-    // 1. Get zone + organizer Stripe account
-    // ========================================================
-
+    // ── 1. Get zone + organizer Stripe account ──
     const zones = await query<ZoneQuery[]>(
-      `
-      SELECT
-        z.id,
-        z.price,
-        z.event_id,
-        o.stripe_id
-      FROM zones z
-      JOIN events e ON e.id = z.event_id
-      JOIN organizers o ON o.id = e.organizer_id
-      WHERE z.id = ? AND z.event_id = ?
-      LIMIT 1
-      `,
-      [zone_id, event_id]
+      `SELECT z.id, z.price, z.event_id, o.stripe_id
+       FROM zones z
+       JOIN events e ON e.id = z.event_id
+       JOIN organizers o ON o.id = e.organizer_id
+       WHERE z.id = ? AND z.event_id = ?
+       LIMIT 1`,
+      [zone_id, event_id],
     );
 
-    if (!zones.length) {
-      return res.status(404).json({
-        message: "Zone not found",
-      });
-    }
+    if (!zones.length) return res.status(404).json({ message: "Zone not found" });
 
     const zone = zones[0];
 
-    // ========================================================
-    // 2. Validate Organizer Stripe Account
-    // ========================================================
-
+    // ── 2. Validate Organizer Stripe Account ──
     const stripeAccountId = zone.stripe_id?.trim();
-
     if (!stripeAccountId || !stripeAccountId.startsWith("acct_")) {
-      return res.status(400).json({
-        message: "ผู้จัดงานยังไม่ได้เชื่อมต่อ Stripe",
-      });
+      return res.status(400).json({ message: "ผู้จัดงานยังไม่ได้เชื่อมต่อ Stripe" });
     }
 
-    // ========================================================
-    // 3. Check seats
-    // ========================================================
-
+    // ── 3. Check only selected seats are taken ──
     if (Array.isArray(seat_ids) && seat_ids.length > 0) {
       const placeholders = seat_ids.map(() => "?").join(",");
-
       const takenCheck = await query<SeatId[]>(
-        `
-        SELECT s.id
-        FROM seats s
-        JOIN tickets t ON t.seat_id = s.id
-        WHERE s.id IN (${placeholders})
-          AND s.zone_id = ?
-          AND t.status IN ('paid', 'checked_in')
-          OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE))
-        `,
-        [...seat_ids, zone_id]
+        `SELECT s.id
+         FROM seats s
+         JOIN tickets t ON t.seat_id = s.id
+         WHERE s.id IN (${placeholders})
+           AND s.zone_id = ?
+           AND (
+             t.status IN ('paid', 'checked_in')
+             OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL ${RESERVATION_MINUTES} MINUTE))
+           )`,
+        [...seat_ids, zone_id],
       );
 
       if (takenCheck.length > 0) {
-        const takenIds = takenCheck.map((row) => row.id);
         return res.status(409).json({
           message: "บางที่นั่งถูกจองแล้ว",
-          taken_seat_ids: takenIds,
+          taken_seat_ids: takenCheck.map((r) => r.id),
         });
       }
     }
 
-    // ========================================================
-    // 4. Calculate amount
-    // ========================================================
-
+    // ── 4. Calculate amount ──
     const qty = Array.isArray(seat_ids) && seat_ids.length > 0 ? seat_ids.length : 1;
     const amount = Number(zone.price) * qty;
     const amountSatang = Math.round(amount * 100);
 
-    // ========================================================
-    // 5. Calculate platform fee
-    // ========================================================
-
+    // ── 5. Platform fee ──
     const platformFeePercent = await getPlatformFeePercent();
     const applicationFeeSatang = Math.round(amountSatang * (platformFeePercent / 100));
 
-    // ========================================================
-    // 6. Create reserved tickets
-    // ========================================================
-
+    // ── 6. Reserve ONLY the selected seats ──
     const ticketIds: number[] = [];
 
     if (Array.isArray(seat_ids) && seat_ids.length > 0) {
@@ -267,43 +186,36 @@ export async function checkout(
         const qrcode = `MT-${uuidv4()}`;
         const result = await execute(
           `INSERT INTO tickets (qrcode, status, users_id, seat_id, reserved_at) VALUES (?, 'reserved', ?, ?, NOW())`,
-          [qrcode, userId, seatId]
+          [qrcode, userId, seatId],
         );
         ticketIds.push(result.insertId);
       }
     } else {
-      // Standing zone logic
+      // Standing zone — pick one free seat
       const freeSeat = await query<{ id: number }[]>(
-        `
-        SELECT s.id
-        FROM seats s
-        LEFT JOIN tickets t ON t.seat_id = s.id
-          AND t.status IN ('reserved', 'paid', 'checked_in')
-          AND (t.status != 'reserved' OR t.reserved_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE))
-        WHERE s.zone_id = ? AND s.is_active = 1 AND t.id IS NULL
-        LIMIT 1
-        `,
-        [zone_id]
+        `SELECT s.id
+         FROM seats s
+         LEFT JOIN tickets t ON t.seat_id = s.id
+           AND (
+             t.status IN ('paid', 'checked_in')
+             OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL ${RESERVATION_MINUTES} MINUTE))
+           )
+         WHERE s.zone_id = ? AND s.is_active = 1 AND t.id IS NULL
+         LIMIT 1`,
+        [zone_id],
       );
 
-      if (!freeSeat[0]) {
-        return res.status(409).json({
-          message: "ที่นั่งในโซนนี้เต็มแล้ว",
-        });
-      }
+      if (!freeSeat[0]) return res.status(409).json({ message: "ที่นั่งในโซนนี้เต็มแล้ว" });
 
       const qrcode = `MT-${uuidv4()}`;
       const result = await execute(
         `INSERT INTO tickets (qrcode, status, users_id, seat_id, reserved_at) VALUES (?, 'reserved', ?, ?, NOW())`,
-        [qrcode, userId, freeSeat[0].id]
+        [qrcode, userId, freeSeat[0].id],
       );
       ticketIds.push(result.insertId);
     }
 
-    // ========================================================
-    // 7. Create PaymentIntent (Fixed & Completed)
-    // ========================================================
-
+    // ── 7. Create PaymentIntent ──
     const paymentIntent = await stripe.paymentIntents.create(
       {
         amount: amountSatang,
@@ -315,22 +227,188 @@ export async function checkout(
           ticketIds: ticketIds.join(","),
         },
       },
-      {
-        stripeAccount: stripeAccountId, // Routes the payment directly to the connected organizer
-      }
+      { stripeAccount: stripeAccountId },
     );
 
-    // 8. Return the client secret to the frontend to mount the payment form
+    // ── 8. Return response matching frontend CheckoutResponse type ──
     return res.status(200).json({
-      clientSecret: paymentIntent.client_secret,
-      ticketIds: ticketIds,
+      client_secret: paymentIntent.client_secret,
+      payment_intent_id: paymentIntent.id,
+      amount,
+      stripe_account_id: stripeAccountId,
+      platform_fee_percent: platformFeePercent,
+      ticket_ids: ticketIds,
     });
-
   } catch (error: any) {
     console.error("Checkout processing failed:", error);
-    return res.status(500).json({
-      message: "Internal Server Error during checkout routing",
-      error: error.message,
-    });
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+}
+
+// ============================================================
+// CONFIRM PAYMENT
+// ============================================================
+
+export async function confirmPayment(req: AuthRequest, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  const { payment_intent_id } = req.body as { payment_intent_id: string };
+  if (!payment_intent_id) return res.status(400).json({ message: "payment_intent_id is required" });
+
+  try {
+    // Get ticket IDs from PaymentIntent metadata
+    const ticketRows = await query<{ id: number; seat_id: number; users_id: number }[]>(
+      `SELECT id, seat_id, users_id FROM tickets
+       WHERE status = 'reserved' AND users_id = ?
+         AND reserved_at > DATE_SUB(NOW(), INTERVAL ${RESERVATION_MINUTES} MINUTE)`,
+      [userId],
+    );
+
+    if (!ticketRows.length) {
+      return res.status(404).json({ message: "ไม่พบตั๋วที่รอชำระเงิน" });
+    }
+
+    // Verify PaymentIntent status with Stripe
+    // We need the stripe account — get it from the ticket's zone's event's organizer
+    const firstTicket = ticketRows[0];
+    const orgRows = await query<{ stripe_id: string }[]>(
+      `SELECT o.stripe_id
+       FROM tickets t
+       JOIN seats s ON s.id = t.seat_id
+       JOIN zones z ON z.id = s.zone_id
+       JOIN events e ON e.id = z.event_id
+       JOIN organizers o ON o.id = e.organizer_id
+       WHERE t.id = ? LIMIT 1`,
+      [firstTicket.id],
+    );
+
+    if (!orgRows.length || !orgRows[0].stripe_id) {
+      return res.status(400).json({ message: "ไม่พบข้อมูล Stripe ของผู้จัด" });
+    }
+
+    const stripeAccountId = orgRows[0].stripe_id.trim();
+
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id, {}, { stripeAccount: stripeAccountId });
+    } catch {
+      return res.status(400).json({ message: "ไม่พบ PaymentIntent" });
+    }
+
+    if (paymentIntent.status !== "succeeded") {
+      // Cancel reserved tickets since payment failed
+      const ids = ticketRows.map((t) => t.id);
+      await execute(
+        `UPDATE tickets SET status = 'cancelled' WHERE id IN (${ids.map(() => "?").join(",")})`,
+        ids,
+      );
+      return res.status(400).json({ message: "การชำระเงินไม่สำเร็จ", status: "failed" });
+    }
+
+    // Update tickets to paid
+    const ids = ticketRows.map((t) => t.id);
+    await execute(
+      `UPDATE tickets SET status = 'paid' WHERE id IN (${ids.map(() => "?").join(",")})`,
+      ids,
+    );
+
+    // Generate QR codes
+    const tickets = [];
+    for (const ticket of ticketRows) {
+      const qrRow = await query<{ qrcode: string; position: string | null }[]>(
+        `SELECT t.qrcode, s.position FROM tickets t
+         LEFT JOIN seats s ON s.id = t.seat_id
+         WHERE t.id = ? LIMIT 1`,
+        [ticket.id],
+      );
+      if (!qrRow.length) continue;
+      const qrDataUrl = await QRCode.toDataURL(qrRow[0].qrcode);
+      tickets.push({
+        ticket_id: ticket.id,
+        qrcode: qrRow[0].qrcode,
+        qr_data_url: qrDataUrl,
+        seat_position: qrRow[0].position,
+      });
+    }
+
+    return res.json({ message: "ชำระเงินสำเร็จ", status: "paid", payment_intent_id, tickets });
+  } catch (error: any) {
+    console.error("Confirm payment failed:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+}
+
+// ============================================================
+// CANCEL PAYMENT
+// ============================================================
+
+export async function cancelPayment(req: AuthRequest, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  const { ticket_ids } = req.body as { ticket_ids: number[] };
+  if (!Array.isArray(ticket_ids) || !ticket_ids.length) {
+    return res.status(400).json({ message: "ticket_ids are required" });
+  }
+
+  try {
+    // Cancel only tickets owned by this user that are still reserved
+    const placeholders = ticket_ids.map(() => "?").join(",");
+    const result = await execute(
+      `UPDATE tickets SET status = 'cancelled'
+       WHERE id IN (${placeholders}) AND users_id = ? AND status = 'reserved'`,
+      [...ticket_ids, userId],
+    );
+
+    return res.json({ message: "ยกเลิกการจองแล้ว", cancelled: result.affectedRows });
+  } catch (error: any) {
+    console.error("Cancel payment failed:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+}
+
+// ============================================================
+// MY TICKETS
+// ============================================================
+
+export async function getMyTickets(req: AuthRequest, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    const tickets = await query<{
+      id: number; qrcode: string; status: string; created_at: string;
+      seat_position: string | null; zone_name: string; zone_type: string;
+      zone_price: number; event_name: string; event_start: string; place_name: string;
+    }[]>(
+      `SELECT
+         t.id, t.qrcode, t.status, t.created_at,
+         s.position AS seat_position,
+         z.name AS zone_name, z.type AS zone_type, z.price AS zone_price,
+         e.name AS event_name, e.start_date AS event_start, e.place_name
+       FROM tickets t
+       JOIN seats s ON s.id = t.seat_id
+       JOIN zones z ON z.id = s.zone_id
+       JOIN events e ON e.id = z.event_id
+       WHERE t.users_id = ? AND t.status != 'cancelled'
+       ORDER BY t.created_at DESC`,
+      [userId],
+    );
+
+    // Generate QR data URLs for paid/checked_in tickets
+    const result = [];
+    for (const ticket of tickets) {
+      let qr_data_url: string | null = null;
+      if (ticket.status === "paid" || ticket.status === "checked_in") {
+        try { qr_data_url = await QRCode.toDataURL(ticket.qrcode); } catch { /* skip */ }
+      }
+      result.push({ ...ticket, zone_price: Number(ticket.zone_price), qr_data_url });
+    }
+
+    return res.json({ tickets: result });
+  } catch (error: any) {
+    console.error("Get my tickets failed:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 }

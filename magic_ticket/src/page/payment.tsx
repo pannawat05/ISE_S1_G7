@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useLocation,
   useNavigate,
@@ -25,6 +25,8 @@ import {
   CheckCircle2,
   Ticket,
   Download,
+  Clock,
+  X,
 } from "lucide-react";
 
 import Cookies from "js-cookie";
@@ -32,6 +34,7 @@ import Cookies from "js-cookie";
 import {
   checkout,
   confirmPayment,
+  cancelReservation,
   type TicketResult,
 } from "@/api/payment";
 
@@ -314,6 +317,13 @@ export default function PaymentPage() {
     setError,
   ] = useState<string | null>(null);
 
+  // Reservation timer (5 min = 300 s)
+  const RESERVE_SECONDS = 5 * 60;
+  const [timeLeft, setTimeLeft] = useState(RESERVE_SECONDS);
+  const [ticketIds, setTicketIds] = useState<number[]>([]);
+  const [cancelling, setCancelling] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // ───────────────────────────────────────────────────────────────────────────
   // Initialize checkout
   // ───────────────────────────────────────────────────────────────────────────
@@ -431,6 +441,10 @@ export default function PaymentPage() {
           res.payment_intent_id ?? ""
         );
 
+        // Start reservation timer
+        setTicketIds(res.ticket_ids ?? []);
+        setTimeLeft(RESERVE_SECONDS);
+
       } catch (
         err: unknown
       ) {
@@ -452,6 +466,39 @@ export default function PaymentPage() {
 
   }, [navigate, state]);
 
+  // ── Countdown timer ──
+  useEffect(() => {
+    if (loading || error || !clientSecret) return;
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          setError("หมดเวลาจอง กรุณาเลือกที่นั่งใหม่");
+          setClientSecret(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [loading, error, clientSecret]);
+
+  async function handleCancel() {
+    const token = Cookies.get("authToken");
+    if (!token) return;
+    setCancelling(true);
+    try {
+      if (ticketIds.length > 0) await cancelReservation(token, ticketIds);
+    } finally {
+      setCancelling(false);
+      navigate(-1);
+    }
+  }
+
+  const timerColor = timeLeft <= 60 ? "text-red-400" : timeLeft <= 120 ? "text-orange-400" : "text-violet-400";
+  const timerMin = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+  const timerSec = String(timeLeft % 60).padStart(2, "0");
+
   if (!state) {
     return null;
   }
@@ -461,28 +508,44 @@ export default function PaymentPage() {
 
       <div className="space-y-6 mx-auto px-4 py-8 max-w-lg">
 
-        {/* Back */}
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-sm"
-        >
-          <ArrowLeft size={18} />
+        {/* Back + Timer */}
+        <div className="flex justify-between items-center">
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-sm"
+          >
+            <ArrowLeft size={18} />
+            กลับ
+          </button>
 
-          กลับ
-        </button>
+          {!loading && !error && clientSecret && (
+            <div className={`flex items-center gap-1.5 text-sm font-mono ${timerColor}`}>
+              <Clock size={14} />
+              <span>{timerMin}:{timerSec}</span>
+            </div>
+          )}
+        </div>
 
-        {/* Header */}
-        <div>
+        {/* Header + Cancel button */}
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="font-bold text-white text-2xl">ชำระเงิน</h1>
+            <p className="mt-0.5 text-gray-500 text-sm">{state.eventName}</p>
+          </div>
 
-          <h1 className="font-bold text-white text-2xl">
-            ชำระเงิน
-          </h1>
-
-          <p className="mt-0.5 text-gray-500 text-sm">
-            {state.eventName}
-          </p>
-
+          {!loading && !error && clientSecret && (
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 border border-red-500/20 rounded-lg text-red-400 text-xs transition-colors disabled:opacity-50"
+            >
+              {cancelling ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+              ยกเลิกการจอง
+            </button>
+          )}
         </div>
 
         {/* Order summary */}
