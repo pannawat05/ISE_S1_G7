@@ -522,6 +522,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
       total_seats: number;
       sold_tickets: number;
       revenue: number;
+      net_revenue: number;
       checkins: number;
     }[]>(
       `SELECT
@@ -547,6 +548,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
            z2.event_id,
            COUNT(t.id)                                                        AS sold_tickets,
            SUM(z2.price)                                                      AS revenue,
+           SUM(COALESCE(t.net_amount, z2.price))                              AS net_revenue,
            COUNT(CASE WHEN t.status = 'checked_in' THEN 1 END)               AS checkins
          FROM tickets t
          JOIN seats  s2 ON s2.id = t.seat_id
@@ -579,10 +581,10 @@ export async function getDashboard(req: AuthRequest, res: Response) {
     const totalSeats   = events.reduce((s, e) => s + Number(e.total_seats), 0);
     const totalSold    = events.reduce((s, e) => s + Number(e.sold_tickets), 0);
     const totalRevenue = events.reduce((s, e) => s + Number(e.revenue), 0);
+    const totalNetRevenue = events.reduce((s, e) => s + Number(e.net_revenue), 0);
     const totalCheckin = events.reduce((s, e) => s + Number(e.checkins), 0);
 
     const platformFeePercent = await getPlatformFeePercent();
-    const totalNetRevenue = Math.round(totalRevenue * (1 - platformFeePercent / 100) * 100) / 100;
 
     const attendanceRate = totalSold > 0 ? Math.round((totalCheckin / totalSold) * 100) : 0;
     const capacityRate   = totalSeats > 0 ? Math.round((totalSold / totalSeats) * 100) : 0;
@@ -613,7 +615,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
         total_seats: Number(e.total_seats),
         sold_tickets: Number(e.sold_tickets),
         revenue: Number(e.revenue),
-        net_revenue: Math.round(Number(e.revenue) * (1 - platformFeePercent / 100) * 100) / 100,
+        net_revenue: Number(e.net_revenue),
         platform_fee_percent: platformFeePercent,
         checkins: Number(e.checkins),
         sales_pct: salesPct,

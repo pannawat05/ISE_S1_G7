@@ -76,6 +76,7 @@ const rowSelect = `
            ELSE 'unpaid'
          END AS payment_status,
          CASE WHEN t.status IN ('paid', 'checked_in') THEN z.price ELSE 0 END AS paid_amount,
+         COALESCE(t.net_amount, CASE WHEN t.status IN ('paid', 'checked_in') THEN z.price ELSE 0 END) AS net_amount,
          NULL AS payment_time,
          (SELECT MAX(ci.time_stamp) FROM check_in_history ci WHERE ci.ticket_id = t.id) AS checked_in_at
     FROM tickets t

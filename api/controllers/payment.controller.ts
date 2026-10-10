@@ -319,10 +319,44 @@ export async function confirmPayment(req: AuthRequest, res: Response) {
       return res.status(400).json({ message: "การชำระเงินไม่สำเร็จ", status: "failed" });
     }
 
-    // ── 4. Update tickets to paid ──
+    // ── 4. Update tickets to paid + store payment info ──
+    // Retrieve charge details from Stripe to get actual net amount
+    let grossAmount: number | null = null;
+    let netAmount: number | null = null;
+
+    try {
+      const charges = paymentIntent.latest_charge
+        ? [await stripe.charges.retrieve(
+            paymentIntent.latest_charge as string,
+            { expand: ["balance_transaction"] },
+            { stripeAccount: stripeAccountId },
+          )]
+        : (await stripe.charges.list(
+            { payment_intent: payment_intent_id, limit: 1, expand: ["data.balance_transaction"] },
+            { stripeAccount: stripeAccountId },
+          )).data;
+
+      const charge = charges[0];
+      if (charge) {
+        const grossSatang = charge.amount;
+        const appFeeSatang = charge.application_fee_amount ?? 0;
+        const bt = charge.balance_transaction as { fee?: number } | null;
+        const stripeFee = bt?.fee ?? 0;
+        grossAmount = grossSatang / 100;
+        netAmount = (grossSatang - appFeeSatang - stripeFee) / 100;
+      }
+    } catch (err) {
+      console.error("Failed to retrieve Stripe charge for net amount:", err);
+    }
+
+    // Distribute gross/net evenly across tickets
+    const perTicketGross = grossAmount !== null ? Math.round((grossAmount / ticketRows.length) * 100) / 100 : null;
+    const perTicketNet = netAmount !== null ? Math.round((netAmount / ticketRows.length) * 100) / 100 : null;
+
     await execute(
-      `UPDATE tickets SET status = 'paid' WHERE id IN (${placeholders}) AND status = 'reserved'`,
-      metaTicketIds,
+      `UPDATE tickets SET status = 'paid', payment_intent_id = ?, gross_amount = ?, net_amount = ?
+       WHERE id IN (${placeholders}) AND status = 'reserved'`,
+      [payment_intent_id, perTicketGross, perTicketNet, ...metaTicketIds],
     );
 
     // ── 5. Generate QR codes ──
