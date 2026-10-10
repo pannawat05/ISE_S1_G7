@@ -23,16 +23,18 @@ const LIFECYCLE_CONFIG: Record<EventLifecycle, {
   rejected: { label: "Rejected", dot: "bg-red-500",                badge: "bg-red-500/15   text-red-400   border-red-500/30"   },
 };
 
-function fmtMoney(n: number) {
-  if (n >= 1_000_000) return `฿${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `฿${(n / 1_000).toFixed(1)}K`;
-  return `฿${n.toLocaleString()}`;
+function fmtMoney(n: number | null | undefined) {
+  const v = n ?? 0;
+  if (v >= 1_000_000) return `฿${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000)     return `฿${(v / 1_000).toFixed(1)}K`;
+  return `฿${v.toLocaleString()}`;
 }
 
-function fmtNum(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
+function fmtNum(n: number | null | undefined) {
+  const v = n ?? 0;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000)     return `${(v / 1_000).toFixed(1)}K`;
+  return v.toLocaleString();
 }
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
