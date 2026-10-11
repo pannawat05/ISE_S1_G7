@@ -532,6 +532,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
          COALESCE(seat_stats.total_seats, 0) AS total_seats,
          COALESCE(ticket_stats.sold_tickets, 0) AS sold_tickets,
          COALESCE(ticket_stats.revenue, 0)      AS revenue,
+         COALESCE(ticket_stats.net_revenue, 0) AS net_revenue,
          COALESCE(ticket_stats.checkins, 0)     AS checkins
        FROM events e
        JOIN event_types et ON et.id = e.type_id
