@@ -505,6 +505,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
     if (!organizer) return;
 
     const now = new Date();
+    const platformFeePercent = await getPlatformFeePercent();
 
     // ── All events for this organizer with stats ──
     const { query } = await import("../model/query.js");
@@ -549,7 +550,11 @@ export async function getDashboard(req: AuthRequest, res: Response) {
            z2.event_id,
            COUNT(t.id)                                                        AS sold_tickets,
            SUM(COALESCE(t.gross_amount, z2.price))                            AS revenue,
-           SUM(COALESCE(t.net_amount, t.gross_amount, z2.price))              AS net_revenue,
+           SUM(COALESCE(
+             t.net_amount,
+             t.gross_amount * (1 - ? / 100),
+             z2.price * (1 - ? / 100)
+           ))                                                               AS net_revenue,
            COUNT(CASE WHEN t.status = 'checked_in' THEN 1 END)               AS checkins
          FROM tickets t
          JOIN seats  s2 ON s2.id = t.seat_id
@@ -559,7 +564,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
        ) ticket_stats ON ticket_stats.event_id = e.id
        WHERE e.organizer_id = ?
        ORDER BY e.start_date DESC`,
-      [organizerId],
+      [platformFeePercent, platformFeePercent, organizerId],
     );
 
     // ── Compute event lifecycle status ──
@@ -584,8 +589,6 @@ export async function getDashboard(req: AuthRequest, res: Response) {
     const totalRevenue = events.reduce((s, e) => s + Number(e.revenue), 0);
     const totalNetRevenue = events.reduce((s, e) => s + Number(e.net_revenue), 0);
     const totalCheckin = events.reduce((s, e) => s + Number(e.checkins), 0);
-
-    const platformFeePercent = await getPlatformFeePercent();
 
     const attendanceRate = totalSold > 0 ? Math.round((totalCheckin / totalSold) * 100) : 0;
     const capacityRate   = totalSeats > 0 ? Math.round((totalSold / totalSeats) * 100) : 0;
