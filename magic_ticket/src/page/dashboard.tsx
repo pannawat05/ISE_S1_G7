@@ -322,7 +322,7 @@ export default function Dashboards() {
                   icon={BadgeDollarSign}
                   label="รายได้รวม"
                   value={fmtMoney(kpi.total_revenue)}
-                  sub={`ยอดสุทธิ ${fmtMoney(kpi.total_net_revenue)} (หัก ${kpi.platform_fee_percent}%)`}
+                  sub={`ยอดสุทธิ ${fmtMoney(kpi.total_net_revenue)} (หักค่าธรรมเนียมรวม ${fmtMoney(kpi.total_revenue - kpi.total_net_revenue)})`}
                   accent="green"
                 />
 

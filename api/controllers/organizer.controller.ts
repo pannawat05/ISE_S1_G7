@@ -543,13 +543,13 @@ export async function getDashboard(req: AuthRequest, res: Response) {
          LEFT JOIN seats s ON s.zone_id = z.id
          GROUP BY z.event_id
        ) seat_stats ON seat_stats.event_id = e.id
-       -- Ticket stats: sold = paid+checked_in, revenue = sum(zone.price)
+       -- Ticket stats use recorded payment amounts, with zone price as a legacy fallback.
        LEFT JOIN (
          SELECT
            z2.event_id,
            COUNT(t.id)                                                        AS sold_tickets,
-           SUM(z2.price)                                                      AS revenue,
-           SUM(COALESCE(t.net_amount, z2.price))                              AS net_revenue,
+           SUM(COALESCE(t.gross_amount, z2.price))                            AS revenue,
+           SUM(COALESCE(t.net_amount, t.gross_amount, z2.price))              AS net_revenue,
            COUNT(CASE WHEN t.status = 'checked_in' THEN 1 END)               AS checkins
          FROM tickets t
          JOIN seats  s2 ON s2.id = t.seat_id
