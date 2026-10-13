@@ -23,16 +23,18 @@ const LIFECYCLE_CONFIG: Record<EventLifecycle, {
   rejected: { label: "Rejected", dot: "bg-red-500",                badge: "bg-red-500/15   text-red-400   border-red-500/30"   },
 };
 
-function fmtMoney(n: number) {
-  if (n >= 1_000_000) return `฿${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `฿${(n / 1_000).toFixed(1)}K`;
-  return `฿${n.toLocaleString()}`;
+function fmtMoney(n: number | null | undefined) {
+  const v = n ?? 0;
+  if (v >= 1_000_000) return `฿${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000)     return `฿${(v / 1_000).toFixed(1)}K`;
+  return `฿${v.toLocaleString()}`;
 }
 
-function fmtNum(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
+function fmtNum(n: number | null | undefined) {
+  const v = n ?? 0;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000)     return `${(v / 1_000).toFixed(1)}K`;
+  return v.toLocaleString();
 }
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
@@ -178,6 +180,7 @@ function EventRow({ ev, organizerId }: { ev: DashboardEvent; organizerId: string
       {/* Revenue */}
       <td className="hidden md:table-cell px-4 py-3 text-right">
         <p className="font-semibold text-white text-sm">{fmtMoney(ev.revenue)}</p>
+        <p className="text-gray-500 text-xs">สุทธิ {fmtMoney(ev.net_revenue)}</p>
       </td>
 
       {/* Actions */}
@@ -319,7 +322,7 @@ export default function Dashboards() {
                   icon={BadgeDollarSign}
                   label="รายได้รวม"
                   value={fmtMoney(kpi.total_revenue)}
-                  sub={`จาก ${fmtNum(kpi.total_sold)} ตั๋ว`}
+                  sub={`ยอดสุทธิ ${fmtMoney(kpi.total_net_revenue)} (หักค่าธรรมเนียมรวม ${fmtMoney(kpi.total_revenue - kpi.total_net_revenue)})`}
                   accent="green"
                 />
 

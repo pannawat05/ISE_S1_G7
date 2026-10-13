@@ -10,6 +10,10 @@ router.use(authenticate, (req, res, next) =>
   requireAdmin(req as AuthRequest, res, next),
 );
 
+router.get("/analytics", (req, res) => sys.getPlatformAnalytics(req as AuthRequest, res));
+router.get("/platform-fee", (req, res) => sys.getPlatformFee(req as AuthRequest, res));
+router.patch("/platform-fee", (req, res) => sys.updatePlatformFee(req as AuthRequest, res));
+
 // Event Types
 router.get   ("/event-types",      (req, res) => sys.listEventTypes(req as AuthRequest, res));
 router.post  ("/event-types",      (req, res) => sys.createEventType(req as AuthRequest, res));

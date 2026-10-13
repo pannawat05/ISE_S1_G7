@@ -1,6 +1,49 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/types.js";
 import { query, execute } from "../model/query.js";
+import { getPlatformAnalytics } from "./analytics.controller.js";
+import { findUserById } from "../model/user.model.js";
+
+export { getPlatformAnalytics };
+
+async function requireSysadmin(req: AuthRequest, res: Response) {
+  if (!req.user?.id) { res.status(401).json({ message: "Unauthorized" }); return false; }
+  const user = await findUserById(req.user.id);
+  if (user?.role !== "sysadmin") { res.status(403).json({ message: "Sysadmin access required" }); return false; }
+  return true;
+}
+
+export async function getPlatformFee(req: AuthRequest, res: Response) {
+  try {
+    if (!await requireSysadmin(req, res)) return;
+    const rows = await query<{ setting_value: number }[]>(
+      "SELECT setting_value FROM platform_settings WHERE setting_key = 'platform_fee_percent' LIMIT 1",
+    );
+    return res.json({ platform_fee_percent: Number(rows[0]?.setting_value ?? 10) });
+  } catch (err) {
+    console.error("GET PLATFORM FEE ERROR:", err);
+    return res.status(500).json({ message: "Error fetching platform fee" });
+  }
+}
+
+export async function updatePlatformFee(req: AuthRequest, res: Response) {
+  const value = Number(req.body.platform_fee_percent);
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    return res.status(400).json({ message: "Platform fee must be between 0 and 100" });
+  }
+  try {
+    if (!await requireSysadmin(req, res)) return;
+    await execute(
+      `INSERT INTO platform_settings (setting_key, setting_value) VALUES ('platform_fee_percent', ?)
+       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+      [value],
+    );
+    return res.json({ message: "Platform fee updated", platform_fee_percent: value });
+  } catch (err) {
+    console.error("UPDATE PLATFORM FEE ERROR:", err);
+    return res.status(500).json({ message: "Error updating platform fee" });
+  }
+}
 
 // ─── Event Types ──────────────────────────────────────────────────────────────
 export async function listEventTypes(_req: AuthRequest, res: Response) {

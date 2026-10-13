@@ -1,208 +1,453 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/types.js";
+
 import QRCode from "qrcode";
 import { v4 as uuidv4 } from "uuid";
-import { query, execute } from "../model/query.js";
 import Stripe from "stripe";
 import type { RowDataPacket } from "mysql2";
 
+import { query, execute } from "../model/query.js";
+
+// ============================================================
+// Stripe
+// ============================================================
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+
+// ============================================================
+// Platform fee
+// ============================================================
+
+const DEFAULT_PLATFORM_FEE_PERCENT = 10;
+const RESERVATION_MINUTES = 5;
+
+async function getPlatformFeePercent(): Promise<number> {
+  try {
+    const rows = await query<{ setting_value: number }[]>(
+      "SELECT setting_value FROM platform_settings WHERE setting_key = 'platform_fee_percent' LIMIT 1",
+    );
+    const value = Number(rows[0]?.setting_value);
+    return Number.isFinite(value) && value >= 0 && value <= 100
+      ? value
+      : DEFAULT_PLATFORM_FEE_PERCENT;
+  } catch {
+    return DEFAULT_PLATFORM_FEE_PERCENT;
+  }
+}
+
+// ============================================================
+// Types
+// ============================================================
 
 interface ZoneQuery extends RowDataPacket {
   id: number;
   price: number;
   event_id: number;
+  stripe_id: string | null;
 }
+
+interface SeatId extends RowDataPacket {
+  id: number;
+}
+
+interface OrganizerQuery extends RowDataPacket {
+  id: number;
+  email: string;
+  stripe_id: string | null;
+}
+
+// ============================================================
+// ORGANIZER STRIPE GENERATOR (Express Method)
+// ============================================================
+
+export async function setupOrganizerStripe(req: AuthRequest, res: Response) {
+  const organizerId = req.user?.id;
+  if (!organizerId) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    const organizers = await query<OrganizerQuery[]>(
+      `SELECT id, email, stripe_id FROM organizers WHERE id = ? LIMIT 1`,
+      [organizerId],
+    );
+
+    if (!organizers.length) return res.status(404).json({ message: "Organizer not found" });
+
+    const organizer = organizers[0];
+    let stripeAccountId = organizer.stripe_id?.trim();
+
+    if (!stripeAccountId || !stripeAccountId.startsWith("acct_")) {
+      const account = await stripe.accounts.create({
+        type: "express",
+        email: organizer.email,
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+      });
+      stripeAccountId = account.id;
+      await execute(`UPDATE organizers SET stripe_id = ? WHERE id = ?`, [stripeAccountId, organizerId]);
+    }
+
+    const accountLink = await stripe.accountLinks.create({
+      account: stripeAccountId,
+      refresh_url: `${process.env.FRONTEND_URL}/stripe/refresh`,
+      return_url: `${process.env.FRONTEND_URL}/stripe/return`,
+      type: "account_onboarding",
+    });
+
+    return res.status(200).json({
+      stripe_account_id: stripeAccountId,
+      onboarding_url: accountLink.url,
+    });
+  } catch (error: any) {
+    console.error("Stripe Connection Setup Failed:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+}
+
+// ============================================================
+// CHECKOUT
+// ============================================================
 
 export async function checkout(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-  const { event_id, zone_id, seat_ids, payment_method_id } = req.body as {
+  const { event_id, zone_id, seat_ids } = req.body as {
     event_id: number;
     zone_id: number;
     seat_ids: number[];
-    payment_method_id?: number;
   };
 
   if (!event_id || !zone_id) {
-    return res
-      .status(400)
-      .json({ message: "event_id and zone_id are required" });
+    return res.status(400).json({ message: "event_id and zone_id are required" });
   }
 
   try {
-    // 1. Verify zone belongs to event and get price
+    // ── 1. Get zone + organizer Stripe account ──
     const zones = await query<ZoneQuery[]>(
-      "SELECT id, price, event_id FROM zones WHERE id = ? AND event_id = ? LIMIT 1",
+      `SELECT z.id, z.price, z.event_id, o.stripe_id
+       FROM zones z
+       JOIN events e ON e.id = z.event_id
+       JOIN organizers o ON o.id = e.organizer_id
+       WHERE z.id = ? AND z.event_id = ?
+       LIMIT 1`,
       [zone_id, event_id],
     );
-    if (!zones.length)
-      return res.status(404).json({ message: "Zone not found" });
+
+    if (!zones.length) return res.status(404).json({ message: "Zone not found" });
+
     const zone = zones[0];
 
-    interface SeatId extends RowDataPacket {
-      id: number;
+    // ── 2. Validate Organizer Stripe Account ──
+    const stripeAccountId = zone.stripe_id?.trim();
+    if (!stripeAccountId || !stripeAccountId.startsWith("acct_")) {
+      return res.status(400).json({ message: "ผู้จัดงานยังไม่ได้เชื่อมต่อ Stripe" });
     }
 
-    if (seat_ids?.length > 0) {
+    // ── 3. Check only selected seats are taken ──
+    if (Array.isArray(seat_ids) && seat_ids.length > 0) {
       const placeholders = seat_ids.map(() => "?").join(",");
       const takenCheck = await query<SeatId[]>(
-        `SELECT s.id FROM seats s
+        `SELECT s.id
+         FROM seats s
          JOIN tickets t ON t.seat_id = s.id
-         WHERE s.id IN (${placeholders}) AND s.zone_id = ? AND t.status NOT IN ('cancelled')`,
+         WHERE s.id IN (${placeholders})
+           AND s.zone_id = ?
+           AND (
+             t.status IN ('paid', 'checked_in')
+             OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL ${RESERVATION_MINUTES} MINUTE))
+           )`,
         [...seat_ids, zone_id],
       );
+
       if (takenCheck.length > 0) {
-        const takenIds = takenCheck.map((r) => r.id);
         return res.status(409).json({
           message: "บางที่นั่งถูกจองแล้ว",
-          taken_seat_ids: takenIds,
+          taken_seat_ids: takenCheck.map((r) => r.id),
         });
       }
     }
 
-    // 2b. Standing zone — just count, no seat assignment
-    const qty = seat_ids?.length > 0 ? seat_ids.length : 1;
-    const amount = Number(zone?.price) * qty;
+    // ── 4. Calculate amount ──
+    const qty = Array.isArray(seat_ids) && seat_ids.length > 0 ? seat_ids.length : 1;
+    const amount = Number(zone.price) * qty;
+    const amountSatang = Math.round(amount * 100);
 
-    // 3. Create pending tickets (seat_ids optional)
+    // ── 5. Platform fee ──
+    const platformFeePercent = await getPlatformFeePercent();
+    const applicationFeeSatang = Math.round(amountSatang * (platformFeePercent / 100));
+
+    // ── 6. Reserve ONLY the selected seats ──
     const ticketIds: number[] = [];
-    if (seat_ids?.length > 0) {
+
+    if (Array.isArray(seat_ids) && seat_ids.length > 0) {
       for (const seatId of seat_ids) {
         const qrcode = `MT-${uuidv4()}`;
         const result = await execute(
-          "INSERT INTO tickets (qrcode, status, users_id, seat_id) VALUES (?, 'reserved', ?, ?)",
+          `INSERT INTO tickets (qrcode, status, users_id, seat_id, reserved_at) VALUES (?, 'reserved', ?, ?, NOW())`,
           [qrcode, userId, seatId],
         );
         ticketIds.push(result.insertId);
       }
+    } else {
+      // Standing zone — pick one free seat
+      const freeSeat = await query<{ id: number }[]>(
+        `SELECT s.id
+         FROM seats s
+         LEFT JOIN tickets t ON t.seat_id = s.id
+           AND (
+             t.status IN ('paid', 'checked_in')
+             OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL ${RESERVATION_MINUTES} MINUTE))
+           )
+         WHERE s.zone_id = ? AND s.is_active = 1 AND t.id IS NULL
+         LIMIT 1`,
+        [zone_id],
+      );
+
+      if (!freeSeat[0]) return res.status(409).json({ message: "ที่นั่งในโซนนี้เต็มแล้ว" });
+
+      const qrcode = `MT-${uuidv4()}`;
+      const result = await execute(
+        `INSERT INTO tickets (qrcode, status, users_id, seat_id, reserved_at) VALUES (?, 'reserved', ?, ?, NOW())`,
+        [qrcode, userId, freeSeat[0].id],
+      );
+      ticketIds.push(result.insertId);
     }
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
-      currency: "thb",
-      metadata: {
-        userId: String(userId),
-        transactionId: String(transactionId),
-      }
-    });
-
-    await execute(
-      `INSERT INTO transactions (gross_amount, status, ticket_id, payment_method_id, bank_ref_no)
-       VALUES (?, 'pending', ?, ?, ?)`,
-      [
-        amount,
-        ticketIds[0] ?? null,
-        payment_method_id ?? null,
-        paymentIntent.id,
-      ],
+    // ── 7. Create PaymentIntent ──
+    const paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount: amountSatang,
+        currency: "thb",
+        application_fee_amount: applicationFeeSatang,
+        metadata: {
+          userId: String(userId),
+          eventId: String(event_id),
+          ticketIds: ticketIds.join(","),
+        },
+      },
+      { stripeAccount: stripeAccountId },
     );
 
-    return res.status(201).json({
+    // ── 8. Return response matching frontend CheckoutResponse type ──
+    return res.status(200).json({
       client_secret: paymentIntent.client_secret,
       payment_intent_id: paymentIntent.id,
       amount,
+      stripe_account_id: stripeAccountId,
+      platform_fee_percent: platformFeePercent,
+      ticket_ids: ticketIds,
     });
-  } catch (err) {
-    console.error(process.env.STRIPE_SECRET_KEY);
-    
-    console.error("CHECKOUT ERROR:", err);
-    return res.status(500).json({ message: "Checkout failed" });
+  } catch (error: any) {
+    console.error("Checkout processing failed:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 }
+
+// ============================================================
+// CONFIRM PAYMENT
+// ============================================================
 
 export async function confirmPayment(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-  const { payment_intent_id, paymentIntentId } = req.body;
-  const intentId = payment_intent_id || paymentIntentId;
+  const { payment_intent_id } = req.body as { payment_intent_id: string };
+  if (!payment_intent_id) return res.status(400).json({ message: "payment_intent_id is required" });
 
-  if (!intentId) {
-    return res.status(400).json({ message: "payment_intent_id is required" });
+  try {
+    // ── 1. Get organizer stripe_id from any reserved ticket of this user ──
+    const anyTicket = await query<{ id: number; stripe_id: string }[]>(
+      `SELECT t.id, o.stripe_id
+       FROM tickets t
+       JOIN seats s ON s.id = t.seat_id
+       JOIN zones z ON z.id = s.zone_id
+       JOIN events e ON e.id = z.event_id
+       JOIN organizers o ON o.id = e.organizer_id
+       WHERE t.users_id = ? AND t.status = 'reserved'
+       ORDER BY t.id DESC
+       LIMIT 1`,
+      [userId],
+    );
+
+    if (!anyTicket.length || !anyTicket[0].stripe_id) {
+      return res.status(404).json({ message: "ไม่พบตั๋วที่รอชำระเงิน" });
+    }
+
+    const stripeAccountId = anyTicket[0].stripe_id.trim();
+
+    // ── 2. Verify PaymentIntent with Stripe ──
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.retrieve(
+        payment_intent_id, {}, { stripeAccount: stripeAccountId },
+      );
+    } catch {
+      return res.status(400).json({ message: "ไม่พบ PaymentIntent" });
+    }
+
+    // ── 3. Get ticket IDs from PaymentIntent metadata ──
+    const metaTicketIds = (paymentIntent.metadata?.ticketIds ?? "")
+      .split(",")
+      .map((s) => parseInt(s.trim()))
+      .filter((n) => !isNaN(n));
+
+    if (!metaTicketIds.length) {
+      return res.status(400).json({ message: "ไม่พบข้อมูลตั๋วใน PaymentIntent" });
+    }
+
+    const placeholders = metaTicketIds.map(() => "?").join(",");
+    const ticketRows = await query<{ id: number; qrcode: string; position: string | null }[]>(
+      `SELECT t.id, t.qrcode, s.position
+       FROM tickets t
+       LEFT JOIN seats s ON s.id = t.seat_id
+       WHERE t.id IN (${placeholders}) AND t.users_id = ?`,
+      [...metaTicketIds, userId],
+    );
+
+    if (!ticketRows.length) {
+      return res.status(404).json({ message: "ไม่พบตั๋ว" });
+    }
+
+    if (paymentIntent.status !== "succeeded") {
+      // Cancel reserved tickets
+      await execute(
+        `UPDATE tickets SET status = 'cancelled' WHERE id IN (${placeholders})`,
+        metaTicketIds,
+      );
+      return res.status(400).json({ message: "การชำระเงินไม่สำเร็จ", status: "failed" });
+    }
+
+    // ── 4. Update tickets to paid + store payment info ──
+    // Retrieve charge details from Stripe to get actual net amount
+    let grossAmount: number | null = null;
+    let netAmount: number | null = null;
+
+    try {
+      const charges = paymentIntent.latest_charge
+        ? [await stripe.charges.retrieve(
+            paymentIntent.latest_charge as string,
+            { expand: ["balance_transaction"] },
+            { stripeAccount: stripeAccountId },
+          )]
+        : (await stripe.charges.list(
+            { payment_intent: payment_intent_id, limit: 1, expand: ["data.balance_transaction"] },
+            { stripeAccount: stripeAccountId },
+          )).data;
+
+      const charge = charges[0];
+      if (charge) {
+        const grossSatang = charge.amount;
+        const appFeeSatang = charge.application_fee_amount ?? 0;
+        const bt = charge.balance_transaction as { fee?: number } | null;
+        const stripeFee = bt?.fee ?? 0;
+        grossAmount = grossSatang / 100;
+        netAmount = (grossSatang - appFeeSatang - stripeFee) / 100;
+      }
+    } catch (err) {
+      console.error("Failed to retrieve Stripe charge for net amount:", err);
+    }
+
+    // Distribute gross/net evenly across tickets
+    const perTicketGross = grossAmount !== null ? Math.round((grossAmount / ticketRows.length) * 100) / 100 : null;
+    const perTicketNet = netAmount !== null ? Math.round((netAmount / ticketRows.length) * 100) / 100 : null;
+
+    await execute(
+      `UPDATE tickets SET status = 'paid', payment_intent_id = ?, gross_amount = ?, net_amount = ?
+       WHERE id IN (${placeholders}) AND status = 'reserved'`,
+      [payment_intent_id, perTicketGross, perTicketNet, ...metaTicketIds],
+    );
+
+    // ── 5. Generate QR codes ──
+    const tickets = [];
+    for (const ticket of ticketRows) {
+      const qrDataUrl = await QRCode.toDataURL(ticket.qrcode);
+      tickets.push({
+        ticket_id: ticket.id,
+        qrcode: ticket.qrcode,
+        qr_data_url: qrDataUrl,
+        seat_position: ticket.position,
+      });
+    }
+
+    return res.json({ message: "ชำระเงินสำเร็จ", status: "paid", payment_intent_id, tickets });
+  } catch (error: any) {
+    console.error("Confirm payment failed:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+}
+
+// ============================================================
+// CANCEL PAYMENT
+// ============================================================
+
+export async function cancelPayment(req: AuthRequest, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  const { ticket_ids } = req.body as { ticket_ids: number[] };
+  if (!Array.isArray(ticket_ids) || !ticket_ids.length) {
+    return res.status(400).json({ message: "ticket_ids are required" });
   }
 
   try {
-    const intent = await stripe.paymentIntents.retrieve(intentId);
-    if (intent.status !== "succeeded") {
-      return res.status(400).json({ message: "การชำระเงินยังไม่สมบูรณ์" });
-    }
-
-    await execute(
-      "UPDATE transactions SET status = 'paid' WHERE bank_ref_no = ?",
-      [intent.id],
+    // Cancel only tickets owned by this user that are still reserved
+    const placeholders = ticket_ids.map(() => "?").join(",");
+    const result = await execute(
+      `UPDATE tickets SET status = 'cancelled'
+       WHERE id IN (${placeholders}) AND users_id = ? AND status = 'reserved'`,
+      [...ticket_ids, userId],
     );
-    interface TicketId extends RowDataPacket {
-      ticket_id: number;
-    }
-    const pendingTickets = await query<TicketId[]>(
-      "SELECT ticket_id FROM transactions WHERE bank_ref_no = ?",
-      [intent.id],
-    );
-    const ticketIds = pendingTickets.map((t) => t.ticket_id);
 
-    if (ticketIds.length > 0) {
-      const placeholders = ticketIds.map(() => "?").join(",");
-      await execute(
-        `UPDATE tickets SET status = 'paid' WHERE id IN (${placeholders})`,
-        ticketIds,
-      );
-    }
-
-    return res.json({ message: "ชำระเงินสำเร็จ", status: "paid" });
-  } catch (err) {
-    console.error("CONFIRM ERROR:", err);
-    return res.status(500).json({ message: "Payment confirmation failed" });
+    return res.json({ message: "ยกเลิกการจองแล้ว", cancelled: result.affectedRows });
+  } catch (error: any) {
+    console.error("Cancel payment failed:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 }
 
-interface Ticket extends RowDataPacket {
-  id: number;
-  qrcode: string;
-  status: string;
-  seat_position: string;
-  zone_name: string;
-  event_name: string;
-}
+// ============================================================
+// MY TICKETS
+// ============================================================
 
 export async function getMyTickets(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-  const tickets = await query<[]>(
-    `SELECT 
-        t.id, 
-        t.qrcode, 
-        t.status,
-        t.created_at,
-        s.position AS seat_position,
-        z.name AS zone_name,
-        z.type AS zone_type,
-        z.price AS zone_price,
-        e.name AS event_name,
-        e.start_date AS event_start,
-        e.place_name AS place_name
+  try {
+    const tickets = await query<{
+      id: number; qrcode: string; status: string; created_at: string;
+      seat_position: string | null; zone_name: string; zone_type: string;
+      zone_price: number; event_name: string; event_start: string; place_name: string;
+    }[]>(
+      `SELECT
+         t.id, t.qrcode, t.status, t.created_at,
+         s.position AS seat_position,
+         z.name AS zone_name, z.type AS zone_type, z.price AS zone_price,
+         e.name AS event_name, e.start_date AS event_start, e.place_name
        FROM tickets t
-       LEFT JOIN seats s ON s.id = t.seat_id
-       LEFT JOIN zones z ON z.id = s.zone_id
-       LEFT JOIN events e ON e.id = z.event_id
-       WHERE t.users_id = ? 
-       ORDER BY t.id DESC`,
-    [userId],
-  );
+       JOIN seats s ON s.id = t.seat_id
+       JOIN zones z ON z.id = s.zone_id
+       JOIN events e ON e.id = z.event_id
+       WHERE t.users_id = ? AND t.status != 'cancelled'
+       ORDER BY t.created_at DESC`,
+      [userId],
+    );
 
-  const withQR = await Promise.all(
-    tickets.map(async (t: Ticket) => {
-      let qr_data_url = null;
-      if (t.status === "paid" || t.status === "checked_in") {
-        qr_data_url = await QRCode.toDataURL(
-          JSON.stringify({ id: t.id, code: t.qrcode }),
-        );
+    // Generate QR data URLs for paid/checked_in tickets
+    const result = [];
+    for (const ticket of tickets) {
+      let qr_data_url: string | null = null;
+      if (ticket.status === "paid" || ticket.status === "checked_in") {
+        try { qr_data_url = await QRCode.toDataURL(ticket.qrcode); } catch { /* skip */ }
       }
-      return { ...t, qr_data_url };
-    }),
-  );
+      result.push({ ...ticket, zone_price: Number(ticket.zone_price), qr_data_url });
+    }
 
-  return res.json({ tickets: withQR });
+    return res.json({ tickets: result });
+  } catch (error: any) {
+    console.error("Get my tickets failed:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
 }

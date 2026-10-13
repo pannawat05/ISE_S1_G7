@@ -102,9 +102,9 @@ function Signin() {
               </label>
             </div>
 
-            <a href="#" className="mt-link font-medium">
+            <Link to="/forgot-password" className="mt-link font-medium">
               ลืมรหัสผ่าน?
-            </a>
+            </Link>
           </div>
 
           <button

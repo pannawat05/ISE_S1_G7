@@ -26,7 +26,9 @@ export async function listEventZones(req: Request, res: Response) {
          COUNT(CASE WHEN s.is_active = 1 AND t.id IS NULL THEN 1 END)   AS available_seats
        FROM zones z
        LEFT JOIN seats   s ON s.zone_id = z.id
-       LEFT JOIN tickets t ON t.seat_id = s.id AND t.status NOT IN ('cancelled')
+       LEFT JOIN tickets t ON t.seat_id = s.id
+         AND t.status NOT IN ('cancelled')
+         AND (t.status != 'reserved' OR t.reserved_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE))
        WHERE z.event_id = ?
        GROUP BY z.id
        ORDER BY z.id ASC`,
@@ -80,7 +82,9 @@ export async function listZoneSeats(req: Request, res: Response) {
          s.id, s.name, s.position, s.is_active,
          CASE WHEN t.id IS NOT NULL THEN 1 ELSE 0 END AS is_taken
        FROM seats s
-       LEFT JOIN tickets t ON t.seat_id = s.id AND t.status NOT IN ('cancelled')
+       LEFT JOIN tickets t ON t.seat_id = s.id
+         AND t.status NOT IN ('cancelled')
+         AND (t.status != 'reserved' OR t.reserved_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE))
        WHERE s.zone_id = ?
        ORDER BY s.position ASC`,
       [zoneId],
@@ -134,6 +138,12 @@ export async function getPublicEvent(req: Request, res: Response) {
     );
 
     if (!rows.length) return res.status(404).json({ message: "Event not found" });
+
+    try {
+      await query("INSERT INTO event_views (event_id, view_count) VALUES (?, 1) ON DUPLICATE KEY UPDATE view_count = view_count + 1", [eventId]);
+    } catch (viewError) {
+      console.error("EVENT VIEW TRACKING ERROR:", viewError);
+    }
 
     // Fetch extra images
     const images = await query<EventImages[]>(

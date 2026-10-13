@@ -30,7 +30,23 @@ import {
   countSeats,
 } from "../model/zone.model.js";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2024-06-20"
+});
+
+async function getPlatformFeePercent(): Promise<number> {
+  try {
+    const rows = await query<{ setting_value: number }[]>(
+      "SELECT setting_value FROM platform_settings WHERE setting_key = 'platform_fee_percent' LIMIT 1",
+    );
+    const value = Number(rows[0]?.setting_value);
+    return Number.isFinite(value) && value >= 0 && value <= 100 ? value : 10;
+  } catch {
+    return 10;
+  }
+}
 
 /** Verify that the authenticated user owns the organizer. Returns organizer or sends error. */
 async function resolveOrganizerOwner(
@@ -96,6 +112,7 @@ export async function getOrganizer(req: AuthRequest, res: Response) {
       logo_url: organizer.logo_url,
       description: organizer.description ?? null,
       owner_id: organizer.owner_id,
+      stripe_account_id: organizer.stripe_id || null,
       created_at: organizer.created_at,
       updated_at: organizer.updated_at,
     });
@@ -488,6 +505,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
     if (!organizer) return;
 
     const now = new Date();
+    const platformFeePercent = await getPlatformFeePercent();
 
     // ── All events for this organizer with stats ──
     const { query } = await import("../model/query.js");
@@ -505,6 +523,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
       total_seats: number;
       sold_tickets: number;
       revenue: number;
+      net_revenue: number;
       checkins: number;
     }[]>(
       `SELECT
@@ -514,6 +533,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
          COALESCE(seat_stats.total_seats, 0) AS total_seats,
          COALESCE(ticket_stats.sold_tickets, 0) AS sold_tickets,
          COALESCE(ticket_stats.revenue, 0)      AS revenue,
+         COALESCE(ticket_stats.net_revenue, 0) AS net_revenue,
          COALESCE(ticket_stats.checkins, 0)     AS checkins
        FROM events e
        JOIN event_types et ON et.id = e.type_id
@@ -524,12 +544,17 @@ export async function getDashboard(req: AuthRequest, res: Response) {
          LEFT JOIN seats s ON s.zone_id = z.id
          GROUP BY z.event_id
        ) seat_stats ON seat_stats.event_id = e.id
-       -- Ticket stats: sold = paid+checked_in, revenue = sum(zone.price)
+       -- Ticket stats use recorded payment amounts, with zone price as a legacy fallback.
        LEFT JOIN (
          SELECT
            z2.event_id,
            COUNT(t.id)                                                        AS sold_tickets,
-           SUM(z2.price)                                                      AS revenue,
+           SUM(COALESCE(t.gross_amount, z2.price))                            AS revenue,
+           SUM(COALESCE(
+             t.net_amount,
+             t.gross_amount * (1 - ? / 100),
+             z2.price * (1 - ? / 100)
+           ))                                                               AS net_revenue,
            COUNT(CASE WHEN t.status = 'checked_in' THEN 1 END)               AS checkins
          FROM tickets t
          JOIN seats  s2 ON s2.id = t.seat_id
@@ -539,7 +564,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
        ) ticket_stats ON ticket_stats.event_id = e.id
        WHERE e.organizer_id = ?
        ORDER BY e.start_date DESC`,
-      [organizerId],
+      [platformFeePercent, platformFeePercent, organizerId],
     );
 
     // ── Compute event lifecycle status ──
@@ -562,6 +587,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
     const totalSeats   = events.reduce((s, e) => s + Number(e.total_seats), 0);
     const totalSold    = events.reduce((s, e) => s + Number(e.sold_tickets), 0);
     const totalRevenue = events.reduce((s, e) => s + Number(e.revenue), 0);
+    const totalNetRevenue = events.reduce((s, e) => s + Number(e.net_revenue), 0);
     const totalCheckin = events.reduce((s, e) => s + Number(e.checkins), 0);
 
     const attendanceRate = totalSold > 0 ? Math.round((totalCheckin / totalSold) * 100) : 0;
@@ -593,6 +619,8 @@ export async function getDashboard(req: AuthRequest, res: Response) {
         total_seats: Number(e.total_seats),
         sold_tickets: Number(e.sold_tickets),
         revenue: Number(e.revenue),
+        net_revenue: Number(e.net_revenue),
+        platform_fee_percent: platformFeePercent,
         checkins: Number(e.checkins),
         sales_pct: salesPct,
         checkin_pct: checkinPct,
@@ -608,6 +636,8 @@ export async function getDashboard(req: AuthRequest, res: Response) {
         total_seats: totalSeats,
         total_sold: totalSold,
         total_revenue: totalRevenue,
+        total_net_revenue: totalNetRevenue,
+        platform_fee_percent: platformFeePercent,
         total_checkins: totalCheckin,
         attendance_rate: attendanceRate,
         capacity_rate: capacityRate,
@@ -617,5 +647,68 @@ export async function getDashboard(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error("DASHBOARD ERROR:", err);
     return res.status(500).json({ message: "Error fetching dashboard" });
+  }
+}
+
+// ─── Stripe Connect Onboarding ────────────────────────────────────────────────
+
+export async function createStripeOnboardLinkHandler(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const userId = req.user?.id;
+
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId)) return res.status(400).json({ message: "Invalid organizer ID" });
+
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return; // resolveOrganizerOwner จัดการ response 403/404 ให้แล้ว
+
+    let accountId = organizer.stripe_id;
+
+    // 1. ถ้ายังไม่มี Stripe Account ให้สร้างบัญชี Custom / Express Account ใหม่
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: "standard",
+        country: "TH", // หรือประเทศที่รองรับ เช่น TH, US
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        business_profile: {
+          name: organizer.name,
+        },
+      });
+
+      accountId = account.id;
+
+      // บันทึก stripe_account_id ลง Database ของ organizer
+      await updateOrganizer(organizerId, {
+        stripe_id: accountId,
+      } as Parameters<typeof updateOrganizer>[1]);
+    }
+
+    // 2. กำหนด URL สำหรับ Redirect กลับเมื่อกรอกเสร็จ หรือเมื่อกดยกเลิก
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const refreshUrl = `${frontendUrl}/profile/organizers/${organizerId}/settings`;
+    const returnUrl = `${frontendUrl}/profile/organizers/${organizerId}/settings?stripe_status=return`;
+
+    // 3. สร้าง Account Link สำหรับกระบวนการ Onboarding
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: refreshUrl,
+      return_url: returnUrl,
+      type: "account_onboarding",
+    });
+
+    // 4. ส่ง onboarding_url กลับไปให้ Frontend
+    return res.json({
+      onboarding_url: accountLink.url,
+      stripe_account_id: accountId,
+    });
+  } catch (err: any) {
+    console.error("STRIPE ONBOARD ERROR:", err);
+    return res.status(500).json({
+      message: err.message || "Error generating Stripe onboarding link",
+    });
   }
 }

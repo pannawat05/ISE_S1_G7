@@ -1,9 +1,13 @@
 import express from "express";
-import * as emailController from "../controllers/email.controller.js";
+import {
+  sendOtp,
+  verifyOtpHandler,
+} from "../controllers/email.controller.js";
 
 const router = express.Router();
 
-router.post("/sendotp", emailController.sendOtp);
-router.post("/verifyotp", emailController.verifyOtpHandler);
+router.post("/sendotp", sendOtp);
+
+router.post("/verifyotp", verifyOtpHandler);
 
 export default router;

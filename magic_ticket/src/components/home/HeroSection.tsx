@@ -12,15 +12,15 @@ export default function HeroSection({
 }: HeroSectionProps) {
   return (
     <section className="relative px-6 pt-16 pb-12 text-center">
-      <h1 className="font-bold text-white text-4xl md:text-5xl lg:text-6xl leading-tight tracking-tight">
+      <h1 className="font-bold text-slate-900 text-4xl md:text-5xl lg:text-6xl leading-tight tracking-tight">
         ค้นพบเวทมนตร์แห่ง
         <br />
-        <span className="bg-clip-text bg-gradient-to-r from-violet-400 to-purple-500 text-transparent">
+          <span className="bg-clip-text bg-gradient-to-r from-violet-600 to-purple-600 text-transparent">
           กิจกรรมและคอนเสิร์ต
         </span>
       </h1>
 
-      <p className="mx-auto mt-5 max-w-2xl text-gray-400 text-sm md:text-base leading-relaxed">
+      <p className="mx-auto mt-5 max-w-2xl text-slate-600 text-sm md:text-base leading-relaxed">
         จองตั๋วเข้าร่วมกิจกรรมและคอนเสิร์ตได้อย่างง่ายดาย
       </p>
 
