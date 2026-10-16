@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
   Menu, CalendarDays, Ticket, BadgeDollarSign, Users,
   TrendingUp, RefreshCw, Eye, Pencil, Loader2,
-  Radio, Clock, CheckCircle2, XCircle, Layers,
+  Layers,
   BarChart3,
 } from "lucide-react";
 import Cookies from "js-cookie";
@@ -205,7 +205,6 @@ function EventRow({ ev, organizerId }: { ev: DashboardEvent; organizerId: string
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboards() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { setIsOpen } = useProfileSidebar();
   const organizerId = id ?? "";
 

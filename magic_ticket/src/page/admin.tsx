@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import Swal from 'sweetalert2';
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ShieldCheck, Search, Check, X, Eye, ChevronDown,
@@ -22,6 +23,19 @@ import {
   type EventType, type PaymentMethod, type SysUser, type SysOrganizer, type PaymentCategory, type PlatformAnalytics,
 } from "@/api/sysadmin";
 import { API_BASE } from "@/api/client";
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function showError(error: unknown, fallback: string) {
+  void Swal.fire({
+    icon: 'error',
+    title: 'เกิดข้อผิดพลาด',
+    text: getErrorMessage(error, fallback),
+    confirmButtonColor: '#7c3aed',
+  });
+}
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -99,8 +113,13 @@ function EventDetailDrawer({ eventId, token, onClose }: {
 
   useEffect(() => {
     fetchAdminEventDetail(token, eventId)
-      .then(setDetail).catch(console.error).finally(() => setLoading(false));
-  }, [eventId]);
+      .then(setDetail)
+      .catch((error: unknown) => {
+        console.error(error);
+        showError(error, "ไม่สามารถโหลดรายละเอียดกิจกรรมได้ กรุณาลองใหม่อีกครั้ง");
+      })
+      .finally(() => setLoading(false));
+  }, [eventId, token]);
 
   const cover = detail ? getAdminCoverUrl(detail.cover_image) : null;
   const lat = parseFloat(detail?.latitude ?? "");
@@ -198,8 +217,8 @@ function EventDetailDrawer({ eventId, token, onClose }: {
   );
 }
 // ─── Events Dashboard (เดิม) ──────────────────────────────────────────────────
-function EventsDashboard({ token, events, isLoading, error, search, setSearch, statusFilter, setStatusFilter, counts, actionMsg, onApprove, onRejectClick, onViewClick }: {
-  token: string; events: AdminEvent[]; isLoading: boolean; error: string | null;
+function EventsDashboard({ events, isLoading, error, search, setSearch, statusFilter, setStatusFilter, counts, actionMsg, onApprove, onRejectClick, onViewClick }: {
+  events: AdminEvent[]; isLoading: boolean; error: string | null;
   search: string; setSearch: (v: string) => void;
   statusFilter: string; setStatusFilter: (v: string) => void;
   counts: { pending: number; approved: number; rejected: number };
@@ -380,7 +399,15 @@ function SystemDashboard({ token, isSysAdmin }: { token: string; isSysAdmin: boo
 function PlatformOverview({ token }: { token: string }) {
   const [data, setData] = useState<PlatformAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { fetchPlatformAnalytics(token).then(setData).catch(console.error).finally(() => setLoading(false)); }, [token]);
+  useEffect(() => {
+    fetchPlatformAnalytics(token)
+      .then(setData)
+      .catch((error: unknown) => {
+        console.error(error);
+        showError(error, "ไม่สามารถโหลดข้อมูลภาพรวมได้ กรุณาลองใหม่อีกครั้ง");
+      })
+      .finally(() => setLoading(false));
+  }, [token]);
   if (loading) return <div className="py-12 text-gray-500 text-center">กำลังโหลดข้อมูลภาพรวม...</div>;
   if (!data) return <div className="py-12 text-red-400 text-center">ไม่สามารถโหลดข้อมูลภาพรวมได้</div>;
   const cards = [
@@ -403,10 +430,16 @@ function EventTypesManager({ token }: { token: string }) {
   const [editName, setEditName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
-  function load() {
-    fetchEventTypes().then(setTypes).catch(console.error).finally(() => setLoading(false));
-  }
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => {
+    fetchEventTypes()
+      .then(setTypes)
+      .catch((error: unknown) => {
+        console.error(error);
+        showError(error, "ไม่สามารถโหลดประเภทกิจกรรมได้ กรุณาลองใหม่อีกครั้ง");
+      })
+      .finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   async function handleCreate() {
     if (!newName.trim()) return;
@@ -415,8 +448,9 @@ function EventTypesManager({ token }: { token: string }) {
       setNewName("");
       load();
       flash("✅ สร้างประเภทใหม่สำเร็จ");
-    } catch (e: unknown) {
-      flash(`❌ ${e instanceof Error ? e.message : "Error"}`);
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถสร้างประเภทกิจกรรมได้ กรุณาลองใหม่อีกครั้ง");
     }
   }
 
@@ -427,8 +461,9 @@ function EventTypesManager({ token }: { token: string }) {
       setEditId(null);
       load();
       flash("✅ อัปเดตสำเร็จ");
-    } catch (e: unknown) {
-      flash(`❌ ${e instanceof Error ? e.message : "Error"}`);
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถแก้ไขประเภทกิจกรรมได้ กรุณาลองใหม่อีกครั้ง");
     }
   }
 
@@ -438,8 +473,9 @@ function EventTypesManager({ token }: { token: string }) {
       await deleteEventType(token, id);
       load();
       flash("✅ ลบสำเร็จ");
-    } catch (e: unknown) {
-      flash(`❌ ${e instanceof Error ? e.message : "Error"}`);
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถลบประเภทกิจกรรมได้ กรุณาลองใหม่อีกครั้ง");
     }
   }
 
@@ -524,19 +560,30 @@ function PaymentMethodsManager({ token }: { token: string }) {
   const [feeLoading, setFeeLoading] = useState(true);
   const [feeSaving, setFeeSaving] = useState(false);
 
-  function load() { fetchPaymentMethods(token).then(setMethods).catch(console.error).finally(() => setLoading(false)); }
+  const load = useCallback(() => {
+    fetchPaymentMethods(token)
+      .then(setMethods)
+      .catch((error: unknown) => {
+        console.error(error);
+        showError(error, "ไม่สามารถโหลดช่องทางชำระเงินได้ กรุณาลองใหม่อีกครั้ง");
+      })
+      .finally(() => setLoading(false));
+  }, [token]);
   useEffect(() => {
     load();
     fetchPlatformFee(token)
       .then((value) => { setPlatformFee(value); setFeeInput(String(value)); })
-      .catch(console.error)
+      .catch((error: unknown) => {
+        console.error(error);
+        showError(error, "ไม่สามารถโหลดค่าธรรมเนียมแพลตฟอร์มได้ กรุณาลองใหม่อีกครั้ง");
+      })
       .finally(() => setFeeLoading(false));
-  }, []);
+  }, [load, token]);
 
   async function handleFeeSave() {
     const value = Number(feeInput);
     if (!Number.isFinite(value) || value < 0 || value > 100) {
-      flash("❌ ค่าธรรมเนียมต้องอยู่ระหว่าง 0-100%");
+      showError(new Error("ค่าธรรมเนียมต้องอยู่ระหว่าง 0-100%"), "กรุณาระบุค่าธรรมเนียมระหว่าง 0-100%");
       return;
     }
     setFeeSaving(true);
@@ -545,12 +592,15 @@ function PaymentMethodsManager({ token }: { token: string }) {
       setPlatformFee(updated);
       setFeeInput(String(updated));
       flash("✅ อัปเดต Platform Fee สำเร็จ");
-    } catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถบันทึกค่าธรรมเนียมแพลตฟอร์มได้ กรุณาลองใหม่อีกครั้ง");
+    }
     finally { setFeeSaving(false); }
   }
 
   async function handleAdd() {
-    if (!form.channel.trim()) { flash("❌ กรุณากรอกชื่อช่องทาง"); return; }
+    if (!form.channel.trim()) { showError(new Error("กรุณากรอกชื่อช่องทาง"), "กรุณากรอกชื่อช่องทาง"); return; }
     setSaving(true);
     try {
       await createPaymentMethod(token, {
@@ -562,7 +612,10 @@ function PaymentMethodsManager({ token }: { token: string }) {
       setShowForm(false);
       load();
       flash("✅ เพิ่ม Payment Method สำเร็จ");
-    } catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถเพิ่มช่องทางชำระเงินได้ กรุณาลองใหม่อีกครั้ง");
+    }
     finally { setSaving(false); }
   }
 
@@ -577,18 +630,27 @@ function PaymentMethodsManager({ token }: { token: string }) {
       setEditId(null);
       load();
       flash("✅ อัปเดตสำเร็จ");
-    } catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถแก้ไขช่องทางชำระเงินได้ กรุณาลองใหม่อีกครั้ง");
+    }
   }
 
   async function handleToggle(id: number) {
     try { await togglePaymentMethod(token, id); load(); }
-    catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+    catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถเปลี่ยนสถานะช่องทางชำระเงินได้ กรุณาลองใหม่อีกครั้ง");
+    }
   }
 
   async function handleDelete(id: number) {
     if (!confirm("ลบ Payment Method นี้?")) return;
     try { await deletePaymentMethod(token, id); load(); flash("✅ ลบสำเร็จ"); }
-    catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+    catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถลบช่องทางชำระเงินได้ กรุณาลองใหม่อีกครั้ง");
+    }
   }
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(null), 3500); }
@@ -785,16 +847,25 @@ function UsersManager({ token }: { token: string }) {
   const [search, setSearch] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
-  function load() { fetchUsers(token, { search }).then(setUsers).catch(console.error).finally(() => setLoading(false)); }
-  useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [search]);
+  const load = useCallback(() => {
+    fetchUsers(token, { search })
+      .then(setUsers)
+      .catch((error: unknown) => {
+        console.error(error);
+        showError(error, "ไม่สามารถโหลดข้อมูลผู้ใช้ได้ กรุณาลองใหม่อีกครั้ง");
+      })
+      .finally(() => setLoading(false));
+  }, [search, token]);
+  useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [load]);
 
   async function handleRoleChange(userId: number, newRole: "admin" | "customer" | "sysadmin") {
     try {
       await updateUserRole(token, userId, newRole as "admin" | "customer");
       load();
       flash(`✅ เปลี่ยน role เป็น ${newRole} แล้ว`);
-    } catch (e: unknown) {
-      flash(`❌ ${e instanceof Error ? e.message : "Error"}`);
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถเปลี่ยนสิทธิ์ผู้ใช้ได้ กรุณาลองใหม่อีกครั้ง");
     }
   }
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(null), 3000); }
@@ -845,8 +916,16 @@ function OrganizersManager({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  function load() { fetchSysOrganizers(token, search).then(setOrganizers).catch(console.error).finally(() => setLoading(false)); }
-  useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [search]);
+  const load = useCallback(() => {
+    fetchSysOrganizers(token, search)
+      .then(setOrganizers)
+      .catch((error: unknown) => {
+        console.error(error);
+        showError(error, "ไม่สามารถโหลดข้อมูล Organizer ได้ กรุณาลองใหม่อีกครั้ง");
+      })
+      .finally(() => setLoading(false));
+  }, [search, token]);
+  useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [load]);
 
   return (
     <div className="space-y-4">
@@ -898,38 +977,51 @@ export default function AdminPage() {
   const [isRejecting, setIsRejecting] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userRole] = useState<string | null>(() => {
+    try {
+      const raw = localStorage.getItem("user");
+      const user = raw ? JSON.parse(raw) as { role?: string } : null;
+      return user?.role ?? null;
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถอ่านข้อมูลผู้ใช้ได้ กรุณาเข้าสู่ระบบอีกครั้ง");
+      return null;
+    }
+  });
 
   useEffect(() => {
-    const raw = localStorage.getItem("user");
-    const user = raw ? JSON.parse(raw) : null;
-    if (!user || !["admin", "sysadmin"].includes(user.role)) {
+    if (!userRole || !["admin", "sysadmin"].includes(userRole)) {
       navigate("/", { replace: true });
-      return;
     }
-    setUserRole(user.role);
-  }, []);
+  }, [navigate, userRole]);
 
-  function loadEvents() {
+  const loadEvents = useCallback(() => {
     setIsLoading(true);
     fetchAdminEvents(token, { status: statusFilter, search })
-      .then(setEvents).catch((e: Error) => setError(e.message)).finally(() => setIsLoading(false));
-  }
+      .then(setEvents)
+      .catch((error: unknown) => {
+        console.error(error);
+        setError(getErrorMessage(error, "ไม่สามารถโหลดกิจกรรมได้ กรุณาลองใหม่อีกครั้ง"));
+        showError(error, "ไม่สามารถโหลดกิจกรรมได้ กรุณาลองใหม่อีกครั้ง");
+      })
+      .finally(() => setIsLoading(false));
+  }, [search, statusFilter, token]);
 
   useEffect(() => {
     if (activeTab === "events") {
       const t = setTimeout(loadEvents, 300);
       return () => clearTimeout(t);
     }
-  }, [search, statusFilter, activeTab]);
+  }, [activeTab, loadEvents]);
 
   async function handleApprove(ev: AdminEvent) {
     try {
       await approveEvent(token, ev.id);
       setEvents((prev) => prev.map((e) => e.id === ev.id ? { ...e, status: "approved" } : e));
       flash(`✅ Approved "${ev.name}" — email sent`);
-    } catch (e: unknown) {
-      flash(`❌ ${e instanceof Error ? e.message : "Error"}`);
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถอนุมัติกิจกรรมได้ กรุณาลองใหม่อีกครั้ง");
     }
   }
 
@@ -941,8 +1033,9 @@ export default function AdminPage() {
       setEvents((prev) => prev.map((e) => e.id === rejectTarget.id ? { ...e, status: "rejected" } : e));
       flash(`🚫 Rejected "${rejectTarget.name}" — email sent`);
       setRejectTarget(null);
-    } catch (e: unknown) {
-      flash(`❌ ${e instanceof Error ? e.message : "Error"}`);
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "ไม่สามารถปฏิเสธกิจกรรมได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsRejecting(false);
     }
@@ -1003,7 +1096,7 @@ export default function AdminPage() {
 
         {activeTab === "events" ? (
           <EventsDashboard
-            token={token} events={events} isLoading={isLoading} error={error}
+            events={events} isLoading={isLoading} error={error}
             search={search} setSearch={setSearch}
             statusFilter={statusFilter} setStatusFilter={setStatusFilter}
             counts={counts} actionMsg={actionMsg}

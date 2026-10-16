@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import { useState, useEffect, useRef } from "react";
 import {
   useLocation,
@@ -62,6 +63,8 @@ interface PaymentState {
   totalPrice: number;
 }
 
+const RESERVE_SECONDS = 5 * 60;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Stripe form
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,8 +80,6 @@ function StripeCardForm({
   const elements = useElements();
 
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
 
   async function handleSubmit(
     e: React.FormEvent
@@ -86,39 +87,54 @@ function StripeCardForm({
     e.preventDefault();
 
     if (!stripe || !elements) {
-      setErrorMessage(
-        "Stripe ยังไม่พร้อมใช้งาน กรุณารอสักครู่"
-      );
+      void Swal.fire({
+        icon: "error",
+        title: "ไม่สามารถชำระเงินได้",
+        text: "Stripe ยังไม่พร้อมใช้งาน กรุณารอสักครู่",
+      });
       return;
     }
 
     setLoading(true);
-    setErrorMessage(null);
 
-    // เก็บข้อมูลไว้ก่อน redirect
-    if (paymentContext) {
-      sessionStorage.setItem(
-        "paymentContext",
-        JSON.stringify(paymentContext)
-      );
-    }
+    try {
+      // เก็บข้อมูลไว้ก่อน redirect
+      if (paymentContext) {
+        sessionStorage.setItem(
+          "paymentContext",
+          JSON.stringify(paymentContext)
+        );
+      }
 
-    const { error } =
-      await stripe.confirmPayment({
-        elements,
+      const { error } =
+        await stripe.confirmPayment({
+          elements,
 
-        confirmParams: {
-          return_url:
-            `${window.location.origin}/payment/return`,
-        },
+          confirmParams: {
+            return_url:
+              `${window.location.origin}/payment/return`,
+          },
+        });
+
+      if (error) {
+        await Swal.fire({
+          icon: "error",
+          title: "การชำระเงินไม่สำเร็จ",
+          text:
+            error.message ??
+            "การชำระเงินไม่สำเร็จ กรุณาลองใหม่",
+        });
+      }
+    } catch (err: unknown) {
+      await Swal.fire({
+        icon: "error",
+        title: "การชำระเงินไม่สำเร็จ",
+        text:
+          err instanceof Error
+            ? err.message
+            : "การชำระเงินไม่สำเร็จ กรุณาลองใหม่",
       });
-
-    if (error) {
-      setErrorMessage(
-        error.message ??
-          "การชำระเงินไม่สำเร็จ กรุณาลองใหม่"
-      );
-
+    } finally {
       setLoading(false);
     }
   }
@@ -144,13 +160,6 @@ function StripeCardForm({
       <div className="bg-white/5 p-4 border border-white/10 rounded-xl">
         <PaymentElement />
       </div>
-
-      {/* Error */}
-      {errorMessage && (
-        <div className="bg-red-500/10 p-3 border border-red-500/20 rounded-xl text-red-400 text-sm">
-          {errorMessage}
-        </div>
-      )}
 
       {/* Submit */}
       <button
@@ -197,18 +206,29 @@ function QRTicketCard({
   seatPosition?: string | null;
 }) {
   function download() {
-    const a = document.createElement("a");
+    try {
+      const a = document.createElement("a");
 
-    a.href = ticket.qr_data_url;
+      a.href = ticket.qr_data_url;
 
-    a.download =
-      `ticket-${ticket.ticket_id}.png`;
+      a.download =
+        `ticket-${ticket.ticket_id}.png`;
 
-    document.body.appendChild(a);
+      document.body.appendChild(a);
 
-    a.click();
+      a.click();
 
-    document.body.removeChild(a);
+      document.body.removeChild(a);
+    } catch (err: unknown) {
+      void Swal.fire({
+        icon: "error",
+        title: "บันทึก QR Code ไม่สำเร็จ",
+        text:
+          err instanceof Error
+            ? err.message
+            : "กรุณาลองใหม่อีกครั้ง",
+      });
+    }
   }
 
   const position =
@@ -293,11 +313,6 @@ export default function PaymentPage() {
   ] = useState<string | null>(null);
 
   const [
-    paymentIntentId,
-    setPaymentIntentId,
-  ] = useState<string>("");
-
-  const [
     stripeAccountId,
     setStripeAccountId,
   ] = useState<string | null>(null);
@@ -318,7 +333,6 @@ export default function PaymentPage() {
   ] = useState<string | null>(null);
 
   // Reservation timer (5 min = 300 s)
-  const RESERVE_SECONDS = 5 * 60;
   const [timeLeft, setTimeLeft] = useState(RESERVE_SECONDS);
   const [ticketIds, setTicketIds] = useState<number[]>([]);
   const [cancelling, setCancelling] = useState(false);
@@ -338,6 +352,8 @@ export default function PaymentPage() {
 
       return;
     }
+
+    const paymentState = state;
 
     async function init() {
 
@@ -362,13 +378,13 @@ export default function PaymentPage() {
         const res =
           await checkout(token, {
             event_id:
-              state.eventId,
+              paymentState.eventId,
 
             zone_id:
-              state.zone.id,
+              paymentState.zone.id,
 
             seat_ids:
-              state.seats.map(
+              paymentState.seats.map(
                 (s) => s.id
               ),
           });
@@ -441,10 +457,6 @@ export default function PaymentPage() {
           res.client_secret
         );
 
-        setPaymentIntentId(
-          res.payment_intent_id ?? ""
-        );
-
         // Start reservation timer
         setTicketIds(res.ticket_ids ?? []);
         setTimeLeft(RESERVE_SECONDS);
@@ -458,6 +470,15 @@ export default function PaymentPage() {
             ? err.message
             : "ไม่สามารถเริ่มการชำระเงินได้"
         );
+
+        void Swal.fire({
+          icon: "error",
+          title: "ไม่สามารถเริ่มการชำระเงินได้",
+          text:
+            err instanceof Error
+              ? err.message
+              : "ไม่สามารถเริ่มการชำระเงินได้",
+        });
 
       } finally {
 
@@ -478,6 +499,11 @@ export default function PaymentPage() {
         if (prev <= 1) {
           clearInterval(timerRef.current!);
           setError("หมดเวลาจอง กรุณาเลือกที่นั่งใหม่");
+          void Swal.fire({
+            icon: "error",
+            title: "หมดเวลาจอง",
+            text: "กรุณาเลือกที่นั่งใหม่",
+          });
           setClientSecret(null);
           return 0;
         }
@@ -489,10 +515,26 @@ export default function PaymentPage() {
 
   async function handleCancel() {
     const token = Cookies.get("authToken");
-    if (!token) return;
+    if (!token) {
+      await Swal.fire({
+        icon: "error",
+        title: "ยกเลิกการจองไม่สำเร็จ",
+        text: "กรุณาเข้าสู่ระบบอีกครั้ง",
+      });
+      return;
+    }
     setCancelling(true);
     try {
       if (ticketIds.length > 0) await cancelReservation(token, ticketIds);
+    } catch (err: unknown) {
+      await Swal.fire({
+        icon: "error",
+        title: "ยกเลิกการจองไม่สำเร็จ",
+        text:
+          err instanceof Error
+            ? err.message
+            : "กรุณาลองใหม่อีกครั้ง",
+      });
     } finally {
       setCancelling(false);
       navigate(-1);
@@ -653,22 +695,6 @@ export default function PaymentPage() {
           </div>
         )}
 
-        {/* Error */}
-        {error && (
-          <div className="space-y-2 bg-red-500/10 p-4 border border-red-500/20 rounded-xl text-center">
-
-            <XCircle
-              size={32}
-              className="mx-auto text-red-400"
-            />
-
-            <p className="text-red-400 text-sm">
-              {error}
-            </p>
-
-          </div>
-        )}
-
         {/* Stripe */}
         {!loading &&
           !error &&
@@ -752,13 +778,6 @@ export function PaymentReturnPage() {
   );
 
   const [
-    error,
-    setError,
-  ] = useState<string | null>(
-    null
-  );
-
-  const [
     eventName,
     setEventName,
   ] = useState("");
@@ -774,34 +793,35 @@ export function PaymentReturnPage() {
 
   useEffect(() => {
 
-    const saved =
-      sessionStorage.getItem(
-        "paymentContext"
-      );
+    try {
+      const saved =
+        sessionStorage.getItem(
+          "paymentContext"
+        );
 
-    if (saved) {
-
-      try {
-
+      if (saved) {
         const ctx =
           JSON.parse(
             saved
           ) as PaymentState;
 
-        setEventName(
-          ctx.eventName
-        );
-
-        setZoneName(
-          ctx.zone.name
-        );
-
-      } catch {
-        // ignore
+        queueMicrotask(() => {
+          setEventName(ctx.eventName);
+          setZoneName(ctx.zone.name);
+        });
       }
+    } catch (err: unknown) {
+      void Swal.fire({
+        icon: "error",
+        title: "ไม่สามารถโหลดข้อมูลการจองได้",
+        text:
+          err instanceof Error
+            ? err.message
+            : "กรุณาลองใหม่อีกครั้ง",
+      });
     }
 
-    const intentId =
+    const paymentIntentId =
       searchParams.get(
         "payment_intent"
       ) ??
@@ -809,7 +829,7 @@ export function PaymentReturnPage() {
         "payment_intent_id"
       );
 
-    if (!intentId) {
+    if (!paymentIntentId) {
 
       navigate("/", {
         replace: true,
@@ -829,16 +849,18 @@ export function PaymentReturnPage() {
       redirectStatus !== "succeeded"
     ) {
 
-      setError(
-        "การชำระเงินไม่สำเร็จ"
-      );
+      void Swal.fire({
+        icon: "error",
+        title: "การชำระเงินไม่สำเร็จ",
+        text: "กรุณาลองใหม่อีกครั้ง",
+      });
 
-      setStep("failed");
+      queueMicrotask(() => setStep("failed"));
 
       return;
     }
 
-    async function confirm() {
+    async function confirm(intentId: string) {
 
       const token =
         Cookies.get("authToken");
@@ -880,18 +902,21 @@ export function PaymentReturnPage() {
         err: unknown
       ) {
 
-        setError(
-          err instanceof Error
-            ? err.message
-            : "ยืนยันการชำระเงินไม่สำเร็จ"
-        );
+        await Swal.fire({
+          icon: "error",
+          title: "ยืนยันการชำระเงินไม่สำเร็จ",
+          text:
+            err instanceof Error
+              ? err.message
+              : "ยืนยันการชำระเงินไม่สำเร็จ",
+        });
 
         setStep("failed");
 
       }
     }
 
-    confirm();
+    confirm(paymentIntentId);
 
   }, [navigate, searchParams]);
 
@@ -933,10 +958,6 @@ export function PaymentReturnPage() {
 
         <p className="font-bold text-white text-xl">
           การชำระเงินไม่สำเร็จ
-        </p>
-
-        <p className="text-red-400 text-sm text-center">
-          {error}
         </p>
 
         <button
