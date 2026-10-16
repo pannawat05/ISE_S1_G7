@@ -1,7 +1,8 @@
 {
   "dependencies": {
     "qrcode": "^1.5.4",
-    "stripe": "^22.5.0"
+    "stripe": "^22.5.0",
+    "sweetalert2": "^11.26.25"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.6"

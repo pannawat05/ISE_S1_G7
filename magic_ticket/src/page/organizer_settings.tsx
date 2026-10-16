@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Menu, ArrowLeft, ImageIcon, Trash2, Save, AlertTriangle, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Menu, ArrowLeft, ImageIcon, Trash2, Save, AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react";
 import Cookies from "js-cookie";
 import {
   fetchOrganizer,

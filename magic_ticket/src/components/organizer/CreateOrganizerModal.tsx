@@ -67,6 +67,7 @@ export default function CreateOrganizerModal({
         id: result.organizerId,
         name: result.name,
         logo_url: result.logo_url,
+        description: null,
         role: "owner",
       });
     } catch (err) {

@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Cookies from "js-cookie";
@@ -11,6 +12,21 @@ import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 import CreateOrganizerModal from "@/components/organizer/CreateOrganizerModal";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message
+    ? error.message
+    : fallback;
+}
+
+function showError(error: unknown, fallback: string) {
+  void Swal.fire({
+    icon: 'error',
+    title: 'เกิดข้อผิดพลาด',
+    text: getErrorMessage(error, fallback),
+    confirmButtonColor: '#7c3aed',
+  });
+}
+
 function getInitials(name: string) {
   const words = name.trim().split(/\s+/);
   return words.length >= 2
@@ -75,20 +91,22 @@ function EditableField({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [previousValue, setPreviousValue] = useState(value);
 
-  // Sync draft if parent value changes
-  useEffect(() => { setDraft(value); }, [value]);
+  if (value !== previousValue) {
+    setPreviousValue(value);
+    setDraft(value);
+  }
 
   async function handleSave() {
     if (draft.trim() === value) { setEditing(false); return; }
     setSaving(true);
-    setError(null);
     try {
       await onSave(draft.trim());
       setEditing(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
+    } catch (error: unknown) {
+      console.error(error);
+      showError(error, "บันทึกโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setSaving(false);
     }
@@ -96,7 +114,7 @@ function EditableField({
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") handleSave();
-    if (e.key === "Escape") { setDraft(value); setEditing(false); setError(null); }
+    if (e.key === "Escape") { setDraft(value); setEditing(false); }
   }
 
   return (
@@ -124,20 +142,19 @@ function EditableField({
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               </button>
               <button
-                onClick={() => { setDraft(value); setEditing(false); setError(null); }}
+                onClick={() => { setDraft(value); setEditing(false); }}
                 className="hover:bg-white/5 p-1.5 border border-white/10 rounded-lg text-gray-400 hover:text-white shrink-0"
                 title="ยกเลิก"
               >
                 <X size={14} />
               </button>
             </div>
-            {error && <p className="text-red-400 text-xs">{error}</p>}
           </div>
         ) : (
           <div className="flex items-center gap-2">
             <p className="font-medium text-white text-sm">{value || "—"}</p>
             <button
-              onClick={() => { setDraft(value); setEditing(true); setError(null); }}
+              onClick={() => { setDraft(value); setEditing(true); }}
               className="p-0.5 rounded text-gray-600 hover:text-gray-300 transition-colors"
               title={`แก้ไข${label}`}
             >
@@ -156,32 +173,49 @@ export default function Profiles() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [organizers, setOrganizers] = useState<UserOrganizer[]>([]);
   const [userLoading, setUserLoading] = useState(true);
-  const [orgLoading, setOrgLoading] = useState(true);
+  const [orgLoading, setOrgLoading] = useState(() => Boolean(Cookies.get("authToken")));
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const token = Cookies.get("authToken");
 
   useEffect(() => {
-    const token = Cookies.get("authToken");
-
-    // Force fresh fetch (bypass localStorage cache on mount)
-    localStorage.removeItem("user");
-    fetchUser(token)
-      .then((profile) => {
-        if (!profile) { setError("ไม่พบข้อมูลผู้ใช้"); return; }
+    async function loadProfile() {
+      try {
+        // Force fresh fetch (bypass localStorage cache on mount)
+        localStorage.removeItem("user");
+        const profile = await fetchUser(token);
+        if (!profile) {
+          const message = "ไม่พบข้อมูลผู้ใช้";
+          setError(message);
+          showError(new Error(message), message);
+          return;
+        }
         setUser(profile);
-      })
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setUserLoading(false));
-
-    if (token) {
-      fetchMyOrganizers(token)
-        .then(setOrganizers)
-        .catch((err: Error) => console.error("Failed to load organizers:", err))
-        .finally(() => setOrgLoading(false));
-    } else {
-      setOrgLoading(false);
+      } catch (error: unknown) {
+        console.error(error);
+        const message = getErrorMessage(error, "ไม่สามารถโหลดข้อมูลผู้ใช้ได้ กรุณาลองใหม่อีกครั้ง");
+        setError(message);
+        showError(error, "ไม่สามารถโหลดข้อมูลผู้ใช้ได้ กรุณาลองใหม่อีกครั้ง");
+      } finally {
+        setUserLoading(false);
+      }
     }
-  }, []);
+
+    async function loadOrganizers() {
+      if (!token) return;
+      try {
+        setOrganizers(await fetchMyOrganizers(token));
+      } catch (error: unknown) {
+        console.error(error);
+        showError(error, "ไม่สามารถโหลดข้อมูล Organizer ได้ กรุณาลองใหม่อีกครั้ง");
+      } finally {
+        setOrgLoading(false);
+      }
+    }
+
+    void loadProfile();
+    void loadOrganizers();
+  }, [token]);
 
   const isLoading = userLoading || orgLoading;
 
@@ -216,13 +250,6 @@ export default function Profiles() {
             {[1, 2].map((i) => (
               <div key={i} className="bg-white/5 rounded-2xl h-24 animate-pulse" />
             ))}
-          </div>
-        )}
-
-        {/* Error */}
-        {!isLoading && error && (
-          <div className="bg-red-500/10 mt-surface p-4 border border-red-500/30 w-full w-full text-red-400 text-sm">
-            {error}
           </div>
         )}
 
