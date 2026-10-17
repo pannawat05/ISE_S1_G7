@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Menu, ArrowLeft, ImageIcon, Trash2, Save, AlertTriangle, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Menu, ArrowLeft, ImageIcon, Trash2, Save, AlertTriangle, AlertCircle } from "lucide-react";
 import Cookies from "js-cookie";
 import {
   fetchOrganizer,
@@ -11,6 +11,7 @@ import {
   type OrganizerDetail,
 } from "@/api/organizer";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
+import Swal from "sweetalert2";
 
 // ─── Delete Confirm Dialog ─────────────────────────────────────────────────
 function DeleteConfirmDialog({
@@ -85,13 +86,11 @@ export default function OrganizerSettingsPage() {
   // Save/delete state
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Stripe Onboarding States
   const [isConnectingStripe, setIsConnectingStripe] = useState(false);
-  const [stripeError, setStripeError] = useState<string | null>(null);
 
   const MAX_DESC = 300;
 
@@ -107,7 +106,24 @@ export default function OrganizerSettingsPage() {
   // ── Fetch organizer ──────────────────────────────────────────────────────
   useEffect(() => {
     const token = Cookies.get("authToken");
-    if (!token || !id) return;
+
+    if (!token || !id || !Number.isFinite(Number(id))) {
+      const message = !token
+        ? "กรุณาเข้าสู่ระบบก่อน"
+        : "ไม่พบไอดี Organizer ที่ถูกต้อง";
+
+      setFetchError(message);
+      setIsLoading(false);
+
+      Swal.fire({
+        icon: "error",
+        title: "โหลดข้อมูลไม่สำเร็จ",
+        text: message,
+        confirmButtonText: "ตกลง",
+      });
+
+      return;
+    }
 
     fetchOrganizer(token, Number(id))
       .then((org) => {
@@ -115,7 +131,21 @@ export default function OrganizerSettingsPage() {
         setName(org.name);
         setDescription(org.description ?? "");
       })
-      .catch((err: Error) => setFetchError(err.message))
+      .catch(async (err: unknown) => {
+        const message =
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : "ไม่สามารถโหลดข้อมูล Organizer ได้";
+
+        setFetchError(message);
+
+        await Swal.fire({
+          icon: "error",
+          title: "โหลดข้อมูลไม่สำเร็จ",
+          text: message,
+          confirmButtonText: "ตกลง",
+        });
+      })
       .finally(() => setIsLoading(false));
   }, [id]);
 
@@ -167,7 +197,6 @@ export default function OrganizerSettingsPage() {
 
     setIsSaving(true);
     setSaveError(null);
-    setSaveSuccess(false);
 
     try {
       const token = Cookies.get("authToken");
@@ -184,34 +213,72 @@ export default function OrganizerSettingsPage() {
       setLogoFile(null);
       setLogoPreview(null);
       setRemoveExistingLogo(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "บันทึกข้อมูล Organizer สำเร็จ",
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+      });
+    } catch (err: unknown) {
+      await Swal.fire({
+        icon: "error",
+        title: "บันทึกไม่สำเร็จ",
+        text:
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : "เกิดข้อผิดพลาด กรุณาลองใหม่",
+        confirmButtonText: "ตกลง",
+      });
     } finally {
       setIsSaving(false);
     }
   }
 
   // ── Delete ───────────────────────────────────────────────────────────────
+
   async function handleDelete() {
     setIsDeleting(true);
+
     try {
       const token = Cookies.get("authToken");
       if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อน");
+
       await deleteOrganizer(token, Number(id));
+
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "ลบ Organizer สำเร็จ",
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+      });
+
       window.location.href = "/profile/account";
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "ลบไม่สำเร็จ กรุณาลองใหม่");
+    } catch (err: unknown) {
+      await Swal.fire({
+        icon: "error",
+        title: "ลบ Organizer ไม่สำเร็จ",
+        text:
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : "ลบไม่สำเร็จ กรุณาลองใหม่",
+        confirmButtonText: "ตกลง",
+      });
+
       setIsDeleting(false);
       setShowDeleteDialog(false);
     }
   }
 
+
   // ── Trigger Stripe Connect Onboarding Flow ──────────────────────────────
   async function handleConnectStripe() {
     setIsConnectingStripe(true);
-    setStripeError(null);
 
     try {
       const token = Cookies.get("authToken");
@@ -225,9 +292,20 @@ export default function OrganizerSettingsPage() {
       } else {
         throw new Error("เซิร์ฟเวอร์ไม่ได้ส่ง onboarding_url กลับมา");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : "เชื่อมต่อกับระบบ Stripe ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+
       console.error("Stripe Connection Setup Failed:", err);
-      setStripeError(err.message || "เชื่อมต่อกับระบบ Stripe ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+
+      await Swal.fire({
+        icon: "error",
+        title: "เชื่อมต่อ Stripe ไม่สำเร็จ",
+        text: message,
+        confirmButtonText: "ตกลง",
+      });
     } finally {
       setIsConnectingStripe(false);
     }
@@ -286,13 +364,6 @@ export default function OrganizerSettingsPage() {
                 <div className="bg-red-500/15 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
                   <AlertCircle size={16} className="shrink-0" />
                   <span>{saveError}</span>
-                </div>
-              )}
-
-              {saveSuccess && (
-                <div className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
-                  <CheckCircle2 size={16} className="shrink-0" />
-                  <span>✨ บันทึกการเปลี่ยนแปลงข้อมูลเรียบร้อยแล้ว</span>
                 </div>
               )}
 
@@ -407,13 +478,6 @@ export default function OrganizerSettingsPage() {
                   </span>
                 )}
               </div>
-
-              {stripeError && (
-                <div className="bg-red-500/15 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-xl flex items-center gap-2">
-                  <AlertCircle size={16} className="shrink-0" />
-                  <span>{stripeError}</span>
-                </div>
-              )}
 
               {!organizer.stripe_account_id ? (
                 <button

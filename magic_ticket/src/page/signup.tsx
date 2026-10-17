@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "@/api/client";
+import Swal from "sweetalert2";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -22,24 +23,52 @@ export default function SignUp() {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
-      alert("รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน!");
+      Swal.fire({
+        toast: true,
+        position: "top",
+        icon: "error",
+        title: "รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน",
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true,
+      });
       return;
     }
 
-    apiFetch("/email/sendotp", {
+    apiFetch<{ message?: string }>("/email/sendotp", {
       method: "POST",
       body: JSON.stringify({
         email: formData.email,
       }),
     })
-      .then((data) => {
+      .then(async (data) => {
+        await Swal.fire({
+          toast: true,
+          position: "top",
+          icon: "success",
+          title: data.message || "ส่ง OTP สำเร็จ",
+          text: "กรุณาตรวจสอบอีเมลของคุณ",
+          showConfirmButton: false,
+          timer: 2500,
+          timerProgressBar: true,
+        });
+
         console.log("OTP sent:", data);
         localStorage.setItem("signupData", JSON.stringify(formData));
         window.location.href = "/otp";
       })
       .catch((error) => {
         console.error("Error sending OTP:", error);
-        alert("เกิดข้อผิดพลาดในการส่ง OTP กรุณาลองใหม่");
+
+        Swal.fire({
+          toast: true,
+          position: "top",
+          icon: "error",
+          title: error.message || "เกิดข้อผิดพลาดในการส่ง OTP กรุณาลองใหม่",
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true,
+        });
       });
   };
 

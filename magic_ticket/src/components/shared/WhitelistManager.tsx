@@ -3,13 +3,14 @@
  * ผู้จัดงานเพิ่ม user เข้า whitelist เพื่อให้เข้างานได้โดยไม่ต้องซื้อบัตร
  * ไม่นับรวมกับ seat/ticket stats บน dashboard
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Search, UserPlus, X, Loader2, UserCheck, ShieldCheck } from "lucide-react";
 import Cookies from "js-cookie";
 import {
   fetchWhitelist, addToWhitelist, removeFromWhitelist, searchUsers,
   type WhitelistEntry, type UserSearchResult,
 } from "@/api/organizer";
+import Swal from "sweetalert2";
 
 // ─── Search Dropdown ──────────────────────────────────────────────────────────
 function UserSearchDropdown({
@@ -49,13 +50,35 @@ function UserSearchDropdown({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       const token = Cookies.get("authToken");
-      if (!token) return;
+
+      if (!token) {
+        setLoading(false);
+        await Swal.fire({
+          icon: "warning",
+          title: "กรุณาเข้าสู่ระบบอีกครั้ง",
+          text: "เซสชันของคุณอาจหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อดำเนินการต่อ",
+          confirmButtonText: "ตกลง",
+        });
+
+        return;
+      }
       try {
         const data = await searchUsers(token, organizerId, q.trim());
         setResults(data.filter((u) => !excludeIds.has(u.id)));
         setOpen(true);
-      } catch { setResults([]); }
-      finally { setLoading(false); }
+      } catch (e) {
+        setResults([]);
+        setOpen(false);
+
+        await Swal.fire({
+          icon: "error",
+          title: "ค้นหา User ไม่สำเร็จ",
+          text: e instanceof Error ? e.message : "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง",
+          confirmButtonText: "ตกลง",
+        });
+      } finally {
+        setLoading(false);
+      }
     }, 350);
   }, [q, organizerId, excludeIds]);
 
@@ -151,14 +174,24 @@ function UserSearchDropdown({
 // ─── Whitelist Row ────────────────────────────────────────────────────────────
 function WhitelistRow({ entry, onRemove }: {
   entry: WhitelistEntry;
-  onRemove: (id: number) => void;
+  onRemove: (id: number) => Promise<boolean>;
 }) {
   const [removing, setRemoving] = useState(false);
 
   async function handleRemove() {
     if (!confirm(`ลบ ${entry.f_name} ${entry.l_name} ออกจาก whitelist?`)) return;
+
     setRemoving(true);
-    onRemove(entry.id);
+
+    try {
+      const success = await onRemove(entry.id);
+
+      if (!success) {
+        setRemoving(false);
+      }
+    } catch {
+      setRemoving(false);
+    }
   }
 
   return (
@@ -205,47 +238,143 @@ interface WhitelistManagerProps {
 export default function WhitelistManager({ organizerId, eventId }: WhitelistManagerProps) {
   const [list, setList] = useState<WhitelistEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState<{ text: string; type: "ok" | "err" } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  function flash(text: string, type: "ok" | "err" = "ok") {
-    setMsg({ text, type });
-    setTimeout(() => setMsg(null), 3500);
+  async function showToast(
+    icon: "success" | "error",
+    title: string
+  ) {
+    await Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon,
+      title,
+      showConfirmButton: false,
+      timer: 3500,
+      timerProgressBar: true,
+    });
   }
+
 
   const load = useCallback(async () => {
     const token = Cookies.get("authToken");
-    if (!token) return;
+
+    if (!token) {
+      setLoading(false);
+      setLoadError("กรุณาเข้าสู่ระบบอีกครั้ง");
+
+      await Swal.fire({
+        icon: "warning",
+        title: "กรุณาเข้าสู่ระบบอีกครั้ง",
+        text: "เซสชันของคุณอาจหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อดำเนินการต่อ",
+        confirmButtonText: "ตกลง",
+      });
+
+      return;
+    }
+
     setLoading(true);
+    setLoadError(null);
+
     try {
       const data = await fetchWhitelist(token, organizerId, eventId);
       setList(data);
-    } catch (e) { flash(e instanceof Error ? e.message : "โหลดไม่สำเร็จ", "err"); }
-    finally { setLoading(false); }
+    } catch (e) {
+      const message = e instanceof Error
+        ? e.message
+        : "โหลด Whitelist ไม่สำเร็จ";
+
+      setLoadError(message);
+
+      await Swal.fire({
+        icon: "error",
+        title: "โหลด Whitelist ไม่สำเร็จ",
+        text: message,
+        confirmButtonText: "ตกลง",
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [organizerId, eventId]);
 
   useEffect(() => { load(); }, [load]);
 
   async function handleAdd(user: UserSearchResult & { _note?: string }) {
+
     const token = Cookies.get("authToken");
-    if (!token) return;
+
+    if (!token) {
+      await Swal.fire({
+        icon: "warning",
+        title: "กรุณาเข้าสู่ระบบอีกครั้ง",
+        text: "เซสชันของคุณอาจหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อดำเนินการต่อ",
+        confirmButtonText: "ตกลง",
+      });
+
+      return;
+    }
+
     try {
-      const updated = await addToWhitelist(token, organizerId, eventId, user.id, user._note);
+      const updated = await addToWhitelist(
+        token,
+        organizerId,
+        eventId,
+        user.id,
+        user._note
+      );
+
       setList(updated);
-      flash(`✅ เพิ่ม ${user.f_name} ${user.l_name} เข้า whitelist แล้ว`);
-    } catch (e) { flash(e instanceof Error ? e.message : "เพิ่มไม่สำเร็จ", "err"); }
+      await showToast(
+        "success",
+        `เพิ่ม ${user.f_name} ${user.l_name} เข้า whitelist แล้ว`
+      );
+    } catch (e) {
+      await showToast(
+        "error",
+        e instanceof Error ? e.message : "เพิ่ม User ไม่สำเร็จ"
+      );
+    }
   }
 
-  async function handleRemove(wlId: number) {
+  async function handleRemove(wlId: number): Promise<boolean> {
     const token = Cookies.get("authToken");
-    if (!token) return;
+
+    if (!token) {
+      await Swal.fire({
+        icon: "warning",
+        title: "กรุณาเข้าสู่ระบบอีกครั้ง",
+        text: "เซสชันของคุณอาจหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อดำเนินการต่อ",
+        confirmButtonText: "ตกลง",
+      });
+
+      return false;
+    }
+
     try {
-      const updated = await removeFromWhitelist(token, organizerId, eventId, wlId);
+      const updated = await removeFromWhitelist(
+        token,
+        organizerId,
+        eventId,
+        wlId
+      );
+
       setList(updated);
-      flash("✅ ลบออกแล้ว");
-    } catch (e) { flash(e instanceof Error ? e.message : "ลบไม่สำเร็จ", "err"); }
+      await showToast("success", "ลบออกจาก Whitelist สำเร็จ");
+      return true;
+    } catch (e) {
+      await showToast(
+        "error",
+        e instanceof Error ? e.message : "ลบ User ไม่สำเร็จ"
+      );
+
+      return false;
+    }
   }
 
-  const excludeIds = new Set(list.map((e) => e.users_id));
+  const excludeIds = useMemo(
+    () => new Set(list.map((e) => e.users_id)),
+    [list]
+  );
 
   return (
     <section className="space-y-4">
@@ -276,13 +405,6 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
         </p>
       </div>
 
-      {/* Flash message */}
-      {msg && (
-        <p className={`text-sm ${msg.type === "ok" ? "text-green-400" : "text-red-400"}`}>
-          {msg.text}
-        </p>
-      )}
-
       {/* Search + Add */}
       <UserSearchDropdown
         organizerId={organizerId}
@@ -290,10 +412,24 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
         excludeIds={excludeIds}
       />
 
+
       {/* List */}
       {loading ? (
         <div className="space-y-2 animate-pulse">
-          {[1, 2].map((i) => <div key={i} className="bg-white/5 rounded-xl h-14" />)}
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white/5 rounded-xl h-14" />
+          ))}
+        </div>
+      ) : loadError ? (
+        <div className="space-y-3 py-6 text-center">
+          <p className="text-red-400 text-sm">{loadError}</p>
+          <button
+            type="button"
+            onClick={load}
+            className="bg-white/10 hover:bg-white/15 px-4 py-2 rounded-lg text-white text-sm"
+          >
+            ลองโหลดอีกครั้ง
+          </button>
         </div>
       ) : list.length === 0 ? (
         <div className="space-y-1 py-8 text-center">
@@ -304,7 +440,11 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
       ) : (
         <div className="space-y-2">
           {list.map((entry) => (
-            <WhitelistRow key={entry.id} entry={entry} onRemove={handleRemove} />
+            <WhitelistRow
+              key={entry.id}
+              entry={entry}
+              onRemove={handleRemove}
+            />
           ))}
         </div>
       )}

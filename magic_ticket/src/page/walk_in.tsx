@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { API_BASE } from "@/api/client";
 import Cookies from "js-cookie";
-
+import Swal from "sweetalert2";
 
 export default function WalkIn() {
   const { id: organizerId } = useParams();
@@ -45,10 +45,26 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     console.log("Walk-in user created:", data);
 
-    alert(`User ID: ${data.userId}`);
+    await Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      title: `User ID: ${data.userId}`,
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true,
+    });
   } catch (error) {
     console.error("Walk-in error:", error);
-    alert(error instanceof Error ? error.message : "Something went wrong");
+    await Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "error",
+      title: error instanceof Error && error.message.trim() ? error.message : "Something went wrong",
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true,
+    });
   }
 };
 

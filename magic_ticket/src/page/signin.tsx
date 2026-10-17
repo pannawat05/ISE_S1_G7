@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "@/api/client";
 import { fetchUser } from "@/api/user";
 import Cookies from "js-cookie";
+import Swal from "sweetalert2";
 
 function Signin() {
   const [formData, setFormData] = useState({
@@ -19,30 +20,56 @@ function Signin() {
 
   const goto = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    apiFetch<{ message: string; token?: string; role?: string }>("/auth/login", {
+
+const handleSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+
+  apiFetch<{ message: string; token?: string; role?: string }>(
+    "/auth/login",
+    {
       method: "POST",
       body: JSON.stringify(formData),
+    },
+  )
+    .then(async (data) => {
+      if (data.token) {
+        Cookies.set("authToken", data.token, { path: "/" });
+
+        localStorage.removeItem("user");
+        await fetchUser(data.token);
+
+        window.dispatchEvent(new Event("user-updated"));
+        goto("/");
+      } else {
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "error",
+          title: data.message || "เข้าสู่ระบบไม่สำเร็จ",
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true,
+        });
+      }
     })
-      .then(async (data) => {
-        if (data.token) {
-          Cookies.set("authToken", data.token, { path: "/" });
-          // Pre-fetch user so Navbar can read it immediately
-          localStorage.removeItem("user");
-          await fetchUser(data.token);
-          // Notify Navbar to re-read localStorage
-          window.dispatchEvent(new Event("user-updated"));
-          goto("/");
-        } else {
-          alert(data.message);
-        }
-      })
-      .catch((error) => {
-        console.error("Error:", error);
-        alert("เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
-      });
-  };
+  .catch((error: unknown) => {
+    console.error("Error:", error);
+
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "error",
+      title:
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "เกิดข้อผิดพลาดในการเข้าสู่ระบบ",
+      showConfirmButton: false,
+      timer: 3500,
+      timerProgressBar: true,
+    });
+  });
+};
+
 
   return (
     <div className="mt-auth-page">

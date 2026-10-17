@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "@/api/client";
+import Swal from "sweetalert2";
 
 export default function ForgotPassword() {
   const [step, setStep] = useState<"email" | "reset">("email");
@@ -20,9 +21,28 @@ export default function ForgotPassword() {
         method: "POST",
         body: JSON.stringify({ email, purpose: "password-reset" }),
       });
+
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "ส่ง OTP สำเร็จ",
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+      });
+
       setStep("reset");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "ส่ง OTP ไม่สำเร็จ กรุณาลองใหม่");
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "error",
+        title:  error instanceof Error && error.message.trim() ? error.message : "ส่ง OTP ไม่สำเร็จ กรุณาลองใหม่",
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -32,7 +52,15 @@ export default function ForgotPassword() {
     event.preventDefault();
 
     if (password !== confirmPassword) {
-      alert("รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน");
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "error",
+        title: "รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน",
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true,
+      });
       return;
     }
 
@@ -42,10 +70,29 @@ export default function ForgotPassword() {
         method: "POST",
         body: JSON.stringify({ email, otp, password }),
       });
-      alert("เปลี่ยนรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบ");
+
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "เปลี่ยนรหัสผ่านสำเร็จ",
+        text: "กำลังกลับไปหน้าเข้าสู่ระบบ",
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+      });
+
       navigate("/signin");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาลองใหม่");
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "error",
+        title: error instanceof Error && error.message.trim() ? error.message : "เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาลองใหม่",
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true,
+      });
     } finally {
       setIsSubmitting(false);
     }

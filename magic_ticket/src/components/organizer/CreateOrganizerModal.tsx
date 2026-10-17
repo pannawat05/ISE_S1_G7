@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, ImageIcon, Trash2 } from "lucide-react";
 import Cookies from "js-cookie";
 import { createOrganizer, type UserOrganizer } from "../../api/organizer";
+import Swal from "sweetalert2";
 
 interface CreateOrganizerModalProps {
   onClose: () => void;
@@ -20,30 +21,64 @@ export default function CreateOrganizerModal({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!logoFile) {
+      setLogoPreview(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(logoFile);
+    setLogoPreview(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [logoFile]);
+
   const MAX_DESC = 200;
 
   function handleFileSelect(file: File) {
     if (!file.type.startsWith("image/")) {
       setError("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
+      resetFileInput();
       return;
     }
+
     if (file.size > 2 * 1024 * 1024) {
       setError("ขนาดไฟล์ต้องไม่เกิน 2MB");
+      resetFileInput();
       return;
     }
+
     setError(null);
     setLogoFile(file);
   }
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  function resetFileInput() {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setIsDragging(false);
+
     const file = e.dataTransfer.files[0];
     if (file) handleFileSelect(file);
-  }, []);
+  }
+
+  function handleRemoveLogo() {
+    setLogoFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
     if (!name.trim()) {
       setError("กรุณากรอกชื่อ Organizer");
       return;
@@ -63,25 +98,46 @@ export default function CreateOrganizerModal({
 
       const result = await createOrganizer(token, formData);
 
+      await Swal.fire({
+        icon: "success",
+        title: "สร้าง Organizer สำเร็จ",
+        text: result.message || "สร้าง Organizer เรียบร้อยแล้ว",
+        confirmButtonText: "ตกลง",
+      });
+
       onCreated({
         id: result.organizerId,
         name: result.name,
+        description: description.trim(),
         logo_url: result.logo_url,
         role: "owner",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      const message =
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+
+      await Swal.fire({
+        icon: "error",
+        title: "สร้าง Organizer ไม่สำเร็จ",
+        text: message,
+        confirmButtonText: "ตกลง",
+      });
     } finally {
       setIsSubmitting(false);
     }
   }
+
 
   return (
     /* Backdrop */
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (!isSubmitting && e.target === e.currentTarget) {
+          onClose();
+        }
       }}
     >
       {/* Modal panel */}
@@ -92,8 +148,10 @@ export default function CreateOrganizerModal({
             สร้าง <span className="font-bold">Organizer</span> ใหม่
           </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+            disabled={isSubmitting}
+            className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
             aria-label="ปิด"
           >
             <X size={20} />
@@ -148,7 +206,7 @@ export default function CreateOrganizerModal({
               <div className="flex items-center justify-between rounded-lg border border-white/10 bg-[#0d0d1a] px-4 py-3">
                 <div className="flex items-center space-x-3 min-w-0">
                   <img
-                    src={URL.createObjectURL(logoFile)}
+                    src={logoPreview ?? ""}
                     alt="logo preview"
                     className="h-8 w-8 rounded object-cover shrink-0"
                   />
@@ -158,7 +216,7 @@ export default function CreateOrganizerModal({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setLogoFile(null)}
+                  onClick={handleRemoveLogo}
                   className="ml-2 shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-red-400"
                   aria-label="ลบไฟล์"
                 >
@@ -185,7 +243,7 @@ export default function CreateOrganizerModal({
                 <p className="text-center text-sm text-gray-400">
                   ลากไฟล์มาวาง หรือคลิกเพื่อเลือกรูป
                 </p>
-                <p className="text-xs text-gray-500">PNG/JPG ไม่เกิน 2MB</p>
+                <p className="text-xs text-gray-500">PNG/JPG/WebP ไม่เกิน 2MB</p>
               </div>
             )}
 

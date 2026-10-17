@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Menu, ArrowLeft, Save, X, ChevronDown, Plus,
+  Menu, ArrowLeft, Save, ChevronDown, Plus,
 } from "lucide-react";
 import Cookies from "js-cookie";
 import { fetchSingleEvent, updateOrganizerEvent, type OrganizerEvent, type EventImage } from "@/api/organizer";
@@ -10,6 +10,7 @@ import { API_BASE } from "@/api/client";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 import { LeafletMapPicker, ZoneEditor, WhitelistManager } from "@/components/shared";
 import { ImageIcon, Trash2 } from "lucide-react";
+import Swal from "sweetalert2";
 
 interface ExistingImage { id: number; url: string; display_order: number }
 
@@ -219,8 +220,6 @@ export default function EventEditPage() {
   const [removedImageIds, setRemovedImageIds] = useState<number[]>([]);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
   function toDatetimeLocal(raw: string) {
     const d = new Date(raw);
@@ -230,13 +229,45 @@ export default function EventEditPage() {
   }
 
   useEffect(() => {
-    // Fetch event types from API
-    fetchEventTypes().then(setEventTypes).catch(console.error);
+    fetchEventTypes()
+      .then(setEventTypes)
+      .catch((err: unknown) => {
+        console.error(err);
+
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "error",
+          title:
+            err instanceof Error && err.message.trim()
+              ? err.message
+              : "ไม่สามารถโหลดประเภท Event ได้",
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true,
+        });
+      });
   }, []);
 
   useEffect(() => {
     const token = Cookies.get("authToken");
-    if (!token || !orgId || !eventId) { setIsLoading(false); return; }
+    if (!token || !orgId || !eventId) {
+      const message = !token
+        ? "กรุณาเข้าสู่ระบบก่อน"
+        : "ไม่พบข้อมูล Organizer หรือ Event";
+
+      setFetchErr(message);
+      setIsLoading(false);
+
+      Swal.fire({
+        icon: "error",
+        title: "โหลด Event ไม่สำเร็จ",
+        text: message,
+        confirmButtonText: "ตกลง",
+      });
+
+      return;
+    }
     fetchSingleEvent(token, Number(orgId), Number(eventId))
       .then((ev) => {
         setEvent(ev);
@@ -260,7 +291,21 @@ export default function EventEditPage() {
           }))
         );
       })
-      .catch((err: Error) => setFetchErr(err.message))
+     .catch((err: unknown) => {
+        const message =
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : "ไม่สามารถโหลดข้อมูล Event ได้";
+
+        setFetchErr(message);
+
+        Swal.fire({
+          icon: "error",
+          title: "โหลด Event ไม่สำเร็จ",
+          text: message,
+          confirmButtonText: "ตกลง",
+        });
+      })
       .finally(() => setIsLoading(false));
   }, [orgId, eventId]);
 
@@ -274,12 +319,26 @@ export default function EventEditPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !placeName.trim() || !startDate || !endDate) {
-      setSaveError("กรุณากรอกข้อมูลที่จำเป็นให้ครบ"); return;
+      await Swal.fire({
+        icon: "warning",
+        title: "ข้อมูลไม่ครบ",
+        text: "กรุณากรอกข้อมูลที่จำเป็นให้ครบ",
+        confirmButtonText: "ตกลง",
+      });
+      return;
     }
     if (new Date(endDate) <= new Date(startDate)) {
-      setSaveError("วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น"); return;
+      await Swal.fire({
+        icon: "warning",
+        title: "วันที่ไม่ถูกต้อง",
+        text: "วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น",
+        confirmButtonText: "ตกลง",
+      });
+      return;
     }
-    setIsSaving(true); setSaveError(null); setSaveSuccess(false);
+
+    setIsSaving(true);
+
     try {
       const token = Cookies.get("authToken");
       if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อน");
@@ -303,7 +362,7 @@ export default function EventEditPage() {
         .forEach((img, idx) => fd.append(`reorder_images[${img.id}]`, String(idx + 1)));
       newImageFiles.forEach((f) => fd.append("event_images", f));
 
-      await updateOrganizerEvent(token, Number(orgId), Number(eventId), fd);
+      await updateOrganizerEvent(token,Number(orgId),Number(eventId),fd);
 
       // Re-fetch updated event to sync all state
       const updated = await fetchSingleEvent(token, Number(orgId), Number(eventId));
@@ -330,11 +389,30 @@ export default function EventEditPage() {
       setNewImageFiles([]);
       setCoverFile(null);
       setRemoveCover(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally { setIsSaving(false); }
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+      });
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+
+      await Swal.fire({
+        icon: "error",
+        title: "บันทึกไม่สำเร็จ",
+        text: message,
+        confirmButtonText: "ตกลง",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const existingCover = event?.cover_image && !removeCover ? event.cover_image : null;
@@ -368,18 +446,6 @@ export default function EventEditPage() {
 
         {!isLoading && !fetchErr && event && (
           <form onSubmit={handleSave} className="space-y-5 w-full">
-            {saveSuccess && (
-              <div className="flex justify-between items-center bg-green-500/10 px-4 py-3 border border-green-500/30 rounded-lg text-green-400 text-sm">
-                <span>บันทึกสำเร็จ</span>
-                <button type="button" onClick={() => setSaveSuccess(false)}><X size={16} /></button>
-              </div>
-            )}
-            {saveError && (
-              <div className="flex justify-between items-center bg-red-500/10 px-4 py-3 border border-red-500/30 rounded-lg text-red-400 text-sm">
-                <span>{saveError}</span>
-                <button type="button" onClick={() => setSaveError(null)}><X size={16} /></button>
-              </div>
-            )}
 
             {/* ข้อมูลงาน */}
             <div className="space-y-4 mt-surface p-5">

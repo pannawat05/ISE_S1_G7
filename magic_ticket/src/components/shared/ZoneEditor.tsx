@@ -21,6 +21,7 @@ import {
   fetchZones, createZone, updateZone, deleteZone,
   type Zone, type ZoneImage,
 } from "@/api/organizer";
+import Swal from "sweetalert2";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,24 @@ function ZoneImagePicker({ files, onChange }: {
   files: File[]; onChange: (f: File[]) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+
+  const [previews, setPreviews] = useState<
+    { file: File; url: string }[]
+  >([]);
+
+  useEffect(() => {
+    const items = files.map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+    }));
+
+    setPreviews(items);
+
+    return () => {
+      items.forEach(({ url }) => URL.revokeObjectURL(url));
+    };
+  }, [files]);
+
   function addFiles(list: FileList | null) {
     if (!list) return;
     const valid = Array.from(list).filter((f) => f.type.startsWith("image/") && f.size <= 10_000_000);
@@ -74,11 +93,21 @@ function ZoneImagePicker({ files, onChange }: {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-        {files.map((f, i) => (
-          <div key={i} className="group relative border border-white/10 rounded-lg w-20 h-14 overflow-hidden">
-            <img src={URL.createObjectURL(f)} alt={f.name} className="w-full h-full object-cover select-none" />
-            <button type="button" onClick={() => onChange(files.filter((_, j) => j !== i))}
-              className="absolute inset-0 flex justify-center items-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+        {previews.map(({ file, url }, i) => (
+          <div
+            key={`${file.name}-${file.lastModified}-${i}`}
+            className="group relative border border-white/10 rounded-lg w-20 h-14 overflow-hidden"
+          >
+            <img
+              src={url}
+              alt={file.name}
+              className="w-full h-full object-cover select-none"
+            />
+            <button
+              type="button"
+              onClick={() => onChange(files.filter((_, j) => j !== i))}
+              className="absolute inset-0 flex justify-center items-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
               <X size={14} className="text-white" />
             </button>
           </div>
@@ -115,12 +144,39 @@ function ExistingZoneImages({ images, zoneId, organizerId, eventId, onDeleted }:
               type="button"
               onClick={async () => {
                 const token = Cookies.get("authToken");
-                if (!token) return;
-                // Send remove_image_ids[] via updateZone
-                const fd = new FormData();
-                fd.append("remove_image_ids[]", String(img.id));
-                await updateZone(token, organizerId, eventId, zoneId, fd);
-                onDeleted(img.id);
+
+                if (!token) {
+                  await Swal.fire({
+                    icon: "warning",
+                    title: "กรุณาเข้าสู่ระบบอีกครั้ง",
+                    text: "เซสชันของคุณอาจหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อดำเนินการต่อ",
+                    confirmButtonText: "ตกลง",
+                  });
+
+                  return;
+                }
+
+                try {
+                  const fd = new FormData();
+                  fd.append("remove_image_ids[]", String(img.id));
+
+                  await updateZone(token, organizerId, eventId, zoneId, fd);
+                  onDeleted(img.id);
+
+                  await Swal.fire({
+                    icon: "success",
+                    title: "ลบรูปภาพสำเร็จ",
+                    text: "ลบรูปภาพเรียบร้อยแล้ว",
+                    confirmButtonText: "ตกลง",
+                  });
+                } catch (e) {
+                  await Swal.fire({
+                    icon: "error",
+                    title: "ลบรูปภาพไม่สำเร็จ",
+                    text: e instanceof Error ? e.message : "กรุณาลองอีกครั้ง",
+                    confirmButtonText: "ตกลง",
+                  });
+                }
               }}
               className="absolute inset-0 flex justify-center items-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
             >
@@ -281,14 +337,61 @@ function ZoneLiveList({ organizerId, eventId }: {
   const [newDraft, setNewDraft] = useState<ZoneDraft | null>(null);
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("authToken");
-    if (!token) return;
-    fetchZones(token, organizerId, eventId)
-      .then(setZones)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    async function loadZones() {
+      const token = Cookies.get("authToken");
+
+      if (!token) {
+        const message = "ไม่พบ Token กรุณาเข้าสู่ระบบใหม่";
+        setLoadError(message);
+        setLoading(false);
+
+        void Swal.fire({
+          icon: "warning",
+          title: "กรุณาเข้าสู่ระบบอีกครั้ง",
+          text: message,
+          confirmButtonText: "ตกลง",
+        });
+
+        return;
+      }
+
+      try {
+        const result = await fetchZones(token, organizerId, eventId);
+
+        if (!cancelled) {
+          setZones(result);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          const message =
+            e instanceof Error ? e.message : "ไม่สามารถโหลดข้อมูลโซนได้";
+
+          setLoadError(message);
+
+          void Swal.fire({
+            icon: "error",
+            title: "โหลดโซนไม่สำเร็จ",
+            text: message,
+            confirmButtonText: "ตกลง",
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadZones();
+
+    return () => {
+      cancelled = true;
+    };
   }, [organizerId, eventId]);
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(null), 3000); }
@@ -298,7 +401,17 @@ function ZoneLiveList({ organizerId, eventId }: {
     setAdding(true);
     try {
       const token = Cookies.get("authToken");
-      if (!token) return;
+
+      if (!token) {
+        await Swal.fire({
+          icon: "warning",
+          title: "กรุณาเข้าสู่ระบบอีกครั้ง",
+          text: "เซสชันของคุณอาจหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อดำเนินการต่อ",
+          confirmButtonText: "ตกลง",
+        });
+
+        return;
+      }
       const fd = new FormData();
       fd.append("name", newDraft.name.trim());
       fd.append("category", newDraft.category);
@@ -307,10 +420,27 @@ function ZoneLiveList({ organizerId, eventId }: {
       fd.append("seat_count", String(newDraft.seat_count));
       newDraft.imageFiles.forEach((f) => fd.append("zone_images", f));
       const result = await createZone(token, organizerId, eventId, fd);
+
       setZones(result.zones);
       setNewDraft(null);
-      flash("✅ เพิ่มโซนสำเร็จ");
-    } catch (e) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+
+      await Swal.fire({
+        icon: "success",
+        title: "เพิ่มโซนสำเร็จ",
+        text: "เพิ่มโซนเรียบร้อยแล้ว",
+        confirmButtonText: "ตกลง",
+      });
+    } catch (e) {
+        await Swal.fire({
+          icon: "error",
+          title: "เพิ่มโซนไม่สำเร็จ",
+          text:
+            e instanceof Error && e.message.trim()
+              ? e.message
+              : "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง",
+          confirmButtonText: "ตกลง",
+        });
+      }
     finally { setAdding(false); }
   }
 
@@ -319,7 +449,17 @@ function ZoneLiveList({ organizerId, eventId }: {
     setSaving(true);
     try {
       const token = Cookies.get("authToken");
-      if (!token) return;
+
+      if (!token) {
+        await Swal.fire({
+          icon: "warning",
+          title: "กรุณาเข้าสู่ระบบอีกครั้ง",
+          text: "เซสชันของคุณอาจหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อดำเนินการต่อ",
+          confirmButtonText: "ตกลง",
+        });
+
+        return;
+      }
       const fd = new FormData();
       fd.append("name", editData.name.trim());
       fd.append("category", editData.category);
@@ -331,8 +471,23 @@ function ZoneLiveList({ organizerId, eventId }: {
       setZones(result.zones);
       setEditId(null);
       setEditImages([]);
-      flash("✅ อัปเดตสำเร็จ");
-    } catch (e) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+      await Swal.fire({
+        icon: "success",
+        title: "อัปเดตโซนสำเร็จ",
+        text: "อัปเดตโซนเรียบร้อยแล้ว",
+        confirmButtonText: "ตกลง",
+      });
+    } catch (e) {
+        await Swal.fire({
+          icon: "error",
+          title: "อัปเดตโซนไม่สำเร็จ",
+          text:
+            e instanceof Error && e.message.trim()
+              ? e.message
+              : "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง",
+          confirmButtonText: "ตกลง",
+        });
+      }
     finally { setSaving(false); }
   }
 
@@ -340,18 +495,54 @@ function ZoneLiveList({ organizerId, eventId }: {
     if (!confirm(`ลบโซน "${zoneName}"? ข้อมูลที่นั่งในโซนนี้จะถูกลบทั้งหมด`)) return;
     try {
       const token = Cookies.get("authToken");
-      if (!token) return;
+
+      if (!token) {
+        await Swal.fire({
+          icon: "warning",
+          title: "กรุณาเข้าสู่ระบบอีกครั้ง",
+          text: "เซสชันของคุณอาจหมดอายุ กรุณาเข้าสู่ระบบใหม่เพื่อดำเนินการต่อ",
+          confirmButtonText: "ตกลง",
+        });
+
+        return;
+      }
       const result = await deleteZone(token, organizerId, eventId, zoneId);
       setZones(result.zones);
-      flash("✅ ลบโซนสำเร็จ");
-    } catch (e) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+      await Swal.fire({
+        icon: "success",
+        title: "ลบโซนสำเร็จ",
+        text: "ลบโซนเรียบร้อยแล้ว",
+        confirmButtonText: "ตกลง",
+      });
+    } catch (e) {
+        await Swal.fire({
+          icon: "error",
+          title: "ลบโซนไม่สำเร็จ",
+          text:
+            e instanceof Error && e.message.trim()
+              ? e.message
+              : "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง",
+          confirmButtonText: "ตกลง",
+        });
+      }
   }
 
-  if (loading) return (
-    <div className="space-y-2 animate-pulse">
-      {[1, 2].map((i) => <div key={i} className="bg-white/5 rounded-xl h-16" />)}
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="space-y-2 animate-pulse">
+        {[1, 2].map((i) => (
+          <div key={i} className="bg-white/5 rounded-xl h-16" />
+        ))}
+      </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <p role="alert" className="text-sm text-red-400">
+        {loadError}
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-3">

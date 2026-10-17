@@ -6,6 +6,7 @@ import { createOrganizerEvent, createZone } from "@/api/organizer";
 import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 import { LeafletMapPicker, ImageUploadZone, ZoneEditor, type ZoneDraft } from "@/components/shared";
+import Swal from "sweetalert2";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CreateEventForm {
@@ -51,7 +52,22 @@ export default function CreateEventPage() {
         setEventTypes(types);
         if (types.length > 0) setForm((prev) => ({ ...prev, type_id: types[0].id }));
       })
-      .catch(console.error)
+      .catch((error: unknown) => {
+        console.error(error);
+
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "error",
+          title:
+            error instanceof Error && error.message.trim()
+              ? error.message
+              : "ไม่สามารถโหลดประเภท Event ได้",
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true,
+        });
+      })
       .finally(() => setTypesLoading(false));
   }, []);
 
@@ -90,7 +106,7 @@ export default function CreateEventPage() {
       if (coverFiles[0])           fd.append("cover_image", coverFiles[0]);
       extraFiles.forEach((f) =>    fd.append("event_images", f));
 
-      const { eventId } = await createOrganizerEvent(token, organizerId, fd);
+      const { eventId, message: eventMessage } = await createOrganizerEvent(token, organizerId, fd);
 
       // Step 2: Create zone drafts (if any)
       const validDrafts = zoneDrafts.filter((d) => d.name.trim());
@@ -110,9 +126,32 @@ export default function CreateEventPage() {
         }
       }
 
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: eventMessage || "สร้าง Event สำเร็จ",
+        showConfirmButton: false,
+        timer: 1800,
+        timerProgressBar: true,
+      });
+
       navigate(`/profile/events/${organizerId}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่");
+
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+
+      setError(null);
+
+      await Swal.fire({
+        icon: "error",
+        title: "สร้าง Event ไม่สำเร็จ",
+        text: message,
+        confirmButtonText: "ตกลง",
+      });
     } finally {
       setIsSubmitting(false);
       setSubmitStep(null);

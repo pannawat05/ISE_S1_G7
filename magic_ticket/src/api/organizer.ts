@@ -63,15 +63,23 @@ export async function fetchOrganizer(token: string, id: number): Promise<Organiz
 export async function createOrganizer(
   token: string,
   formData: FormData,
-): Promise<{ organizerId: number; name: string; logo_url: string | null }> {
-  const result = await apiFetch<{ organizerId: number; name: string; logo_url: string | null }>(
-    "/organizer/create",
-    {
-      method: "POST",
-      token,
-      body: formData,
-    },
-  );
+): Promise<{
+  organizerId: number;
+  name: string;
+  logo_url: string | null;
+  message?: string;
+}> {
+  const result = await apiFetch<{
+    organizerId: number;
+    name: string;
+    logo_url: string | null;
+    message?: string;
+  }>("/organizer/create", {
+    method: "POST",
+    token,
+    body: formData,
+  });
+
   return {
     ...result,
     logo_url: getLogoUrl(result.logo_url),
@@ -148,7 +156,7 @@ export async function createOrganizerEvent(
     description?: string; theme?: string; type: string;
     start_date: string; end_date: string; is_active?: boolean;
   },
-): Promise<{ eventId: number }> {
+): Promise<{ eventId: number; message?: string }> {
   const isFormData = body instanceof FormData;
   return apiFetch(`/organizer/${organizerId}/events`, {
     method: "POST", token,

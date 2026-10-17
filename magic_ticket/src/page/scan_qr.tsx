@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import Cookies from "js-cookie";
 import { fetchMyStaffAssignments, scanTicket, type StaffAssignment, type ScanResult } from "@/api/user";
+import Swal from "sweetalert2";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const EVENT_ROLE_LABEL: Record<string, string> = {
@@ -68,9 +69,24 @@ export default function ScanQRPage() {
     const token = Cookies.get("authToken");
     if (!token) { setLoading(false); return; }
     fetchMyStaffAssignments(token)
-      .then(setAssignments)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    .then(setAssignments)
+    .catch((error: unknown) => {
+      console.error(error);
+
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "error",
+        title:
+          error instanceof Error && error.message.trim()
+            ? error.message
+            : "ไม่สามารถโหลดข้อมูลงานได้",
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true,
+      });
+    })
+    .finally(() => setLoading(false));
   }, []);
 
   // Cleanup camera on unmount
@@ -113,7 +129,16 @@ export default function ScanQRPage() {
       }
     } catch {
       setCameraMode(false);
-      alert("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้อง");
+
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "error",
+        title: "ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้อง",
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true,
+      });
     }
   }
 

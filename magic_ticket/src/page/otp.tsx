@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "@/api/client";
+import Swal from "sweetalert2";
 
 function Otp() {
   const [otpValues, setOtpValues] = useState<string[]>(new Array(6).fill(""));
@@ -26,8 +27,21 @@ function Otp() {
 
   useEffect(() => {
     if (timeLeft === 0) {
-      alert("OTP has expired. Please request a new one.");
-      window.location.href = "/signup";
+      const redirect = async () => {
+        await Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "error",
+          title: "OTP หมดอายุ กรุณาขอรหัสใหม่",
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true,
+        });
+
+        window.location.href = "/signup";
+      };
+
+      redirect();
     }
   }, [timeLeft]);
 
@@ -73,15 +87,33 @@ function Otp() {
 
       const otpCode = otpValues.join("");
       if (otpCode.length < 6) {
-        alert("กรุณากรอกรหัส OTP ให้ครบ 6 หลัก");
+        Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "warning",
+        title: "กรุณากรอกรหัส OTP ให้ครบ 6 หลัก",
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true,
+      });
         return;
       }
 
       const signupDataStr = localStorage.getItem("signupData");
 
       if (!signupDataStr || signupDataStr === "undefined") {
-        alert("ไม่พบข้อมูลการสมัครสมาชิกของคุณ กรุณากลับไปสมัครใหม่อีกครั้ง");
-        window.location.href = "/signup";
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "error",
+          title: "ไม่พบข้อมูลการสมัครสมาชิกของคุณ กรุณาสมัครใหม่",
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true,
+        }).then(() => {
+          window.location.href = "/signup";
+        });
+
         return;
       }
 
@@ -102,8 +134,18 @@ function Otp() {
         formData = JSON.parse(signupDataStr);
         email = formData.email;
       } catch {
-        alert("ข้อมูลเซสชันไม่ถูกต้อง กรุณาเริ่มใหม่อีกครั้ง");
-        window.location.href = "/signup";
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "error",
+          title: "ข้อมูลเซสชันไม่ถูกต้อง กรุณาเริ่มใหม่",
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true,
+        }).then(() => {
+          window.location.href = "/signup";
+        });
+
         return;
       }
 
@@ -122,33 +164,70 @@ function Otp() {
                 body: JSON.stringify(formData),
               },
             )
-              .then((signupRes) => {
+              .then(async (signupRes) => {
                 
                 if (signupRes.status === 201) {
-                  alert("สมัครสมาชิกและยืนยันตัวตนสำเร็จ!");
+                  await Swal.fire({
+                  toast: true,
+                  position: "top-end",
+                  icon: "success",
+                  title: "สมัครสมาชิกและยืนยันตัวตนสำเร็จ!",
+                  showConfirmButton: false,
+                  timer: 2500,
+                  timerProgressBar: true,
+                });
                   localStorage.removeItem("signupData");
                   window.location.href = "/signin";
                 } else {
-                  alert(
-                    signupRes.error ||
-                    "การยืนยัน OTP ผ่านแล้ว แต่เกิดข้อผิดพลาดในการบันทึกข้อมูลระบบ"
-                  );
+                  Swal.fire({
+                    toast: true,
+                    position: "top-end",
+                    icon: "error",
+                    title: signupRes.error || "เกิดข้อผิดพลาดในการสมัครสมาชิก กรุณาลองใหม่",
+                    showConfirmButton: false,
+                    timer: 3500,
+                    timerProgressBar: true,
+                  });
                   setIsSubmitting(false);
                 }
               })
               .catch((error) => {
                 console.error("Signup Error:", error);
-                alert("เกิดข้อผิดพลาดในระบบฐานข้อมูล");
+                Swal.fire({
+                  toast: true,
+                  position: "top-end",
+                  icon: "error",
+                  title: error instanceof Error && error.message.trim() ? error.message : "เกิดข้อผิดพลาดในการสมัครสมาชิก กรุณาลองใหม่",
+                  showConfirmButton: false,
+                  timer: 3500,
+                  timerProgressBar: true,
+                });
                 setIsSubmitting(false);
               });
           } else {
-            alert("รหัส OTP ไม่ถูกต้องหรือหมดอายุ: " + (data.error || "Invalid code"));
+            Swal.fire({
+              toast: true,
+              position: "top-end",
+              icon: "error",
+              title: data.error || "รหัส OTP ไม่ถูกต้อง กรุณาลองใหม่",
+              showConfirmButton: false,
+              timer: 3500,
+              timerProgressBar: true,
+            });
             setIsSubmitting(false);
           }
         })
         .catch((error) => {
           console.error("Network Error:", error);
-          alert("เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย กรุณาลองใหม่");
+          Swal.fire({
+            toast: true,
+            position: "top-end",
+            icon: "error",
+            title: "เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย กรุณาลองใหม่",
+            showConfirmButton: false,
+            timer: 3500,
+            timerProgressBar: true,
+          });
           setIsSubmitting(false);
         });
     },
