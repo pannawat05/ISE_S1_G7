@@ -22,7 +22,7 @@ export default function SearchBar({
   }, []);
 
   return (
-    <div className="relative flex sm:flex-row flex-col items-stretch sm:items-center bg-white mx-auto border border-slate-200 rounded-full w-full max-w-3xl shadow-sm">
+    <div className="relative flex sm:flex-row flex-col items-stretch sm:items-center bg-white shadow-sm mx-auto border border-slate-200 rounded-xl md:rounded-full w-full max-w-3xl">
       <div className="flex flex-1 items-center gap-3 px-5 py-3.5 border-slate-200 sm:border-r border-b sm:border-b-0">
         <Search size={18} className="text-gray-500 shrink-0" />
         <input
@@ -57,13 +57,13 @@ export default function SearchBar({
           <ChevronDown size={14} className={`transition-transform ${isFilterOpen ? "rotate-180" : ""}`} />
         </button>
         {isFilterOpen && (
-          <div role="menu" className="absolute top-full right-2 z-20 mt-2 p-1 bg-white border border-slate-200 rounded-xl w-56 max-h-64 overflow-y-auto shadow-lg">
+          <div role="menu" className="top-full right-2 z-20 absolute bg-white shadow-lg mt-2 p-1 border border-slate-200 rounded-xl w-56 max-h-64 overflow-y-auto">
             <button
               type="button"
               role="menuitemradio"
               aria-checked={!type}
               onClick={() => { onTypeChange(""); setIsFilterOpen(false); }}
-              className="flex items-center justify-between hover:bg-slate-50 px-3 py-2 rounded-lg w-full text-left text-sm text-slate-700"
+              className="flex justify-between items-center hover:bg-slate-50 px-3 py-2 rounded-lg w-full text-slate-700 text-sm text-left"
             >
               ทุกประเภท
               {!type && <Check size={15} className="text-violet-600" />}
@@ -75,7 +75,7 @@ export default function SearchBar({
                 role="menuitemradio"
                 aria-checked={type === eventType.name}
                 onClick={() => { onTypeChange(eventType.name); setIsFilterOpen(false); }}
-                className="flex items-center justify-between hover:bg-slate-50 px-3 py-2 rounded-lg w-full text-left text-sm text-slate-700"
+                className="flex justify-between items-center hover:bg-slate-50 px-3 py-2 rounded-lg w-full text-slate-700 text-sm text-left"
               >
                 <span className="truncate">{eventType.name}</span>
                 {type === eventType.name && <Check size={15} className="text-violet-600 shrink-0" />}

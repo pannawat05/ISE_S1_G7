@@ -544,7 +544,7 @@ export default function PaymentPage() {
               type="button"
               onClick={handleCancel}
               disabled={cancelling}
-              className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 border border-red-500/20 rounded-lg text-red-400 text-xs transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 px-3 py-1.5 border border-red-500/20 rounded-lg text-red-400 text-xs transition-colors"
             >
               {cancelling ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
               ยกเลิกการจอง
