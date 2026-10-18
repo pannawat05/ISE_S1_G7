@@ -6,7 +6,7 @@ export interface ApiEvent {
   place_name: string;
   address: string | null;
   description: string | null;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "deleted";
   is_active: boolean | number;
   start_date: string;
   end_date: string;
@@ -127,7 +127,7 @@ export interface OrganizerEvent {
   cover_image: string;
   description: string | null;
   theme: string | null;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "deleted";
   is_active: boolean | number;
   start_date: string;
   end_date: string;
@@ -184,6 +184,16 @@ export async function updateOrganizerEvent(
 ): Promise<{ event: OrganizerEvent }> {
   return apiFetch(`/organizer/${organizerId}/events/${eventId}`, {
     method: "PUT", token, body,
+  });
+}
+
+export async function deleteOrganizerEvent(
+  token: string,
+  organizerId: number,
+  eventId: number,
+): Promise<{ message: string }> {
+  return apiFetch(`/organizer/${organizerId}/events/${eventId}`, {
+    method: "DELETE", token,
   });
 }
 
@@ -266,7 +276,7 @@ export interface DashboardEvent {
   id: number;
   name: string;
   cover_image: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "deleted";
   is_active: boolean;
   lifecycle: EventLifecycle;
   is_sold_out: boolean;

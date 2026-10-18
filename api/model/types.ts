@@ -29,7 +29,7 @@ export interface EventTypeRow extends RowDataPacket {
   name: string;
 }
 
-export type EventStatus = "pending" | "approved" | "rejected";
+export type EventStatus = "pending" | "approved" | "rejected" | "deleted";
 
 export interface EventRow extends RowDataPacket {
   id: number;

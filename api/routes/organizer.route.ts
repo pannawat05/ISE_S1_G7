@@ -105,6 +105,10 @@ router.put(
   (req, res) => organizerController.updateEventHandler(req as AuthRequest, res),
 );
 
+router.delete("/:id/events/:eventId", authenticate, (req, res) =>
+  organizerController.softDeleteEventHandler(req as AuthRequest, res),
+);
+
 // ─── Zone routes ──────────────────────────────────────────────────────────────
 router.get("/:id/events/:eventId/zones", authenticate, (req, res) =>
   organizerController.listZones(req as AuthRequest, res),

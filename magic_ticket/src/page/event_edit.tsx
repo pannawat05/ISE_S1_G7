@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Menu, ArrowLeft, Save, ChevronDown, Plus,
+  Menu, ArrowLeft, Save, ChevronDown, Plus, Trash2 as TrashIcon,
 } from "lucide-react";
 import Cookies from "js-cookie";
-import { fetchSingleEvent, updateOrganizerEvent, type OrganizerEvent, type EventImage } from "@/api/organizer";
+import { fetchSingleEvent, updateOrganizerEvent, deleteOrganizerEvent, type OrganizerEvent, type EventImage } from "@/api/organizer";
 import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 import { API_BASE } from "@/api/client";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
@@ -220,6 +220,7 @@ export default function EventEditPage() {
   const [removedImageIds, setRemovedImageIds] = useState<number[]>([]);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   function toDatetimeLocal(raw: string) {
     const d = new Date(raw);
@@ -544,6 +545,81 @@ export default function EventEditPage() {
                 organizerId={Number(orgId)}
                 eventId={Number(eventId)}
               />
+            </div>
+
+            {/* ─── Danger Zone ──────────────────────────────────────────────── */}
+            <div className="space-y-4 mt-surface p-5 border border-red-500/30 rounded-2xl">
+              <div className="flex items-center gap-2">
+                <TrashIcon size={16} className="text-red-400 shrink-0" />
+                <h2 className="font-semibold text-red-400 text-sm uppercase tracking-wider">
+                  Danger Zone
+                </h2>
+              </div>
+
+              <div className="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-4 bg-red-500/5 px-4 py-3 border border-red-500/15 rounded-xl">
+                <div>
+                  <p className="font-medium text-white text-sm">ลบกิจกรรมนี้</p>
+                  <p className="mt-0.5 text-gray-500 text-xs">
+                    Event จะถูกซ่อนออกจากระบบ (soft delete) — ไม่สามารถลบได้หากมีผู้ซื้อตั๋วแล้ว
+                    หรือกิจกรรมยังไม่สิ้นสุด
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={isDeleting || isSaving}
+                  onClick={async () => {
+                    const result = await Swal.fire({
+                      icon: "warning",
+                      title: "ยืนยันการลบ Event?",
+                      html: `<span>คุณกำลังจะลบ <strong>${event?.name ?? "Event นี้"}</strong><br/>การกระทำนี้ไม่สามารถยกเลิกได้</span>`,
+                      showCancelButton: true,
+                      confirmButtonText: "ลบ Event",
+                      cancelButtonText: "ยกเลิก",
+                      confirmButtonColor: "#dc2626",
+                    });
+                    if (!result.isConfirmed) return;
+
+                    setIsDeleting(true);
+                    try {
+                      const token = Cookies.get("authToken");
+                      if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อน");
+                      await deleteOrganizerEvent(token, Number(orgId), Number(eventId));
+                      await Swal.fire({
+                        icon: "success",
+                        title: "ลบ Event สำเร็จ",
+                        text: "Event ถูกลบออกจากระบบแล้ว",
+                        timer: 2000,
+                        showConfirmButton: false,
+                      });
+                      navigate(`/profile/events/${orgId}`);
+                    } catch (err: unknown) {
+                      const message =
+                        err instanceof Error && err.message.trim()
+                          ? err.message
+                          : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+                      await Swal.fire({
+                        icon: "error",
+                        title: "ลบ Event ไม่สำเร็จ",
+                        text: message,
+                        confirmButtonText: "ตกลง",
+                      });
+                    } finally {
+                      setIsDeleting(false);
+                    }
+                  }}
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 px-4 py-2 rounded-xl font-semibold text-white text-sm whitespace-nowrap transition-colors disabled:cursor-not-allowed shrink-0"
+                >
+                  {isDeleting ? (
+                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  ) : (
+                    <TrashIcon size={15} />
+                  )}
+                  {isDeleting ? "กำลังลบ..." : "ลบ Event นี้"}
+                </button>
+              </div>
             </div>
 
             {/* Save */}

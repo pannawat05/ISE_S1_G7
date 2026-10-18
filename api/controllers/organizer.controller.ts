@@ -10,12 +10,14 @@ import {
   deleteEventImage,
   getMaxDisplayOrder,
   updateEventImageOrder,
+  findEventByNameAndOrganizer,
 } from "../model/event.model.js";
 import {
   createOrganizer,
   findOrganizerById,
   updateOrganizer,
   deleteOrganizer,
+  findOrganizerByName,
 } from "../model/organizer.model.js";
 import {
   listZonesByEvent,
@@ -29,6 +31,7 @@ import {
   setSeatCount,
   countSeats,
 } from "../model/zone.model.js";
+import { query } from "../model/query.js";
 
 import Stripe from "stripe";
 
@@ -82,6 +85,11 @@ export async function createOrganizerHandler(req: AuthRequest, res: Response) {
   if (!name?.trim()) return res.status(400).json({ message: "ชื่อ Organizer is required" });
 
   try {
+    const isDuplicate = await findOrganizerByName(name.trim());
+    if (isDuplicate) {
+      return res.status(409).json({ message: `ชื่อ Organizer "${name.trim()}" มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น` });
+    }
+
     const logoUrl = logoFile ? `/uploads/organizer/logo/${logoFile.filename}` : "";
     const organizerId = await createOrganizer(name.trim(), logoUrl, description ?? "", userId);
     return res.status(201).json({
@@ -139,6 +147,13 @@ export async function updateOrganizerHandler(req: AuthRequest, res: Response) {
     if (name?.trim()) updates.name = name.trim();
     if (description !== undefined) updates.description = description.trim();
     if (logoFile) updates.logo_url = `/uploads/organizer/logo/${logoFile.filename}`;
+
+    if (name?.trim()) {
+      const isDuplicate = await findOrganizerByName(name.trim(), organizerId);
+      if (isDuplicate) {
+        return res.status(409).json({ message: `ชื่อ Organizer "${name.trim()}" มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น` });
+      }
+    }
 
     await updateOrganizer(organizerId, updates);
     const updated = await findOrganizerById(organizerId);
@@ -219,6 +234,11 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
   try {
     const organizer = await resolveOrganizerOwner(req, res, organizerId);
     if (!organizer) return;
+
+    const isDuplicate = await findEventByNameAndOrganizer(name.trim(), organizerId);
+    if (isDuplicate) {
+      return res.status(409).json({ message: `ชื่อ Event "${name.trim()}" มีอยู่ใน Organizer นี้แล้ว กรุณาใช้ชื่ออื่น` });
+    }
 
     const finalTypeId = resolvedTypeId ?? (await findOrCreateEventType(type));
     const eventId = await createEvent({
@@ -310,6 +330,13 @@ export async function updateEventHandler(req: AuthRequest, res: Response) {
     if (coverFile)                 updates.cover_image = `/uploads/event/${coverFile.filename}`;
     if (type?.trim())              updates.type_id     = await findOrCreateEventType(type.trim());
 
+    if (name?.trim()) {
+      const isDuplicate = await findEventByNameAndOrganizer(name.trim(), organizerId, eventId);
+      if (isDuplicate) {
+        return res.status(409).json({ message: `ชื่อ Event "${name.trim()}" มีอยู่ใน Organizer นี้แล้ว กรุณาใช้ชื่ออื่น` });
+      }
+    }
+
     await updateEvent(eventId, updates as Parameters<typeof updateEvent>[1]);
 
     // Remove deleted images
@@ -365,6 +392,65 @@ export async function listZones(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error("LIST ZONES ERROR:", err);
     return res.status(500).json({ message: "Error fetching zones" });
+  }
+}
+
+// ─── Soft Delete Event ────────────────────────────────────────────────────────
+
+export async function softDeleteEventHandler(req: AuthRequest, res: Response) {
+  const organizerId = Number(req.params.id);
+  const eventId = Number(req.params.eventId);
+  if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+  if (isNaN(organizerId) || isNaN(eventId)) return res.status(400).json({ message: "Invalid ID" });
+
+  try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+
+    const existing = await findEventById(eventId);
+    if (!existing || existing.organizer_id !== organizerId) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+    if (existing.status === "deleted") {
+      return res.status(409).json({ message: "Event ถูกลบไปแล้ว" });
+    }
+
+    // ── ตรวจสอบ: งานกำลังดำเนินอยู่ AND มีตั๋วที่ถูกซื้อแล้ว → ห้ามลบ ──
+    const now = new Date();
+    const startDate = new Date(existing.start_date);
+    const endDate = new Date(existing.end_date);
+    const isOngoing = now >= startDate && now <= endDate;
+
+    // ── ตรวจสอบ: มีตั๋วที่ถูกซื้อแล้ว ──
+    const paidRows = await query<{ paid_count: number }[]>(
+      `SELECT COUNT(t.id) AS paid_count
+       FROM tickets t
+       JOIN seats s ON s.id = t.seat_id
+       JOIN zones z ON z.id = s.zone_id
+       WHERE z.event_id = ? AND t.status IN ('paid', 'checked_in')`,
+      [eventId],
+    );
+    const paidCount = Number(paidRows[0]?.paid_count ?? 0);
+
+    if (isOngoing && paidCount > 0) {
+      return res.status(403).json({
+        message: `ไม่สามารถลบได้ เนื่องจากกิจกรรมกำลังดำเนินอยู่และมีผู้ซื้อตั๋วแล้ว ${paidCount} ใบ`,
+      });
+    }
+
+    if (paidCount > 0 && !isOngoing && now < startDate) {
+      // งานยังไม่เริ่ม แต่มีคนซื้อตั๋วแล้ว → ห้ามลบ
+      return res.status(403).json({
+        message: `ไม่สามารถลบได้ เนื่องจากมีผู้ซื้อตั๋วแล้ว ${paidCount} ใบ`,
+      });
+    }
+
+    await updateEvent(eventId, { status: "deleted" });
+
+    return res.json({ message: "ลบ Event สำเร็จ (soft delete)" });
+  } catch (err) {
+    console.error("SOFT DELETE EVENT ERROR:", err);
+    return res.status(500).json({ message: "Error deleting event" });
   }
 }
 

@@ -46,6 +46,20 @@ export async function findOrganizerById(
   return rows[0] ?? null;
 }
 
+export async function findOrganizerByName(
+  name: string,
+  excludeId?: number,
+): Promise<boolean> {
+  const rows = await query<{ id: number }[]>(
+    `SELECT id FROM organizers
+     WHERE LOWER(name) = LOWER(?)
+     ${excludeId ? "AND id != ?" : ""}
+     LIMIT 1`,
+    excludeId ? [name, excludeId] : [name],
+  );
+  return rows.length > 0;
+}
+
 export async function createOrganizer(
   name: string,
   logoUrl: string,

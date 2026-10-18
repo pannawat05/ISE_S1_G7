@@ -18,6 +18,21 @@ export async function findOrCreateEventType(name: string): Promise<number> {
   return result.insertId;
 }
 
+export async function findEventByNameAndOrganizer(
+  name: string,
+  organizerId: number,
+  excludeEventId?: number,
+): Promise<boolean> {
+  const rows = await query<{ id: number }[]>(
+    `SELECT id FROM events
+     WHERE LOWER(name) = LOWER(?) AND organizer_id = ?
+     ${excludeEventId ? "AND id != ?" : ""}
+     LIMIT 1`,
+    excludeEventId ? [name, organizerId, excludeEventId] : [name, organizerId],
+  );
+  return rows.length > 0;
+}
+
 export async function createEvent(input: CreateEventInput): Promise<number> {
   const result = await execute(
     `INSERT INTO events (
@@ -52,7 +67,7 @@ export async function findEventsByOrganizerId(
     `SELECT e.*, et.name AS type_name
      FROM events e
      JOIN event_types et ON et.id = e.type_id
-     WHERE e.organizer_id = ?
+     WHERE e.organizer_id = ? AND e.status != 'deleted'
      ORDER BY e.start_date DESC`,
     [organizerId],
   );
