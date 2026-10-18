@@ -415,7 +415,13 @@ export async function softDeleteEventHandler(req: AuthRequest, res: Response) {
       return res.status(409).json({ message: "Event ถูกลบไปแล้ว" });
     }
 
-    // ── ตรวจสอบ: งานกำลังดำเนินอยู่ AND มีตั๋วที่ถูกซื้อแล้ว → ห้ามลบ ──
+    // ── ถ้า status ไม่ใช่ "approved" → ลบได้เลย (pending/rejected ยังไม่เปิดขาย) ──
+    if (existing.status !== "approved") {
+      await updateEvent(eventId, { status: "deleted" });
+      return res.json({ message: "ลบ Event สำเร็จ (soft delete)" });
+    }
+
+    // ── status === "approved": ต้องเช็คเงื่อนไขเพิ่ม ──
     const now = new Date();
     const startDate = new Date(existing.start_date);
     const endDate = new Date(existing.end_date);

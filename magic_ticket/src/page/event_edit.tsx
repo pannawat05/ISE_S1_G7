@@ -9,7 +9,7 @@ import { fetchEventTypes, type EventType } from "@/api/sysadmin";
 import { API_BASE } from "@/api/client";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 import { LeafletMapPicker, ZoneEditor, WhitelistManager } from "@/components/shared";
-import { ImageIcon, Trash2 } from "lucide-react";
+import { ImageIcon, Trash2, MapPin } from "lucide-react";
 import Swal from "sweetalert2";
 
 interface ExistingImage { id: number; url: string; display_order: number }
@@ -516,18 +516,21 @@ export default function EventEditPage() {
             <div className="space-y-4 mt-surface p-5">
               <h2 className="font-semibold text-white text-sm">สถานที่จัดงาน</h2>
               <div className="space-y-1.5">
-                <label className="mt-label">ชื่อสถานที่ <span className="text-red-400">*</span></label>
-                <input value={placeName} onChange={(e) => setPlaceName(e.target.value)} placeholder="เช่น อิมแพ็ค อารีน่า" className="mt-input" />
+                <label className="mt-label">ตำแหน่งสถานที่ <span className="text-red-400">*</span></label>
+                <p className="text-gray-600 text-xs">เลือกตำแหน่งบนแผนที่ ระบบจะดึงชื่อสถานที่อัตโนมัติ</p>
+                <LeafletMapPicker lat={lat} lng={lng}
+                  onChange={(rLat, rLng) => { setLat(rLat); setLng(rLng); }}
+                  onPlaceName={(n) => setPlaceName(n)} />
+                {placeName && (
+                  <div className="flex items-center gap-1.5 mt-1 text-green-400 text-xs">
+                    <MapPin size={12} />
+                    <span className="truncate">{placeName}</span>
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <label className="mt-label">ที่อยู่</label>
                 <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="ที่อยู่แบบเต็ม (ไม่บังคับ)" className="mt-input resize-none" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="mt-label">ตำแหน่งบนแผนที่ <span className="text-red-400">*</span></label>
-                <LeafletMapPicker lat={lat} lng={lng}
-                  onChange={(rLat, rLng) => { setLat(rLat); setLng(rLng); }}
-                  onPlaceName={(n) => { if (!placeName) setPlaceName(n); }} />
               </div>
             </div>
 

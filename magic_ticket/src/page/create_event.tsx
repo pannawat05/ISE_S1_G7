@@ -42,7 +42,6 @@ export default function CreateEventPage() {
   const [zoneDrafts, setZoneDrafts] = useState<ZoneDraft[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStep, setSubmitStep] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [typesLoading, setTypesLoading] = useState(true);
 
@@ -77,15 +76,20 @@ export default function CreateEventPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError("กรุณากรอกชื่องาน"); return; }
-    if (!form.place_name.trim()) { setError("กรุณากรอกชื่อสถานที่"); return; }
-    if (!form.start_date || !form.end_date) { setError("กรุณาเลือกวันเวลาเริ่มและสิ้นสุด"); return; }
-    if (form.type_id === 0) { setError("กรุณาเลือกประเภทงาน"); return; }
+
+    const toastWarn = (title: string) => Swal.fire({
+      toast: true, position: "top-end", icon: "warning",
+      title, showConfirmButton: false, timer: 3500, timerProgressBar: true,
+    });
+
+    if (!form.name.trim()) { void toastWarn("กรุณากรอกชื่องาน"); return; }
+    if (!form.place_name.trim()) { void toastWarn("กรุณากรอกชื่อสถานที่"); return; }
+    if (!form.start_date || !form.end_date) { void toastWarn("กรุณาเลือกวันเวลาเริ่มและสิ้นสุด"); return; }
+    if (form.type_id === 0) { void toastWarn("กรุณาเลือกประเภทงาน"); return; }
     if (new Date(form.end_date) <= new Date(form.start_date)) {
-      setError("วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น"); return;
+      void toastWarn("วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น"); return;
     }
     setIsSubmitting(true);
-    setError(null);
     try {
       const token = Cookies.get("authToken");
       if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อน");
@@ -144,8 +148,6 @@ export default function CreateEventPage() {
           ? err.message
           : "เกิดข้อผิดพลาด กรุณาลองใหม่";
 
-      setError(null);
-
       await Swal.fire({
         icon: "error",
         title: "สร้าง Event ไม่สำเร็จ",
@@ -183,12 +185,6 @@ export default function CreateEventPage() {
       <main className="flex-1 px-4 md:px-8 py-6 min-h-0 overflow-y-auto">
         <div className="mx-auto max-w-2xl">
           <form onSubmit={handleSubmit} className="space-y-8">
-
-            {error && (
-              <div className="bg-red-500/10 px-4 py-3 border border-red-500/30 rounded-xl text-red-400 text-sm">
-                {error}
-              </div>
-            )}
 
             {/* ── ข้อมูลทั่วไป ── */}
             <section className="space-y-5">
@@ -273,10 +269,20 @@ export default function CreateEventPage() {
               <div className="space-y-1.5">
                 <label className="flex items-center gap-1.5 mt-label">
                   <MapPin size={14} className="text-violet-400" />
-                  ชื่อสถานที่ <span className="text-red-400">*</span>
+                  ตำแหน่งสถานที่ <span className="text-red-400">*</span>
                 </label>
-                <input value={form.place_name} onChange={(e) => set("place_name", e.target.value)}
-                  placeholder="เช่น อิมแพ็ค อารีน่า เมืองทองธานี" className="mt-input" />
+                <p className="text-gray-600 text-xs">เลือกตำแหน่งบนแผนที่ ระบบจะดึงชื่อสถานที่อัตโนมัติ</p>
+                <LeafletMapPicker
+                  lat={form.latitude} lng={form.longitude}
+                  onChange={(lat, lng) => { set("latitude", lat); set("longitude", lng); }}
+                  onPlaceName={(name) => set("place_name", name)}
+                />
+                {form.place_name && (
+                  <div className="flex items-center gap-1.5 mt-1 text-green-400 text-xs">
+                    <MapPin size={12} />
+                    <span className="truncate">{form.place_name}</span>
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <label className="mt-label">
@@ -284,14 +290,6 @@ export default function CreateEventPage() {
                 </label>
                 <textarea value={form.address} onChange={(e) => set("address", e.target.value)}
                   rows={2} placeholder="ที่อยู่แบบเต็ม เช่น 99 ถ.แจ้งวัฒนะ ปากเกร็ด นนทบุรี" className="mt-input resize-none" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="mt-label">ตำแหน่งบนแผนที่</label>
-                <LeafletMapPicker
-                  lat={form.latitude} lng={form.longitude}
-                  onChange={(lat, lng) => { set("latitude", lat); set("longitude", lng); }}
-                  onPlaceName={(name) => { if (!form.place_name) set("place_name", name); }}
-                />
               </div>
             </section>
 

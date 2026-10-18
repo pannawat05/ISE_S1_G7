@@ -36,6 +36,17 @@ export async function apiFetch<T = unknown>(
     : await response.text();
 
   if (response.status === 401) {
+    // ถ้าเป็น endpoint login → ไม่ redirect (เป็นการ login ผิด ไม่ใช่ session หมดอายุ)
+    if (path === "/auth/login") {
+      const message =
+        typeof data === "string"
+          ? data
+          : (data as { message?: string; error?: string }).message ||
+            (data as { error?: string }).error ||
+            "เข้าสู่ระบบไม่สำเร็จ";
+      throw new Error(message);
+    }
+
     // Clear stale credentials and redirect to login
     import("js-cookie").then(({ default: Cookies }) => {
       Cookies.remove("authToken");
