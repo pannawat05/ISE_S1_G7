@@ -162,6 +162,7 @@ export async function listPublicEvents(req: Request, res: Response) {
   const search   = String(req.query.search   ?? "").trim();
   const location = String(req.query.location ?? "").trim();
   const type     = String(req.query.type     ?? "").trim();
+  const sortOrder = req.query.sortOrder === "DESC" ? "DESC" : "ASC";
   const limit    = Math.min(Number(req.query.limit  ?? 20), 100);
   const offset   = Math.max(Number(req.query.offset ?? 0),  0);
 
@@ -194,7 +195,7 @@ export async function listPublicEvents(req: Request, res: Response) {
        JOIN event_types et ON et.id = e.type_id
        JOIN organizers o   ON o.id  = e.organizer_id
        ${where}
-       ORDER BY e.start_date ASC
+      ORDER BY e.start_date ${sortOrder}
        LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );

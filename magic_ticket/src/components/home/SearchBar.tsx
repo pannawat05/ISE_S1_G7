@@ -6,13 +6,15 @@ interface SearchBarProps {
   search: string;
   location: string;
   type: string;
+  sortOrder: "ASC" | "DESC";
   onSearchChange: (v: string) => void;
   onLocationChange: (v: string) => void;
   onTypeChange: (v: string) => void;
+  onSortOrderChange: (v: "ASC" | "DESC") => void;
 }
 
 export default function SearchBar({
-  search, location, type, onSearchChange, onLocationChange, onTypeChange,
+  search, location, type, sortOrder, onSearchChange, onLocationChange, onTypeChange, onSortOrderChange,
 }: SearchBarProps) {
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -50,37 +52,55 @@ export default function SearchBar({
           aria-haspopup="menu"
           aria-expanded={isFilterOpen}
           onClick={() => setIsFilterOpen((open) => !open)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm transition-colors ${type ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-100"}`}
+          className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm transition-colors ${type || sortOrder === "DESC" ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-100"}`}
         >
           <SlidersHorizontal size={16} />
-          <span className="max-w-32 truncate">{type || "ตัวกรอง"}</span>
+          <span className="max-w-32 truncate">{type || (sortOrder === "ASC" ? "เก่าไปใหม่" : "ใหม่ไปเก่า")}</span>
           <ChevronDown size={14} className={`transition-transform ${isFilterOpen ? "rotate-180" : ""}`} />
         </button>
         {isFilterOpen && (
-          <div role="menu" className="top-full right-2 z-20 absolute bg-white shadow-lg mt-2 p-1 border border-slate-200 rounded-xl w-56 max-h-64 overflow-y-auto">
-            <button
-              type="button"
-              role="menuitemradio"
-              aria-checked={!type}
-              onClick={() => { onTypeChange(""); setIsFilterOpen(false); }}
-              className="flex justify-between items-center hover:bg-slate-50 px-3 py-2 rounded-lg w-full text-slate-700 text-sm text-left"
-            >
-              ทุกประเภท
-              {!type && <Check size={15} className="text-violet-600" />}
-            </button>
-            {eventTypes.map((eventType) => (
+          <div role="menu" className="top-full right-2 z-20 absolute flex flex-col bg-white shadow-lg mt-2 p-1 border border-slate-200 rounded-xl w-56 max-h-96">
+            <div className="overflow-y-auto">
               <button
-                key={eventType.id}
                 type="button"
                 role="menuitemradio"
-                aria-checked={type === eventType.name}
-                onClick={() => { onTypeChange(eventType.name); setIsFilterOpen(false); }}
+                aria-checked={!type}
+                onClick={() => { onTypeChange(""); setIsFilterOpen(false); }}
                 className="flex justify-between items-center hover:bg-slate-50 px-3 py-2 rounded-lg w-full text-slate-700 text-sm text-left"
               >
-                <span className="truncate">{eventType.name}</span>
-                {type === eventType.name && <Check size={15} className="text-violet-600 shrink-0" />}
+                ทุกประเภท
+                {!type && <Check size={15} className="text-violet-600" />}
               </button>
-            ))}
+              {eventTypes.map((eventType) => (
+                <button
+                  key={eventType.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={type === eventType.name}
+                  onClick={() => { onTypeChange(eventType.name); setIsFilterOpen(false); }}
+                  className="flex justify-between items-center hover:bg-slate-50 px-3 py-2 rounded-lg w-full text-slate-700 text-sm text-left"
+                >
+                  <span className="truncate">{eventType.name}</span>
+                  {type === eventType.name && <Check size={15} className="text-violet-600 shrink-0" />}
+                </button>
+              ))}
+            </div>
+            <div className="mt-1 pt-1 border-slate-200 border-t">
+              <p className="px-3 py-1 text-slate-500 text-xs">เรียงตามวันที่เริ่มงาน</p>
+              {(["ASC", "DESC"] as const).map((order) => (
+                <button
+                  key={order}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={sortOrder === order}
+                  onClick={() => { onSortOrderChange(order); setIsFilterOpen(false); }}
+                  className="flex justify-between items-center hover:bg-slate-50 px-3 py-2 rounded-lg w-full text-slate-700 text-sm text-left"
+                >
+                  {order === "ASC" ? "เก่าไปใหม่" : "ใหม่ไปเก่า"}
+                  {sortOrder === order && <Check size={15} className="text-violet-600" />}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

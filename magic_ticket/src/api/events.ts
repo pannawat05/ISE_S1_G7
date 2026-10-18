@@ -22,6 +22,7 @@ export interface FetchEventsParams {
   search?: string;
   location?: string;
   type?: string;
+  sortOrder?: "ASC" | "DESC";
   limit?: number;
   offset?: number;
 }
@@ -33,6 +34,7 @@ export async function fetchPublicEvents(
   if (params.search)   qs.set("search",   params.search);
   if (params.location) qs.set("location", params.location);
   if (params.type)     qs.set("type",     params.type);
+  if (params.sortOrder) qs.set("sortOrder", params.sortOrder);
   if (params.limit)    qs.set("limit",    String(params.limit));
   if (params.offset)   qs.set("offset",   String(params.offset));
 
