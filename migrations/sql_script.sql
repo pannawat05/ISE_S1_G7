@@ -144,8 +144,6 @@ CREATE TABLE staff (
 
 -- Event Staff
 CREATE TABLE event_staff (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-
     event_id INT NOT NULL,
     staff_id INT NOT NULL,
 
@@ -159,6 +157,9 @@ CREATE TABLE event_staff (
 
     assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
+    -- ใช้ Composite Primary Key จาก Owner Entities
+    PRIMARY KEY (event_id, staff_id),
+
     CONSTRAINT fk_event_staff_event
         FOREIGN KEY (event_id)
         REFERENCES events(id)
@@ -167,10 +168,7 @@ CREATE TABLE event_staff (
     CONSTRAINT fk_event_staff_staff
         FOREIGN KEY (staff_id)
         REFERENCES staff(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT uq_event_staff
-        UNIQUE(event_id, staff_id)
+        ON DELETE CASCADE
 );
 
 -- payment

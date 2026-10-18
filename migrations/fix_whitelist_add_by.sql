@@ -12,3 +12,7 @@ ALTER TABLE white_list
   ADD CONSTRAINT fk_wl_added_by
     FOREIGN KEY (add_by)
     REFERENCES users(id);
+
+ALTER TABLE events 
+  MODIFY COLUMN status ENUM('pending', 'approved', 'rejected', 'deleted') 
+  NOT NULL DEFAULT 'pending';

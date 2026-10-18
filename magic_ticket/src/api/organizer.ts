@@ -27,7 +27,6 @@ export interface OrganizerDetail {
   logo_url: string | null;
   description: string | null;
   owner_id: number;
-  stripe_account_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -269,8 +268,6 @@ export interface DashboardEvent {
   total_seats: number;
   sold_tickets: number;
   revenue: number;
-  net_revenue: number;
-  platform_fee_percent: number;
   checkins: number;
   sales_pct: number | null;
   checkin_pct: number;
@@ -284,8 +281,6 @@ export interface DashboardKPI {
   total_seats: number;
   total_sold: number;
   total_revenue: number;
-  total_net_revenue: number;
-  platform_fee_percent: number;
   total_checkins: number;
   attendance_rate: number;
   capacity_rate: number;
@@ -303,75 +298,6 @@ export async function fetchDashboard(
   return apiFetch<DashboardData>(`/organizer/${organizerId}/dashboard`, { token });
 }
 
-export interface AnalyticsRow {
-  ticket_id: number;
-  event_id: number;
-  event_name: string;
-  attendee_name: string;
-  email: string;
-  zone_name: string;
-  ticket_type: string;
-  is_whitelisted: number;
-  ticket_status: string;
-  payment_status: string;
-  paid_amount: number;
-  checked_in_at: string | null;
-}
-
-export interface OrganizerAnalytics {
-  kpi: {
-    views: number;
-    registered: number;
-    sold: number;
-    paid_amount: number;
-    checkins: number;
-    no_show: number;
-    no_show_rate: number;
-    checkin_rate: number;
-  };
-  rows: AnalyticsRow[];
-}
-
-export interface AnalyticsFilters {
-  eventId?: number;
-  from?: string;
-  to?: string;
-  ticketType?: string;
-  whitelist?: "all" | "whitelisted" | "general";
-  zoneId?: number;
-  paymentStatus?: string;
-  ticketStatus?: string;
-}
-
-function analyticsQuery(filters: AnalyticsFilters) {
-  const params = new URLSearchParams();
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== "" && value !== 0) params.set(key, String(value));
-  });
-  const query = params.toString();
-  return query ? `?${query}` : "";
-}
-
-export async function fetchOrganizerAnalytics(
-  token: string,
-  organizerId: number,
-  filters: AnalyticsFilters = {},
-): Promise<OrganizerAnalytics> {
-  return apiFetch<OrganizerAnalytics>(`/organizer/${organizerId}/analytics${analyticsQuery(filters)}`, { token });
-}
-
-export async function exportOrganizerAnalytics(
-  token: string,
-  organizerId: number,
-  filters: AnalyticsFilters = {},
-): Promise<Blob> {
-  const response = await fetch(`${API_BASE}/organizer/${organizerId}/analytics/export${analyticsQuery(filters)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) throw new Error("ส่งออกข้อมูลไม่สำเร็จ");
-  return response.blob();
-}
-
 // ─── Whitelist ────────────────────────────────────────────────────────────────
 
 export interface WhitelistEntry {
@@ -381,6 +307,8 @@ export interface WhitelistEntry {
   l_name: string;
   email: string;
   note: string | null;
+  ticket_id: number | null;
+  ticket_qrcode: string | null;
 }
 
 export interface UserSearchResult {
@@ -413,15 +341,14 @@ export async function fetchWhitelist(
   );
   return data.whitelist ?? [];
 }
-
 export async function addToWhitelist(
   token: string,
   organizerId: number,
   eventId: number,
   usersId: number,
   note?: string,
-): Promise<WhitelistEntry[]> {
-  const data = await apiFetch<{ whitelist: WhitelistEntry[] }>(
+): Promise<{ whitelist: WhitelistEntry[]; ticket?: { ticket_id: number; qrcode: string; qr_data_url: string } }> {
+  return apiFetch(
     `/organizer/${organizerId}/events/${eventId}/whitelist`,
     {
       method: "POST",
@@ -429,7 +356,6 @@ export async function addToWhitelist(
       body: JSON.stringify({ users_id: usersId, note }),
     },
   );
-  return data.whitelist ?? [];
 }
 
 export async function removeFromWhitelist(
@@ -445,53 +371,122 @@ export async function removeFromWhitelist(
   return data.whitelist ?? [];
 }
 
-export interface EventStaffAssignment {
-  assignment_id: number;
-  staff_id: number;
-  user_id: number;
+// ─── Zone rows ────────────────────────────────────────────────────────────────
+
+export interface RowConfig {
+  label: string;
+  count: number;
+}
+
+export async function fetchZoneRows(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  zoneId: number,
+): Promise<RowConfig[]> {
+  const data = await apiFetch<{ rows: RowConfig[] }>(
+    `/organizer/${organizerId}/events/${eventId}/zones/${zoneId}/rows`,
+    { token },
+  );
+  return data.rows ?? [];
+}
+
+// ─── Soft delete event ────────────────────────────────────────────────────────
+export async function deleteOrganizerEvent(
+  token: string,
+  organizerId: number,
+  eventId: number,
+): Promise<void> {
+  await apiFetch(`/organizer/${organizerId}/events/${eventId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+// ─── Staff ────────────────────────────────────────────────────────────────────
+
+export type StaffRole = "general_staff" | "manager";
+export type EventStaffRole = "checkin" | "security" | "registration" | "backstage" | "manager";
+
+export interface StaffMember {
+  id: number;
+  role: StaffRole;
+  join_date: string;
+  users_id: number;
   f_name: string;
   l_name: string;
   email: string;
-  staff_role: string;
-  event_role: string;
 }
 
-export async function fetchEventStaff(token: string, organizerId: number, eventId: number) {
-  const data = await apiFetch<{ staff: EventStaffAssignment[] }>(
-    `/organizer/${organizerId}/events/${eventId}/staff`, { token },
-  );
-  return data.staff ?? [];
+export interface EventStaffMember {
+  event_id: number;
+  staff_id: number;
+  role: EventStaffRole;
+  assigned_at: string;
+  users_id: number;
+  f_name: string;
+  l_name: string;
+  email: string;
 }
 
-export async function assignEventStaff(
-  token: string, organizerId: number, eventId: number, userId: number, role: string,
-) {
-  return apiFetch(`/organizer/${organizerId}/events/${eventId}/staff`, {
-    method: "POST", token, body: JSON.stringify({ user_id: userId, role }),
+export async function fetchStaff(token: string, organizerId: number): Promise<StaffMember[]> {
+  const d = await apiFetch<{ staff: StaffMember[] }>(`/organizer/${organizerId}/staff`, { token });
+  return d.staff ?? [];
+}
+
+export async function addStaff(
+  token: string, organizerId: number,
+  usersId: number, role: StaffRole,
+): Promise<StaffMember[]> {
+  const d = await apiFetch<{ staff: StaffMember[] }>(`/organizer/${organizerId}/staff`, {
+    method: "POST", token, body: JSON.stringify({ users_id: usersId, role }),
+  });
+  return d.staff ?? [];
+}
+
+export async function updateStaffRole(
+  token: string, organizerId: number, staffId: number, role: StaffRole,
+): Promise<void> {
+  await apiFetch(`/organizer/${organizerId}/staff/${staffId}`, {
+    method: "PATCH", token, body: JSON.stringify({ role }),
   });
 }
 
-export async function removeEventStaff(token: string, organizerId: number, eventId: number, assignmentId: number) {
-  return apiFetch(`/organizer/${organizerId}/events/${eventId}/staff/${assignmentId}`, {
+export async function removeStaff(
+  token: string, organizerId: number, staffId: number,
+): Promise<StaffMember[]> {
+  const d = await apiFetch<{ staff: StaffMember[] }>(`/organizer/${organizerId}/staff/${staffId}`, {
     method: "DELETE", token,
   });
+  return d.staff ?? [];
 }
 
-// ─── Stripe Connect ──────────────────────────────────────────────────────────
-
-export interface StripeOnboardingResponse {
-  onboarding_url: string;
-}
-
-export async function generateStripeOnboardingLink(
-  token: string,
-  organizerId: number,
-): Promise<StripeOnboardingResponse> {
-  return apiFetch<StripeOnboardingResponse>(
-    `/organizer/${organizerId}/stripe/onboard`,
-    {
-      method: "POST",
-      token,
-    },
+export async function fetchEventStaff(
+  token: string, organizerId: number, eventId: number,
+): Promise<EventStaffMember[]> {
+  const d = await apiFetch<{ event_staff: EventStaffMember[] }>(
+    `/organizer/${organizerId}/events/${eventId}/staff`, { token },
   );
+  return d.event_staff ?? [];
+}
+
+export async function assignStaffToEvent(
+  token: string, organizerId: number, eventId: number,
+  staffId: number, role: EventStaffRole,
+): Promise<EventStaffMember[]> {
+  const d = await apiFetch<{ event_staff: EventStaffMember[] }>(
+    `/organizer/${organizerId}/events/${eventId}/staff`,
+    { method: "POST", token, body: JSON.stringify({ staff_id: staffId, role }) },
+  );
+  return d.event_staff ?? [];
+}
+
+export async function removeStaffFromEvent(
+  token: string, organizerId: number, eventId: number, staffId: number,
+): Promise<EventStaffMember[]> {
+  const d = await apiFetch<{ event_staff: EventStaffMember[] }>(
+    `/organizer/${organizerId}/events/${eventId}/staff/${staffId}`,
+    { method: "DELETE", token },
+  );
+  return d.event_staff ?? [];
 }

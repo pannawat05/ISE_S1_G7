@@ -6,10 +6,9 @@ import { fetchPublicEvents, type PublicEvent } from "@/api/events";
 interface EventGridProps {
   search: string;
   location: string;
-  type: string;
 }
 
-export default function EventGrid({ search, location, type }: EventGridProps) {
+export default function EventGrid({ search, location }: EventGridProps) {
   const [events, setEvents] = useState<PublicEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +20,7 @@ export default function EventGrid({ search, location, type }: EventGridProps) {
 
     // Debounce search 300ms
     const timer = setTimeout(() => {
-      fetchPublicEvents({ search, location, type, limit: 20 })
+      fetchPublicEvents({ search, location, limit: 20 })
         .then((data) => {
           setEvents(data.events);
           setTotal(data.total);
@@ -31,7 +30,7 @@ export default function EventGrid({ search, location, type }: EventGridProps) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [search, location, type]);
+  }, [search, location]);
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
@@ -62,7 +61,7 @@ export default function EventGrid({ search, location, type }: EventGridProps) {
     return (
       <section className="mx-auto px-6 pb-16 max-w-6xl">
         <div className="flex flex-col items-center gap-4 bg-surface py-16 border border-white/5 rounded-2xl text-center">
-          {search || location || type ? (
+          {search || location ? (
             <>
               <Search size={36} className="text-gray-600" />
               <div>
@@ -88,7 +87,7 @@ export default function EventGrid({ search, location, type }: EventGridProps) {
   return (
     <section className="mx-auto px-6 pb-16 max-w-6xl">
       {/* Result count */}
-      {(search || location || type) && (
+      {(search || location) && (
         <p className="mb-4 text-gray-400 text-sm">
           พบ <span className="font-semibold text-white">{total}</span> กิจกรรม
         </p>

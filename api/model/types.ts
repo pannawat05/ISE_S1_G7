@@ -18,7 +18,6 @@ export interface OrganizerRow extends RowDataPacket {
   name: string;
   description: string | null;
   logo_url: string | null;
-  stripe_id: string;
   owner_id: number;
   created_at: Date;
   updated_at: Date;
@@ -29,7 +28,7 @@ export interface EventTypeRow extends RowDataPacket {
   name: string;
 }
 
-export type EventStatus = "pending" | "approved" | "rejected";
+export type EventStatus = "pending" | "approved" | "rejected" | "deleted";
 
 export interface EventRow extends RowDataPacket {
   id: number;

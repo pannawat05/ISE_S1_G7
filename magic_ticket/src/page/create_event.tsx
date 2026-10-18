@@ -104,7 +104,9 @@ export default function CreateEventPage() {
           zfd.append("category", draft.category);
           zfd.append("type", draft.type);
           zfd.append("price", String(draft.price));
-          zfd.append("seat_count", String(draft.seat_count));
+          if (draft.rows && draft.rows.length > 0) {
+            zfd.append("rows", JSON.stringify(draft.rows));
+          }
           draft.imageFiles.forEach((f) => zfd.append("zone_images", f));
           await createZone(token, organizerId, eventId, zfd);
         }

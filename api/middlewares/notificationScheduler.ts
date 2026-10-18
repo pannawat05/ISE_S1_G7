@@ -344,36 +344,3 @@ cron.schedule(
     timezone: "Asia/Bangkok",
   }
 );
-
-// ─── Expired Reservation Cleanup ─────────────────────────────────────────────
-async function cancelExpiredReservations(): Promise<void> {
-  try {
-    const result = await new Promise<{ affectedRows: number }>((resolve, reject) => {
-      db.query(
-        `UPDATE tickets
-         SET status = 'cancelled'
-         WHERE status = 'reserved'
-           AND reserved_at IS NOT NULL
-           AND reserved_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`,
-        (err, res: any) => {
-          if (err) reject(err);
-          else resolve(res);
-        }
-      );
-    });
-
-    if (result.affectedRows > 0) {
-      console.log(`🗑️  Cancelled ${result.affectedRows} expired reservation(s)`);
-    }
-  } catch (err) {
-    console.error("❌ Failed to cancel expired reservations:", err);
-  }
-}
-
-cron.schedule(
-  "*/5 * * * *",
-  async () => {
-    await cancelExpiredReservations();
-  },
-  { timezone: "Asia/Bangkok" }
-);

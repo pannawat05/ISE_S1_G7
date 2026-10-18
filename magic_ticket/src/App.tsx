@@ -24,35 +24,30 @@ function App() {
 
   return (
     <Router>
-      <div className="light-theme flex flex-col bg-white w-full h-screen overflow-hidden text-black">
+
+      <div className="flex flex-col bg-bg w-full h-screen overflow-hidden text-[color:var(--mt-text)]">
+
         <Navbar />
 
-        <div className="flex-1 w-full min-h-0 overflow-hidden">
+        <div className="flex-1 w-full min-h-0 overflow-x-hidden overflow-y-auto">
+
           <Routes>
             <Route path="/" element={<pages.Home />} />
 
             <Route path="/events/:id" element={<pages.EventDetail />} />
 
             <Route path="/payment" element={<pages.Payment />} />
-
-            <Route
-              path="/payment/return"
-              element={<pages.PaymentReturnPage />}
-            />
+            <Route path="/payment/return" element={<pages.PaymentReturn />} />
 
             <Route path="/admin" element={<pages.AdminPage />} />
 
             <Route path="/my-tickets" element={<pages.MyTickets />} />
-
             <Route path="/my-staff" element={<pages.MyStaff />} />
-
-            <Route path="/scan-qr" element={<pages.ScanQR />} />
+            <Route path="/scan-qr"  element={<pages.ScanQR />} />
 
             <Route path="/signup" element={<pages.SignUp />} />
 
             <Route path="/signin" element={<pages.Signin />} />
-
-            <Route path="/forgot-password" element={<pages.ForgotPassword />} />
 
             <Route path="/otp" element={<pages.Otp />} />
 
@@ -73,16 +68,6 @@ function App() {
               />
 
               <Route
-                path="analytics/:id"
-                element={<pages.Analytics />}
-              />
-
-              <Route
-                path="attendees/:id"
-                element={<pages.Attendees />}
-              />
-
-              <Route
                 path="events/:id"
                 element={<pages.Event />}
               />
@@ -97,10 +82,9 @@ function App() {
                 element={<pages.EventEdit />}
               />
 
-              <Route
-                path="organizer/:id"
-                element={<pages.OrganizerSettings />}
-              />
+              <Route path="organizer/:id" element={<pages.OrganizerSettings />} />
+              <Route path="attendees/:id" element={<pages.Attendees />} />
+
             </Route>
           </Routes>
         </div>

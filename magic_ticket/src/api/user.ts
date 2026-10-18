@@ -39,6 +39,7 @@ export const updateProfile = async (
 };
 
 // ─── Staff assignments ────────────────────────────────────────────────────────
+
 export interface StaffAssignment {
   staff_id: number;
   staff_role: string;
@@ -65,6 +66,7 @@ export async function fetchMyStaffAssignments(token: string): Promise<StaffAssig
 }
 
 // ─── Check-in scan ────────────────────────────────────────────────────────────
+
 export interface ScanResult {
   status: "ok" | "already_checked_in" | "wrong_event" | "invalid" | "cancelled" | "not_paid" | "invalid_status" | "forbidden";
   message: string;
@@ -89,7 +91,9 @@ export async function scanTicket(
       body: JSON.stringify({ qrcode, event_id: eventId }),
     });
   } catch (err: unknown) {
+    // apiFetch throws on non-2xx — extract the body message
     if (err instanceof Error) {
+      // Try parse JSON from message
       try {
         const parsed = JSON.parse(err.message);
         return parsed as ScanResult;

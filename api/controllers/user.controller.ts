@@ -96,8 +96,10 @@ export async function updateMe(req: AuthRequest, res: Response) {
 // ─── GET /users/my-staff-assignments ─────────────────────────────────────────
 export async function getMyStaffAssignments(req: AuthRequest, res: Response) {
   if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
   try {
     const { query } = await import("../model/query.js");
+
     const assignments = await query<{
       staff_id: number;
       staff_role: string;
@@ -137,6 +139,7 @@ export async function getMyStaffAssignments(req: AuthRequest, res: Response) {
        ORDER BY e.start_date DESC`,
       [req.user.id],
     );
+
     return res.json({ assignments });
   } catch (err) {
     console.error("MY STAFF ASSIGNMENTS ERROR:", err);

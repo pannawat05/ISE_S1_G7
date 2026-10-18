@@ -30,16 +30,6 @@ export async function createUser(
   return result.insertId;
 }
 
-export async function updateUserPassword(
-  id: number,
-  hashedPassword: string,
-): Promise<void> {
-  await execute(
-    "UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?",
-    [hashedPassword, id],
-  );
-}
-
 export async function getUserProfile(id: number) {
   const rows = await query<
     (UserRow & { organizer_id?: number | null })[]
