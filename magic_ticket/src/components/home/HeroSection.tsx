@@ -3,12 +3,14 @@ import SearchBar from "./SearchBar";
 interface HeroSectionProps {
   search: string;
   location: string;
+  type: string;
   onSearchChange: (v: string) => void;
   onLocationChange: (v: string) => void;
+  onTypeChange: (v: string) => void;
 }
 
 export default function HeroSection({
-  search, location, onSearchChange, onLocationChange,
+  search, location, type, onSearchChange, onLocationChange, onTypeChange,
 }: HeroSectionProps) {
   return (
     <section className="relative px-6 pt-16 pb-12 text-center">
@@ -28,8 +30,10 @@ export default function HeroSection({
         <SearchBar
           search={search}
           location={location}
+          type={type}
           onSearchChange={onSearchChange}
           onLocationChange={onLocationChange}
+          onTypeChange={onTypeChange}
         />
       </div>
     </section>

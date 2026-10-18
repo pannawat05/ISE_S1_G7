@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { X, ImageIcon, Trash2 } from "lucide-react";
 import Cookies from "js-cookie";
 import { createOrganizer, type UserOrganizer } from "../../api/organizer";
@@ -21,64 +21,30 @@ export default function CreateOrganizerModal({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!logoFile) {
-      setLogoPreview(null);
-      return;
-    }
-
-    const url = URL.createObjectURL(logoFile);
-    setLogoPreview(url);
-
-    return () => URL.revokeObjectURL(url);
-  }, [logoFile]);
-
   const MAX_DESC = 200;
 
   function handleFileSelect(file: File) {
     if (!file.type.startsWith("image/")) {
       setError("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
-      resetFileInput();
       return;
     }
-
     if (file.size > 2 * 1024 * 1024) {
       setError("ขนาดไฟล์ต้องไม่เกิน 2MB");
-      resetFileInput();
       return;
     }
-
     setError(null);
     setLogoFile(file);
   }
 
-  function resetFileInput() {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-
-  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-
     const file = e.dataTransfer.files[0];
     if (file) handleFileSelect(file);
-  }
-
-  function handleRemoveLogo() {
-    setLogoFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
     if (!name.trim()) {
       setError("กรุณากรอกชื่อ Organizer");
       return;
@@ -108,7 +74,6 @@ export default function CreateOrganizerModal({
       onCreated({
         id: result.organizerId,
         name: result.name,
-        description: description.trim(),
         logo_url: result.logo_url,
         role: "owner",
       });
@@ -129,46 +94,41 @@ export default function CreateOrganizerModal({
     }
   }
 
-
   return (
     /* Backdrop */
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+      className="z-[100] fixed inset-0 flex justify-center items-center bg-black/70 p-4"
       onClick={(e) => {
-        if (!isSubmitting && e.target === e.currentTarget) {
-          onClose();
-        }
+        if (e.target === e.currentTarget) onClose();
       }}
     >
       {/* Modal panel */}
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#1a1a2e] shadow-2xl">
+      <div className="bg-[#1a1a2e] shadow-2xl border border-white/10 rounded-2xl w-full max-w-md">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5">
-          <h2 className="text-lg font-bold text-white">
+        <div className="flex justify-between items-center px-6 py-5">
+          <h2 className="font-bold text-white text-lg">
             สร้าง <span className="font-bold">Organizer</span> ใหม่
           </h2>
           <button
-            type="button"
             onClick={onClose}
-            disabled={isSubmitting}
-            className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+            className="hover:bg-white/10 p-1 rounded-lg text-gray-400 hover:text-white transition-colors"
             aria-label="ปิด"
           >
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 px-6 pb-6">
           {/* Error */}
           {error && (
-            <p className="rounded-lg bg-red-500/15 px-4 py-3 text-sm text-red-400 border border-red-500/30">
+            <p className="bg-red-500/15 px-4 py-3 border border-red-500/30 rounded-lg text-red-400 text-sm">
               {error}
             </p>
           )}
 
           {/* ชื่อ Organizer */}
           <div className="space-y-2">
-            <label className="text-sm text-gray-300">
+            <label className="text-gray-300 text-sm">
               ชื่อ Organizer <span className="text-red-400">*</span>
             </label>
             <input
@@ -176,13 +136,13 @@ export default function CreateOrganizerModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="เช่น Magic Ticket Events Co."
-              className="w-full rounded-lg bg-[#0d0d1a] border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40"
+              className="bg-[#0d0d1a] px-4 py-3 border border-white/10 focus:border-violet-500 rounded-lg outline-none focus:ring-1 focus:ring-violet-500/40 w-full text-white text-sm transition-colors placeholder-gray-500"
             />
           </div>
 
           {/* คำอธิบาย */}
           <div className="space-y-2">
-            <label className="text-sm text-gray-300">คำอธิบาย</label>
+            <label className="text-gray-300 text-sm">คำอธิบาย</label>
             <textarea
               value={description}
               onChange={(e) =>
@@ -190,34 +150,34 @@ export default function CreateOrganizerModal({
               }
               placeholder="อธิบายสั้นๆ ว่า organizer นี้จัดงานประเภทไหน"
               rows={4}
-              className="w-full resize-y rounded-lg bg-[#0d0d1a] border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40"
+              className="bg-[#0d0d1a] px-4 py-3 border border-white/10 focus:border-violet-500 rounded-lg outline-none focus:ring-1 focus:ring-violet-500/40 w-full text-white text-sm transition-colors resize-y placeholder-gray-500"
             />
-            <p className="text-right text-xs text-gray-500">
+            <p className="text-gray-500 text-xs text-right">
               {description.length}/{MAX_DESC}
             </p>
           </div>
 
           {/* โลโก้ */}
           <div className="space-y-2">
-            <label className="text-sm text-gray-300">โลโก้ (ไม่บังคับ)</label>
+            <label className="text-gray-300 text-sm">โลโก้ (ไม่บังคับ)</label>
 
             {logoFile ? (
               /* Preview state */
-              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-[#0d0d1a] px-4 py-3">
+              <div className="flex justify-between items-center bg-[#0d0d1a] px-4 py-3 border border-white/10 rounded-lg">
                 <div className="flex items-center space-x-3 min-w-0">
                   <img
-                    src={logoPreview ?? ""}
+                    src={URL.createObjectURL(logoFile)}
                     alt="logo preview"
-                    className="h-8 w-8 rounded object-cover shrink-0"
+                    className="rounded w-8 h-8 object-cover shrink-0"
                   />
-                  <span className="truncate text-sm text-gray-300">
+                  <span className="text-gray-300 text-sm truncate">
                     {logoFile.name}
                   </span>
                 </div>
                 <button
                   type="button"
-                  onClick={handleRemoveLogo}
-                  className="ml-2 shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-red-400"
+                  onClick={() => setLogoFile(null)}
+                  className="hover:bg-white/10 ml-2 p-1 rounded text-gray-400 hover:text-red-400 transition-colors shrink-0"
                   aria-label="ลบไฟล์"
                 >
                   <Trash2 size={16} />
@@ -240,10 +200,10 @@ export default function CreateOrganizerModal({
                 }`}
               >
                 <ImageIcon size={32} className="text-gray-500" />
-                <p className="text-center text-sm text-gray-400">
+                <p className="text-gray-400 text-sm text-center">
                   ลากไฟล์มาวาง หรือคลิกเพื่อเลือกรูป
                 </p>
-                <p className="text-xs text-gray-500">PNG/JPG/WebP ไม่เกิน 2MB</p>
+                <p className="text-gray-500 text-xs">PNG/JPG ไม่เกิน 2MB</p>
               </div>
             )}
 
@@ -265,14 +225,14 @@ export default function CreateOrganizerModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/5 disabled:opacity-50"
+              className="flex-1 bg-transparent hover:bg-white/5 disabled:opacity-50 px-4 py-3 border border-white/10 rounded-xl font-semibold text-white text-sm transition-colors"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !name.trim()}
-              className="flex-1 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-4 py-3 rounded-xl font-semibold text-white text-sm transition-colors disabled:cursor-not-allowed"
             >
               {isSubmitting ? "กำลังสร้าง..." : "สร้าง Organizer"}
             </button>

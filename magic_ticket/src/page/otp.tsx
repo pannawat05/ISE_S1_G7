@@ -88,14 +88,14 @@ function Otp() {
       const otpCode = otpValues.join("");
       if (otpCode.length < 6) {
         Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "warning",
-        title: "กรุณากรอกรหัส OTP ให้ครบ 6 หลัก",
-        showConfirmButton: false,
-        timer: 3500,
-        timerProgressBar: true,
-      });
+          toast: true,
+          position: "top-end",
+          icon: "warning",
+          title: "กรุณากรอกรหัส OTP ให้ครบ 6 หลัก",
+          showConfirmButton: false,
+          timer: 3500,
+          timerProgressBar: true,
+        });
         return;
       }
 
@@ -168,14 +168,14 @@ function Otp() {
                 
                 if (signupRes.status === 201) {
                   await Swal.fire({
-                  toast: true,
-                  position: "top-end",
-                  icon: "success",
-                  title: "สมัครสมาชิกและยืนยันตัวตนสำเร็จ!",
-                  showConfirmButton: false,
-                  timer: 2500,
-                  timerProgressBar: true,
-                });
+                    toast: true,
+                    position: "top-end",
+                    icon: "success",
+                    title: "สมัครสมาชิกและยืนยันตัวตนสำเร็จ!",
+                    showConfirmButton: false,
+                    timer: 2500,
+                    timerProgressBar: true,
+                  });
                   localStorage.removeItem("signupData");
                   window.location.href = "/signin";
                 } else {
@@ -239,18 +239,18 @@ function Otp() {
 
   return (
     <div className="mt-auth-page">
-      <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-purple-600/10 blur-[100px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-600/10 blur-[100px] rounded-full pointer-events-none" />
+      <div className="top-1/4 left-1/4 absolute bg-purple-600/10 blur-[100px] rounded-full w-80 h-80 pointer-events-none" />
+      <div className="right-1/4 bottom-1/4 absolute bg-violet-600/10 blur-[100px] rounded-full w-80 h-80 pointer-events-none" />
 
       <div className="mt-auth-card text-center">
-        <div className="text-3xl mb-2">🔐✨</div>
-        <h2 className="text-2xl font-extrabold mt-heading mb-2">
+        <div className="mb-2 text-3xl">🔐✨</div>
+        <h2 className="mt-heading mb-2 font-extrabold text-2xl">
           ยืนยันตัวตนของคุณ
         </h2>
-        <p className="text-sm text-gray-400 mb-2">
+        <p className="mb-2 text-gray-400 text-sm">
           กรอกรหัส OTP 6 หลักที่ส่งไปยังอีเมลของคุณ
         </p>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="mb-6 text-gray-500 text-sm">
           รหัสหมดอายุใน{" "}
           <span className="font-bold text-violet-400">{formatTime(timeLeft)}</span>
         </p>
@@ -280,13 +280,13 @@ function Otp() {
           <button
             type="submit"
             disabled={isSubmitting || isExpired}
-            className="w-full py-3 mt-btn-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm"
+            className="disabled:opacity-50 mt-btn-primary py-3 w-full text-sm disabled:transform-none disabled:cursor-not-allowed"
           >
             {isSubmitting ? "กำลังยืนยัน..." : "ยืนยันรหัส OTP 🔮"}
           </button>
         </form>
 
-        <div className="text-center mt-6 text-xs text-gray-500">
+        <div className="mt-6 text-gray-500 text-xs text-center">
           ไม่ได้รับรหัส?{" "}
           <Link to="/signup" className="mt-link font-medium underline underline-offset-4">
             กลับไปสมัครใหม่

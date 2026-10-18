@@ -38,7 +38,7 @@ export default function ForgotPassword() {
         toast: true,
         position: "top-end",
         icon: "error",
-        title:  error instanceof Error && error.message.trim() ? error.message : "ส่ง OTP ไม่สำเร็จ กรุณาลองใหม่",
+        title: error instanceof Error && error.message.trim() ? error.message : "ส่ง OTP ไม่สำเร็จ กรุณาลองใหม่",
         showConfirmButton: false,
         timer: 3500,
         timerProgressBar: true,
@@ -126,7 +126,7 @@ export default function ForgotPassword() {
                 required
               />
             </div>
-            <button type="submit" disabled={isSubmitting} className="mt-btn-primary py-3 w-full disabled:opacity-50">
+            <button type="submit" disabled={isSubmitting} className="disabled:opacity-50 mt-btn-primary py-3 w-full">
               {isSubmitting ? "กำลังส่ง OTP..." : "ส่งรหัส OTP"}
             </button>
           </form>
@@ -166,7 +166,7 @@ export default function ForgotPassword() {
                 required
               />
             </div>
-            <button type="submit" disabled={isSubmitting} className="mt-btn-primary py-3 w-full disabled:opacity-50">
+            <button type="submit" disabled={isSubmitting} className="disabled:opacity-50 mt-btn-primary py-3 w-full">
               {isSubmitting ? "กำลังเปลี่ยนรหัสผ่าน..." : "เปลี่ยนรหัสผ่าน"}
             </button>
           </form>

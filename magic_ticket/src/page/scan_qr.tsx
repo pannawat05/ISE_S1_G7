@@ -33,7 +33,7 @@ function ScanResultCard({ result, onReset }: { result: ScanResult; onReset: () =
         <p className={`font-bold text-xl ${isOk ? "text-green-300" : isDuplicate ? "text-yellow-300" : "text-red-300"}`}>
           {result.message}
         </p>
-        {result.holder && <p className="text-white text-lg font-semibold">{result.holder}</p>}
+        {result.holder && <p className="font-semibold text-white text-lg">{result.holder}</p>}
         {result.holder_email && <p className="text-gray-400 text-sm">{result.holder_email}</p>}
         {result.zone && (
           <p className="text-gray-300 text-sm">
@@ -43,7 +43,7 @@ function ScanResultCard({ result, onReset }: { result: ScanResult; onReset: () =
         )}
       </div>
       <button onClick={onReset}
-        className="flex items-center gap-2 mx-auto bg-white/10 hover:bg-white/20 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors">
+        className="flex items-center gap-2 bg-white/10 hover:bg-white/20 mx-auto px-5 py-2.5 rounded-xl font-semibold text-white text-sm transition-colors">
         <RefreshCw size={16} /> สแกนต่อ
       </button>
     </div>
@@ -174,8 +174,8 @@ export default function ScanQRPage() {
   function reset() { setScanResult(null); setManualCode(""); }
 
   return (
-    <div className="bg-black min-h-screen text-white overflow-y-auto">
-      <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
+    <div className="bg-black min-h-screen overflow-y-auto text-white">
+      <div className="space-y-6 mx-auto px-4 py-8 max-w-lg">
 
         {/* Header */}
         <div className="flex items-center gap-2">
@@ -188,7 +188,7 @@ export default function ScanQRPage() {
 
         {/* Not logged in */}
         {!Cookies.get("authToken") && (
-          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3 text-yellow-400 text-sm">
+          <div className="bg-yellow-500/10 px-4 py-3 border border-yellow-500/20 rounded-xl text-yellow-400 text-sm">
             กรุณาเข้าสู่ระบบก่อนใช้งาน
           </div>
         )}
@@ -196,7 +196,7 @@ export default function ScanQRPage() {
         {/* Loading */}
         {loading && (
           <div className="flex justify-center py-16">
-            <Loader2 size={28} className="animate-spin text-violet-400" />
+            <Loader2 size={28} className="text-violet-400 animate-spin" />
           </div>
         )}
 
@@ -204,12 +204,12 @@ export default function ScanQRPage() {
           <>
             {/* Event selector */}
             <div className="space-y-1.5">
-              <label className="text-gray-400 text-sm font-medium">เลือก Event ที่จะตรวจบัตร</label>
+              <label className="font-medium text-gray-400 text-sm">เลือก Event ที่จะตรวจบัตร</label>
               <div className="relative">
                 <select
                   value={selectedEventId}
                   onChange={(e) => { setSelectedEventId(Number(e.target.value)); reset(); stopCamera(); }}
-                  className="mt-input w-full appearance-none cursor-pointer pr-9"
+                  className="mt-input pr-9 w-full appearance-none cursor-pointer"
                 >
                   <option value={0}>— เลือก event —</option>
                   {uniqueEvents.map((a) => (
@@ -219,12 +219,12 @@ export default function ScanQRPage() {
                     </option>
                   ))}
                 </select>
-                <ChevronDown size={16} className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <ChevronDown size={16} className="top-1/2 right-3 absolute text-gray-400 -translate-y-1/2 pointer-events-none" />
               </div>
 
               {uniqueEvents.length === 0 && (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 flex gap-2">
-                  <ShieldCheck size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <div className="flex gap-2 bg-amber-500/10 px-4 py-3 border border-amber-500/20 rounded-xl">
+                  <ShieldCheck size={16} className="mt-0.5 text-amber-400 shrink-0" />
                   <p className="text-amber-400 text-xs">
                     คุณยังไม่ได้ถูก assign เข้างานใด — ติดต่อ organizer เพื่อให้ assign เป็น staff
                   </p>
@@ -238,25 +238,25 @@ export default function ScanQRPage() {
                 {/* Camera */}
                 {!cameraMode ? (
                   <button onClick={startCamera}
-                    className="w-full flex items-center justify-center gap-3 bg-violet-600 hover:bg-violet-700 py-6 rounded-2xl font-bold text-white text-lg transition-colors shadow-lg shadow-violet-600/20">
+                    className="flex justify-center items-center gap-3 bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-600/20 py-6 rounded-2xl w-full font-bold text-white text-lg transition-colors">
                     <QrCode size={30} /> เปิดกล้องสแกน QR
                   </button>
                 ) : (
                   <div className="space-y-3">
-                    <div className="relative bg-black rounded-2xl overflow-hidden border border-violet-500/40">
-                      <video ref={videoRef} autoPlay playsInline muted className="w-full aspect-square object-cover" />
+                    <div className="relative bg-black border border-violet-500/40 rounded-2xl overflow-hidden">
+                      <video ref={videoRef} autoPlay playsInline muted className="w-full object-cover aspect-square" />
                       {/* Scan overlay */}
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-52 h-52 rounded-xl border-2 border-violet-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+                      <div className="absolute inset-0 flex justify-center items-center pointer-events-none">
+                        <div className="shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] border-2 border-violet-400 rounded-xl w-52 h-52" />
                       </div>
-                      <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                        <p className="bg-black/70 text-white text-sm px-4 py-1.5 rounded-full">
+                      <div className="right-0 bottom-4 left-0 absolute flex justify-center">
+                        <p className="bg-black/70 px-4 py-1.5 rounded-full text-white text-sm">
                           {("BarcodeDetector" in window) ? "กำลังสแกนอัตโนมัติ..." : "กรอก code ด้านล่าง"}
                         </p>
                       </div>
                     </div>
                     <button onClick={stopCamera}
-                      className="w-full py-2.5 border border-white/10 rounded-xl text-gray-400 hover:text-white text-sm transition-colors">
+                      className="py-2.5 border border-white/10 rounded-xl w-full text-gray-400 hover:text-white text-sm transition-colors">
                       ปิดกล้อง
                     </button>
                   </div>
@@ -270,11 +270,11 @@ export default function ScanQRPage() {
                       value={manualCode}
                       onChange={(e) => setManualCode(e.target.value)}
                       placeholder="MT-xxxxxxxx"
-                      className="mt-input flex-1 font-mono text-sm"
+                      className="flex-1 mt-input font-mono text-sm"
                       autoComplete="off"
                     />
                     <button type="submit" disabled={!manualCode.trim() || scanning}
-                      className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-4 py-2 rounded-xl text-white text-sm font-semibold transition-colors">
+                      className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-4 py-2 rounded-xl font-semibold text-white text-sm transition-colors">
                       {scanning ? <Loader2 size={16} className="animate-spin" /> : "ตรวจ"}
                     </button>
                   </form>

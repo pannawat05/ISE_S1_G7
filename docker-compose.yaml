@@ -15,6 +15,7 @@ services:
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "true"
       VITE_API_BASE_URL: /api
+      DOCKER_ENV: "true"
       DB_HOST: db-mysql
       DB_USER: root
       DB_PASSWORD: secretpassword

@@ -24,10 +24,10 @@ function App() {
 
   return (
     <Router>
-      <div className="light-theme flex flex-col bg-white w-full h-screen overflow-hidden text-black">
+      <div className="flex flex-col bg-white w-full h-screen overflow-x-hidden text-black light-theme">
         <Navbar />
 
-        <div className="flex-1 w-full min-h-0 overflow-hidden">
+        <div className="flex-1 w-full min-h-0 overflow-x-hidden">
           <Routes>
             <Route path="/" element={<pages.Home />} />
 
