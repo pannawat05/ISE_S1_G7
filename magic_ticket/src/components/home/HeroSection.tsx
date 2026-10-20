@@ -4,13 +4,15 @@ interface HeroSectionProps {
   search: string;
   location: string;
   type: string;
+  sortOrder: "ASC" | "DESC";
   onSearchChange: (v: string) => void;
   onLocationChange: (v: string) => void;
   onTypeChange: (v: string) => void;
+  onSortOrderChange: (v: "ASC" | "DESC") => void;
 }
 
 export default function HeroSection({
-  search, location, type, onSearchChange, onLocationChange, onTypeChange,
+  search, location, type, sortOrder, onSearchChange, onLocationChange, onTypeChange, onSortOrderChange,
 }: HeroSectionProps) {
   return (
     <section className="relative px-6 pt-16 pb-12 text-center">
@@ -31,9 +33,11 @@ export default function HeroSection({
           search={search}
           location={location}
           type={type}
+          sortOrder={sortOrder}
           onSearchChange={onSearchChange}
           onLocationChange={onLocationChange}
           onTypeChange={onTypeChange}
+          onSortOrderChange={onSortOrderChange}
         />
       </div>
     </section>

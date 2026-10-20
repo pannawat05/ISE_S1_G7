@@ -7,9 +7,10 @@ interface EventGridProps {
   search: string;
   location: string;
   type: string;
+  sortOrder: "ASC" | "DESC";
 }
 
-export default function EventGrid({ search, location, type }: EventGridProps) {
+export default function EventGrid({ search, location, type, sortOrder }: EventGridProps) {
   const [events, setEvents] = useState<PublicEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +22,7 @@ export default function EventGrid({ search, location, type }: EventGridProps) {
 
     // Debounce search 300ms
     const timer = setTimeout(() => {
-      fetchPublicEvents({ search, location, type, limit: 20 })
+      fetchPublicEvents({ search, location, type, sortOrder, limit: 20 })
         .then((data) => {
           setEvents(data.events);
           setTotal(data.total);
@@ -31,7 +32,7 @@ export default function EventGrid({ search, location, type }: EventGridProps) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [search, location, type]);
+  }, [search, location, type, sortOrder]);
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
