@@ -11,19 +11,22 @@ export interface CheckoutRequest {
   payment_method_id?: number;
 }
 
-interface CheckoutResponse {
-  client_secret: string;
-  payment_intent_id: string;
-  amount: number;
-
-  // Stripe Connected Account
-  stripe_account_id: string;
-
-  // Platform fee
+export interface CheckoutResponse {
+  // Paid ticket fields
+  client_secret?: string;
+  payment_intent_id?: string;
+  stripe_account_id?: string;
   platform_fee?: number;
   platform_fee_percent?: number;
 
+  // Common
+  amount: number;
   ticket_ids?: number[];
+
+  // Free ticket fields
+  is_free?: boolean;
+  tickets?: TicketResult[];
+  message?: string;
 }
 
 export interface TicketResult {

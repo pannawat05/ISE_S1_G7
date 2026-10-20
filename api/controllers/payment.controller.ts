@@ -215,7 +215,44 @@ export async function checkout(req: AuthRequest, res: Response) {
       ticketIds.push(result.insertId);
     }
 
-    // ── 7. Create PaymentIntent ──
+    // ── 7. Free ticket shortcut — ข้าม Stripe ──
+    if (amountSatang === 0) {
+      const placeholders = ticketIds.map(() => "?").join(",");
+      await execute(
+        `UPDATE tickets SET status = 'paid', gross_amount = 0, net_amount = 0
+         WHERE id IN (${placeholders}) AND status = 'reserved'`,
+        ticketIds,
+      );
+
+      const ticketRows = await query<{ id: number; qrcode: string; position: string | null }[]>(
+        `SELECT t.id, t.qrcode, s.position
+         FROM tickets t
+         LEFT JOIN seats s ON s.id = t.seat_id
+         WHERE t.id IN (${placeholders})`,
+        ticketIds,
+      );
+
+      const tickets = [];
+      for (const ticket of ticketRows) {
+        const qrDataUrl = await QRCode.toDataURL(ticket.qrcode);
+        tickets.push({
+          ticket_id: ticket.id,
+          qrcode: ticket.qrcode,
+          qr_data_url: qrDataUrl,
+          seat_position: ticket.position,
+        });
+      }
+
+      return res.status(200).json({
+        is_free: true,
+        amount: 0,
+        ticket_ids: ticketIds,
+        tickets,
+        message: "จองบัตรฟรีสำเร็จ",
+      });
+    }
+
+    // ── 8. Create PaymentIntent ──
     const paymentIntent = await stripe.paymentIntents.create(
       {
         amount: amountSatang,
@@ -230,7 +267,7 @@ export async function checkout(req: AuthRequest, res: Response) {
       { stripeAccount: stripeAccountId },
     );
 
-    // ── 8. Return response matching frontend CheckoutResponse type ──
+    // ── 9. Return response matching frontend CheckoutResponse type ──
     return res.status(200).json({
       client_secret: paymentIntent.client_secret,
       payment_intent_id: paymentIntent.id,

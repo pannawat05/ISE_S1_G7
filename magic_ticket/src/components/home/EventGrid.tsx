@@ -37,8 +37,8 @@ export default function EventGrid({ search, location, type, sortOrder }: EventGr
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <section className="mx-auto px-6 pb-16 max-w-6xl">
-        <div className="gap-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <section className="mx-auto px-4 sm:px-6 pb-16 max-w-6xl">
+        <div className="gap-4 grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="bg-white/5 rounded-2xl h-72 animate-pulse" />
           ))}
@@ -50,7 +50,7 @@ export default function EventGrid({ search, location, type, sortOrder }: EventGr
   // ── Error ─────────────────────────────────────────────────────────────────
   if (error) {
     return (
-      <section className="mx-auto px-6 pb-16 max-w-6xl">
+      <section className="mx-auto px-4 sm:px-6 pb-16 max-w-6xl">
         <div className="bg-red-500/5 p-8 border border-red-500/20 rounded-2xl text-center">
           <p className="text-red-400 text-sm">{error}</p>
         </div>
@@ -61,7 +61,7 @@ export default function EventGrid({ search, location, type, sortOrder }: EventGr
   // ── Empty ─────────────────────────────────────────────────────────────────
   if (events.length === 0) {
     return (
-      <section className="mx-auto px-6 pb-16 max-w-6xl">
+      <section className="mx-auto px-4 sm:px-6 pb-16 max-w-6xl">
         <div className="flex flex-col items-center gap-4 bg-surface py-16 border border-white/5 rounded-2xl text-center">
           {search || location || type ? (
             <>
@@ -87,7 +87,7 @@ export default function EventGrid({ search, location, type, sortOrder }: EventGr
 
   // ── Grid ──────────────────────────────────────────────────────────────────
   return (
-    <section className="mx-auto px-6 pb-16 max-w-6xl">
+    <section className="mx-auto px-4 sm:px-6 pb-16 max-w-6xl">
       {/* Result count */}
       {(search || location || type) && (
         <p className="mb-4 text-gray-400 text-sm">
@@ -95,7 +95,7 @@ export default function EventGrid({ search, location, type, sortOrder }: EventGr
         </p>
       )}
 
-      <div className="gap-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="gap-4 grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3">
         {events.map((event) => (
           <EventCard key={event.id} event={event} />
         ))}

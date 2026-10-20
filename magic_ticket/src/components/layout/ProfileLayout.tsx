@@ -28,9 +28,9 @@ export default function ProfileLayout() {
 
   return (
     <SidebarContext.Provider value={{ isOpen: isSidebarOpen, setIsOpen: setIsSidebarOpen }}>
-      <div className="flex h-full w-full overflow-hidden">
+      <div className="flex w-full h-full overflow-hidden">
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <Outlet />
         </div>
       </div>

@@ -322,6 +322,7 @@ export default function PaymentPage() {
   const [timeLeft, setTimeLeft] = useState(RESERVE_SECONDS);
   const [ticketIds, setTicketIds] = useState<number[]>([]);
   const [cancelling, setCancelling] = useState(false);
+  const [freeTickets, setFreeTickets] = useState<TicketResult[] | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const checkoutCalledRef = useRef(false); // prevent StrictMode double-invoke
 
@@ -372,6 +373,16 @@ export default function PaymentPage() {
                 (s) => s.id
               ),
           });
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Free ticket shortcut — ไม่ต้องผ่าน Stripe
+        // ─────────────────────────────────────────────────────────────────────
+
+        if (res.is_free) {
+          setFreeTickets(res.tickets ?? []);
+          setLoading(false);
+          return;
+        }
 
         // ─────────────────────────────────────────────────────────────────────
         // Connected Account
@@ -470,9 +481,9 @@ export default function PaymentPage() {
 
   }, [navigate, state]);
 
-  // ── Countdown timer ──
+  // ── Countdown timer ── (เฉพาะ paid ticket ที่ใช้ Stripe)
   useEffect(() => {
-    if (loading || error || !clientSecret) return;
+    if (loading || error || freeTickets || !clientSecret) return;
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -647,9 +658,48 @@ export default function PaymentPage() {
             />
 
             <p className="text-gray-400 text-sm">
-              กำลังเชื่อมต่อ Stripe...
+              กำลังดำเนินการ...
             </p>
 
+          </div>
+        )}
+
+        {/* ── Free ticket success ── */}
+        {!loading && !error && freeTickets && (
+          <div className="space-y-6 pb-12">
+            <div className="flex flex-col items-center gap-3 py-6">
+              <div className="flex justify-center items-center bg-green-500/20 rounded-full w-16 h-16">
+                <CheckCircle2 size={36} className="text-green-400" />
+              </div>
+              <h2 className="font-bold text-white text-xl">จองบัตรฟรีสำเร็จ!</h2>
+              <p className="text-gray-400 text-sm">QR Code สำหรับ check-in ที่หน้างาน</p>
+            </div>
+
+            {freeTickets.map((ticket) => (
+              <QRTicketCard
+                key={ticket.ticket_id}
+                ticket={ticket}
+                eventName={state.eventName}
+                zoneName={state.zone.name}
+              />
+            ))}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => navigate("/my-tickets")}
+                className="flex-1 hover:bg-white/5 py-3 border border-white/10 rounded-xl font-semibold text-white text-sm"
+              >
+                ดูตั๋วทั้งหมด
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="flex-1 bg-violet-600 hover:bg-violet-700 py-3 rounded-xl font-semibold text-white text-sm"
+              >
+                กลับหน้าหลัก
+              </button>
+            </div>
           </div>
         )}
 
@@ -672,6 +722,7 @@ export default function PaymentPage() {
         {/* Stripe */}
         {!loading &&
           !error &&
+          !freeTickets &&
           clientSecret &&
           stripeInstance &&
           stripeAccountId && (

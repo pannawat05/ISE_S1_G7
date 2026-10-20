@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { LogOut, ShieldCheck } from "lucide-react";
 import Cookies from "js-cookie";
+import Swal from "sweetalert2";
 import type { UserProfile } from "@/api/user";
 
 function readUserFromStorage(): UserProfile | null {
@@ -32,7 +33,17 @@ export default function NavbarActions() {
 
   if (!token) return <AuthenNav />;
 
-  function handleLogout() {
+  async function handleLogout() {
+    const result = await Swal.fire({
+      title: "ออกจากระบบ?",
+      text: "คุณต้องการออกจากระบบใช่หรือไม่",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "ออกจากระบบ",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!result.isConfirmed) return;
     Cookies.remove("authToken");
     localStorage.clear();
     setToken(undefined);

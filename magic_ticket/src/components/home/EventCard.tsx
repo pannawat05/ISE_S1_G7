@@ -43,36 +43,14 @@ export default function EventCard({ event }: EventCardProps) {
   return (
     <Link to={`/events/${event.id}`} className="group block">
       <article
-        className="
-          flex flex-col
-          bg-white
-          hover:bg-white
-          border border-purple-100
-          hover:border-purple-300
-          rounded-2xl
-          h-full
-          overflow-hidden
-          shadow-sm
-          hover:shadow-lg
-          hover:shadow-purple-200/50
-          transition-all
-          hover:-translate-y-1
-          duration-300
-        "
+        className="flex flex-col bg-white hover:bg-white shadow-sm hover:shadow-lg hover:shadow-purple-200/50 border border-purple-100 hover:border-purple-300 rounded-2xl h-full overflow-hidden transition-all hover:-translate-y-1 duration-300"
       >
         {/* Cover */}
         <div className="relative aspect-16/10 overflow-hidden">
           <img
             src={coverSrc}
             alt={event.name}
-            className="
-              w-full
-              h-full
-              object-cover
-              group-hover:scale-105
-              transition-transform
-              duration-500
-            "
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = PLACEHOLDER;
             }}
@@ -82,12 +60,12 @@ export default function EventCard({ event }: EventCardProps) {
           <span
             className={`
               absolute
-              left-3
-              top-3
+              left-2 sm:left-3
+              top-2 sm:top-3
               rounded-full
-              px-2.5
-              py-1
-              text-xs
+              px-2 sm:px-2.5
+              py-0.5 sm:py-1
+              text-[10px] sm:text-xs
               font-medium
               backdrop-blur-sm
               ${typeColor}
@@ -98,20 +76,11 @@ export default function EventCard({ event }: EventCardProps) {
         </div>
 
         {/* Content */}
-        <div className="flex flex-col flex-1 p-5">
+        <div className="flex flex-col flex-1 p-3 sm:p-5">
 
           {/* Title */}
           <h3
-            className="
-              mb-1.5
-              font-bold
-              text-gray-900
-              group-hover:text-violet-600
-              text-base
-              line-clamp-2
-              leading-snug
-              transition-colors
-            "
+            className="mb-1.5 font-bold text-gray-900 group-hover:text-violet-600 text-sm sm:text-base line-clamp-2 leading-snug transition-colors"
           >
             {event.name}
           </h3>
@@ -119,13 +88,7 @@ export default function EventCard({ event }: EventCardProps) {
           {/* Description */}
           {event.description && (
             <p
-              className="
-                mb-4
-                text-gray-500
-                text-sm
-                line-clamp-2
-                leading-relaxed
-              "
+              className="hidden sm:block mb-4 text-gray-500 text-sm line-clamp-2 leading-relaxed"
             >
               {event.description}
             </p>

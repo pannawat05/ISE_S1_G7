@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart3, Download, Loader2, RefreshCw, Users, Ticket, CreditCard, UserCheck, UserX, Eye } from "lucide-react";
+import { BarChart3, Download, Loader2, Menu, RefreshCw, Users, Ticket, CreditCard, UserCheck, UserX, Eye } from "lucide-react";
 import Cookies from "js-cookie";
 import {
   exportOrganizerAnalytics, fetchDashboard, fetchOrganizerAnalytics, fetchZones,
@@ -10,7 +10,7 @@ import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 const money = (value: number) => `฿${value.toLocaleString()}`;
 
 function Kpi({ label, value, icon: Icon, color }: { label: string; value: string; icon: typeof Eye; color: string }) {
-  return <div className="mt-surface space-y-3 p-5 rounded-2xl">
+  return <div className="space-y-3 mt-surface p-5 rounded-2xl">
     <div className="flex justify-between items-center"><span className="text-gray-400 text-sm">{label}</span><Icon size={18} className={color} /></div>
     <strong className="block font-bold text-white text-2xl">{value}</strong>
   </div>;
@@ -62,7 +62,7 @@ export default function AnalyticsPage() {
 
   return <div className="flex flex-col h-full min-h-0 overflow-hidden">
     <header className="mt-dashboard-header shrink-0">
-      <div className="flex items-center gap-3"><button onClick={() => setIsOpen(true)} className="md:hidden text-gray-400"><BarChart3 size={22} /></button><h1 className="font-semibold text-white text-xl">Analytics</h1></div>
+      <div className="flex items-center gap-3"><button onClick={() => setIsOpen(true)} className="md:hidden text-gray-400"><Menu size={24} /></button><h1 className="font-semibold text-white text-xl">Analytics</h1></div>
       <button onClick={() => loadReport()} disabled={loading} className="flex items-center gap-2 text-gray-400 hover:text-white text-sm"><RefreshCw size={14} className={loading ? "animate-spin" : ""} /> รีเฟรช</button>
     </header>
     <main className="flex-1 space-y-6 px-4 md:px-6 py-6 min-h-0 overflow-y-auto">
