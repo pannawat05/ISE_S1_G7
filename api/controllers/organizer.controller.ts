@@ -429,10 +429,19 @@ export async function softDeleteEventHandler(req: AuthRequest, res: Response) {
 
     // ── ตรวจสอบ: มีตั๋วที่ถูกซื้อแล้ว ──
     const paidRows = await query<{ paid_count: number }[]>(
-      `SELECT COUNT(t.id) AS paid_count
-       FROM tickets t
-       WHERE t.event_id = ? AND t.status IN ('paid', 'checked_in')`,
-      [eventId],
+      `SELECT COUNT(*) AS paid_count
+       FROM (
+         SELECT t.id
+         FROM tickets t
+         JOIN seats s ON s.id = t.seat_id
+         JOIN zones z ON z.id = s.zone_id
+         WHERE z.event_id = ? AND t.status IN ('paid', 'checked_in')
+         UNION ALL
+         SELECT wl.id
+         FROM white_list wl
+         WHERE wl.event_id = ?
+       ) AS event_admissions`,
+      [eventId, eventId],
     );
     const paidCount = Number(paidRows[0]?.paid_count ?? 0);
 
