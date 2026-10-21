@@ -31,14 +31,14 @@ async function checkNotifications(): Promise<void> {
       INNER JOIN tickets t
         ON t.users_id = u.id
 
-      INNER JOIN seats s
+      LEFT JOIN seats s
         ON s.id = t.seat_id
 
-      INNER JOIN zones z
+      LEFT JOIN zones z
         ON z.id = s.zone_id
 
       INNER JOIN events e
-        ON e.id = z.event_id
+        ON e.id = t.event_id
 
       LEFT JOIN event_notifications en
         ON en.ticket_id = t.id

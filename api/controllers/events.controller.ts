@@ -29,9 +29,7 @@ export async function getMyTicketCount(req: Request, res: Response) {
     const rows = await query<{ cnt: number }[]>(
       `SELECT COUNT(t.id) AS cnt
        FROM tickets t
-       JOIN seats s ON s.id = t.seat_id
-       JOIN zones z ON z.id = s.zone_id
-       WHERE t.users_id = ? AND z.event_id = ?
+       WHERE t.users_id = ? AND t.event_id = ?
          AND (
            t.status IN ('paid', 'checked_in')
            OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE))

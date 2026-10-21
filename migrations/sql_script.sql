@@ -199,7 +199,9 @@ CREATE TABLE tickets (
         'cancelled'
     ) DEFAULT 'reserved' NOT NULL,
     users_id INT NOT NULL,
-    seat_id INT NOT NULL,
+    seat_id INT NULL,
+    event_id INT NOT NULL,
+    ticket_type ENUM('purchase', 'whitelist') NOT NULL DEFAULT 'purchase',
 
     CONSTRAINT fk_ticket_users
         FOREIGN KEY (users_id)
@@ -209,6 +211,11 @@ CREATE TABLE tickets (
     CONSTRAINT fk_ticket_seat
         FOREIGN KEY (seat_id)
         REFERENCES seats(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_ticket_event
+        FOREIGN KEY (event_id)
+        REFERENCES events(id)
         ON DELETE CASCADE
 );
 

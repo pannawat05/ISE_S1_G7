@@ -66,17 +66,17 @@ export async function scanTicket(req: AuthRequest, res: Response) {
     }[]>(
       `SELECT
          t.id, t.status, t.users_id,
-         s.position AS seat_position,
-         z.name     AS zone_name,
+         COALESCE(s.position, 'WL-00') AS seat_position,
+         COALESCE(z.name, 'Whitelist') AS zone_name,
          e.id       AS event_id,
          e.name     AS event_name,
          CONCAT(u.f_name,' ',u.l_name) AS holder_name,
          u.email    AS holder_email,
-         CASE WHEN s.position = 'WL-00' THEN 1 ELSE 0 END AS is_wl
+         CASE WHEN t.ticket_type = 'whitelist' THEN 1 ELSE 0 END AS is_wl
        FROM tickets t
-       JOIN seats    s ON s.id  = t.seat_id
-       JOIN zones    z ON z.id  = s.zone_id
-       JOIN events   e ON e.id  = z.event_id
+       LEFT JOIN seats    s ON s.id  = t.seat_id
+       LEFT JOIN zones    z ON z.id  = s.zone_id
+       JOIN events   e ON e.id  = t.event_id
        JOIN users    u ON u.id  = t.users_id
        WHERE t.qrcode = ? LIMIT 1`,
       [qrcode.trim()],

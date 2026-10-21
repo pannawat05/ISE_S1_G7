@@ -431,9 +431,7 @@ export async function softDeleteEventHandler(req: AuthRequest, res: Response) {
     const paidRows = await query<{ paid_count: number }[]>(
       `SELECT COUNT(t.id) AS paid_count
        FROM tickets t
-       JOIN seats s ON s.id = t.seat_id
-       JOIN zones z ON z.id = s.zone_id
-       WHERE z.event_id = ? AND t.status IN ('paid', 'checked_in')`,
+       WHERE t.event_id = ? AND t.status IN ('paid', 'checked_in')`,
       [eventId],
     );
     const paidCount = Number(paidRows[0]?.paid_count ?? 0);
@@ -639,20 +637,21 @@ export async function getDashboard(req: AuthRequest, res: Response) {
        -- Ticket stats use recorded payment amounts, with zone price as a legacy fallback.
        LEFT JOIN (
          SELECT
-           z2.event_id,
+           t.event_id,
            COUNT(t.id)                                                        AS sold_tickets,
-           SUM(COALESCE(t.gross_amount, z2.price))                            AS revenue,
+           SUM(COALESCE(t.gross_amount, z2.price, 0))                         AS revenue,
            SUM(COALESCE(
              t.net_amount,
              t.gross_amount * (1 - ? / 100),
-             z2.price * (1 - ? / 100)
+             z2.price * (1 - ? / 100),
+             0
            ))                                                               AS net_revenue,
            COUNT(CASE WHEN t.status = 'checked_in' THEN 1 END)               AS checkins
          FROM tickets t
-         JOIN seats  s2 ON s2.id = t.seat_id
-         JOIN zones  z2 ON z2.id = s2.zone_id
+         LEFT JOIN seats  s2 ON s2.id = t.seat_id
+         LEFT JOIN zones  z2 ON z2.id = s2.zone_id
          WHERE t.status IN ('paid', 'checked_in')
-         GROUP BY z2.event_id
+         GROUP BY t.event_id
        ) ticket_stats ON ticket_stats.event_id = e.id
        WHERE e.organizer_id = ?
        ORDER BY e.start_date DESC`,

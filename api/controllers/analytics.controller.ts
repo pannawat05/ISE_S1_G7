@@ -46,7 +46,10 @@ function buildWhere(organizerId: number, filters: AnalyticsFilters) {
     conditions.push("t.created_at < DATE_ADD(?, INTERVAL 1 DAY)");
     params.push(filters.to);
   }
-  if (filters.ticketType) { conditions.push("z.type = ?"); params.push(filters.ticketType); }
+  if (filters.ticketType) {
+    conditions.push("COALESCE(z.type, t.ticket_type) = ?");
+    params.push(filters.ticketType);
+  }
   if (filters.zoneId) { conditions.push("z.id = ?"); params.push(filters.zoneId); }
   if (filters.paymentStatus) {
     if (filters.paymentStatus === "paid") {
@@ -58,8 +61,8 @@ function buildWhere(organizerId: number, filters: AnalyticsFilters) {
     }
   }
   if (filters.ticketStatus) { conditions.push("t.status = ?"); params.push(filters.ticketStatus); }
-  if (filters.whitelist === "whitelisted") { conditions.push("wl.id IS NOT NULL"); }
-  if (filters.whitelist === "general") { conditions.push("wl.id IS NULL"); }
+  if (filters.whitelist === "whitelisted") { conditions.push("(t.ticket_type = 'whitelist' OR wl.id IS NOT NULL)"); }
+  if (filters.whitelist === "general") { conditions.push("t.ticket_type <> 'whitelist' AND wl.id IS NULL"); }
 
   return { where: conditions.join(" AND "), params };
 }
@@ -67,9 +70,10 @@ function buildWhere(organizerId: number, filters: AnalyticsFilters) {
 const rowSelect = `
   SELECT t.id AS ticket_id, t.status AS ticket_status, t.created_at,
          e.id AS event_id, e.name AS event_name, z.id AS zone_id,
-         z.name AS zone_name, z.type AS ticket_type, u.email,
+         COALESCE(z.name, 'Whitelist') AS zone_name,
+         COALESCE(z.type, t.ticket_type) AS ticket_type, u.email,
          CONCAT(u.f_name, ' ', u.l_name) AS attendee_name,
-         CASE WHEN wl.id IS NULL THEN 0 ELSE 1 END AS is_whitelisted,
+         CASE WHEN t.ticket_type = 'whitelist' OR wl.id IS NOT NULL THEN 1 ELSE 0 END AS is_whitelisted,
          CASE
            WHEN t.status IN ('paid', 'checked_in') THEN 'paid'
            WHEN t.status = 'reserved' THEN 'pending'
@@ -80,9 +84,9 @@ const rowSelect = `
          NULL AS payment_time,
          (SELECT MAX(ci.time_stamp) FROM check_in_history ci WHERE ci.ticket_id = t.id) AS checked_in_at
     FROM tickets t
-    JOIN seats s ON s.id = t.seat_id
-    JOIN zones z ON z.id = s.zone_id
-    JOIN events e ON e.id = z.event_id
+    LEFT JOIN seats s ON s.id = t.seat_id
+    LEFT JOIN zones z ON z.id = s.zone_id
+    JOIN events e ON e.id = t.event_id
     JOIN users u ON u.id = t.users_id
     LEFT JOIN white_list wl ON wl.event_id = e.id AND wl.users_id = t.users_id
 `;

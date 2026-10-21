@@ -7,8 +7,9 @@
 
 import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/types.js";
-import { query, execute } from "../model/query.js";
+import { query, pool } from "../model/query.js";
 import { findOrganizerById } from "../model/organizer.model.js";
+import { v4 as uuidv4 } from "uuid";
 
 // ─── Guard: verify organizer ownership ───────────────────────────────────────
 async function verifyOwner(req: AuthRequest, res: Response, organizerId: number) {
@@ -85,18 +86,29 @@ export async function addToWhitelist(req: AuthRequest, res: Response) {
     );
     if (!userRows.length) return res.status(404).json({ message: "User not found" });
 
-    // Add to whitelist (uq_white_list prevents duplicate)
+    // Create the whitelist entry and its no-seat ticket atomically.
+    const connection = await pool.getConnection();
     try {
-      await execute(
+      await connection.beginTransaction();
+      await connection.execute(
         "INSERT INTO white_list (users_id, event_id, note, add_by) VALUES (?, ?, ?, ?)",
         [Number(users_id), eventId, note?.trim() ?? null, req.user.id],
       );
+      await connection.execute(
+        `INSERT INTO tickets (qrcode, status, users_id, seat_id, event_id, ticket_type, gross_amount, net_amount)
+         VALUES (?, 'paid', ?, NULL, ?, 'whitelist', 0, 0)`,
+        [`MT-${uuidv4()}`, Number(users_id), eventId],
+      );
+      await connection.commit();
     } catch (dupErr: unknown) {
+      await connection.rollback();
       const code = (dupErr as { code?: string }).code;
       if (code === "ER_DUP_ENTRY") {
         return res.status(409).json({ message: "User นี้อยู่ใน whitelist แล้ว" });
       }
       throw dupErr;
+    } finally {
+      connection.release();
     }
 
     // Return full updated list
@@ -132,13 +144,29 @@ export async function removeFromWhitelist(req: AuthRequest, res: Response) {
     const organizer = await verifyOwner(req, res, organizerId);
     if (!organizer) return;
 
-    const rows = await query<{ id: number }[]>(
-      "SELECT id FROM white_list WHERE id = ? AND event_id = ? LIMIT 1",
+    const rows = await query<{ id: number; users_id: number }[]>(
+      "SELECT id, users_id FROM white_list WHERE id = ? AND event_id = ? LIMIT 1",
       [wlId, eventId],
     );
     if (!rows.length) return res.status(404).json({ message: "Whitelist entry not found" });
 
-    await execute("DELETE FROM white_list WHERE id = ?", [wlId]);
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.execute(
+        `UPDATE tickets
+         SET status = 'cancelled'
+         WHERE users_id = ? AND event_id = ? AND ticket_type = 'whitelist' AND status = 'paid'`,
+        [rows[0]!.users_id, eventId],
+      );
+      await connection.execute("DELETE FROM white_list WHERE id = ?", [wlId]);
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
 
     const updated = await query<{
       id: number; note: string | null; users_id: number;

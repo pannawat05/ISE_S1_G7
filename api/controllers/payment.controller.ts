@@ -191,9 +191,7 @@ export async function checkout(req: AuthRequest, res: Response) {
       const ownedRows = await query<{ cnt: number }[]>(
         `SELECT COUNT(t.id) AS cnt
          FROM tickets t
-         JOIN seats s ON s.id = t.seat_id
-         JOIN zones z ON z.id = s.zone_id
-         WHERE t.users_id = ? AND z.event_id = ?
+         WHERE t.users_id = ? AND t.event_id = ?
            AND (
              t.status IN ('paid', 'checked_in')
              OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL ${RESERVATION_MINUTES} MINUTE))
@@ -222,8 +220,9 @@ export async function checkout(req: AuthRequest, res: Response) {
       for (const seatId of seat_ids) {
         const qrcode = `MT-${uuidv4()}`;
         const result = await execute(
-          `INSERT INTO tickets (qrcode, status, users_id, seat_id, reserved_at) VALUES (?, 'reserved', ?, ?, NOW())`,
-          [qrcode, userId, seatId],
+          `INSERT INTO tickets (qrcode, status, users_id, seat_id, event_id, reserved_at)
+           VALUES (?, 'reserved', ?, ?, ?, NOW())`,
+          [qrcode, userId, seatId, Number(event_id)],
         );
         ticketIds.push(result.insertId);
       }
@@ -246,8 +245,9 @@ export async function checkout(req: AuthRequest, res: Response) {
 
       const qrcode = `MT-${uuidv4()}`;
       const result = await execute(
-        `INSERT INTO tickets (qrcode, status, users_id, seat_id, reserved_at) VALUES (?, 'reserved', ?, ?, NOW())`,
-        [qrcode, userId, freeSeat[0].id],
+        `INSERT INTO tickets (qrcode, status, users_id, seat_id, event_id, reserved_at)
+         VALUES (?, 'reserved', ?, ?, ?, NOW())`,
+        [qrcode, userId, freeSeat[0].id, Number(event_id)],
       );
       ticketIds.push(result.insertId);
     }
@@ -497,13 +497,15 @@ export async function getMyTickets(req: AuthRequest, res: Response) {
     }[]>(
       `SELECT
          t.id, t.qrcode, t.status, t.created_at,
-         s.position AS seat_position,
-         z.name AS zone_name, z.type AS zone_type, z.price AS zone_price,
+         COALESCE(s.position, 'WL-00') AS seat_position,
+         COALESCE(z.name, 'Whitelist') AS zone_name,
+         COALESCE(z.type, 'whitelist') AS zone_type,
+         COALESCE(z.price, 0) AS zone_price,
          e.name AS event_name, e.start_date AS event_start, e.end_date AS event_end, e.place_name
        FROM tickets t
-       JOIN seats s ON s.id = t.seat_id
-       JOIN zones z ON z.id = s.zone_id
-       JOIN events e ON e.id = z.event_id
+       LEFT JOIN seats s ON s.id = t.seat_id
+       LEFT JOIN zones z ON z.id = s.zone_id
+       JOIN events e ON e.id = t.event_id
        WHERE t.users_id = ? AND t.status != 'cancelled'
        ORDER BY t.created_at DESC`,
       [userId],
