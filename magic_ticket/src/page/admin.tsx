@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ShieldCheck, Search, Check, X, Eye, ChevronDown,
   Calendar, MapPin, Building2, Mail, AlertTriangle,
   Settings, Tag, CreditCard, Users, LayoutDashboard,
   Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Shield,
+  FileText, RefreshCw, Loader2,
 } from "lucide-react";
 import Cookies from "js-cookie";
 import {
@@ -20,6 +21,7 @@ import {
   fetchUsers, updateUserRole,
   fetchSysOrganizers,
   fetchPlatformAnalytics,
+  fetchSystemLogDates, fetchSystemLog,
   type EventType, type PaymentMethod, type SysUser, type SysOrganizer, type PaymentCategory, type PlatformAnalytics,
 } from "@/api/sysadmin";
 import { API_BASE } from "@/api/client";
@@ -342,7 +344,7 @@ function EventsDashboard({ token, events, isLoading, error, search, setSearch, s
 }
 // ─── System Dashboard ─────────────────────────────────────────────────────────
 function SystemDashboard({ token, isSysAdmin }: { token: string; isSysAdmin: boolean }) {
-  const [sysTab, setSysTab] = useState<"overview" | "types" | "payments" | "users" | "organizers">("overview");
+  const [sysTab, setSysTab] = useState<"overview" | "types" | "payments" | "users" | "organizers" | "logs">("overview");
 
   if (!isSysAdmin) {
     return (
@@ -360,6 +362,7 @@ function SystemDashboard({ token, isSysAdmin }: { token: string; isSysAdmin: boo
     { key: "payments" as const, label: "Payment Methods", icon: CreditCard },
     { key: "users" as const, label: "Users", icon: Users },
     { key: "organizers" as const, label: "Organizers", icon: Building2 },
+    { key: "logs" as const, label: "System Logs", icon: FileText },
   ];
 
   return (
@@ -386,7 +389,145 @@ function SystemDashboard({ token, isSysAdmin }: { token: string; isSysAdmin: boo
         {sysTab === "payments" && <PaymentMethodsManager token={token} />}
         {sysTab === "users" && <UsersManager token={token} />}
         {sysTab === "organizers" && <OrganizersManager token={token} />}
+        {sysTab === "logs" && <SystemLogsManager token={token} />}
       </div>
+    </div>
+  );
+}
+
+function SystemLogsManager({ token }: { token: string }) {
+  const [dates, setDates] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [content, setContent] = useState("");
+  const [datesLoading, setDatesLoading] = useState(true);
+  const [logLoading, setLogLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadDates = useCallback(async () => {
+    setDatesLoading(true);
+    setError(null);
+    try {
+      const availableDates = await fetchSystemLogDates(token);
+      setDates(availableDates);
+      if (availableDates.length === 0) setLogLoading(false);
+      setSelectedDate((current) =>
+        availableDates.includes(current) ? current : availableDates[0] ?? "",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "โหลดรายการ log ไม่สำเร็จ");
+      setLogLoading(false);
+    } finally {
+      setDatesLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    let active = true;
+    fetchSystemLogDates(token)
+      .then((availableDates) => {
+        if (!active) return;
+        setDates(availableDates);
+        setSelectedDate((current) =>
+          availableDates.includes(current) ? current : availableDates[0] ?? "",
+        );
+        setLogLoading(availableDates.length > 0);
+      })
+      .catch((e: unknown) => {
+        if (active) setError(e instanceof Error ? e.message : "โหลดรายการ log ไม่สำเร็จ");
+      })
+      .finally(() => { if (active) setDatesLoading(false); });
+    return () => { active = false; };
+  }, [token]);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    let active = true;
+    fetchSystemLog(token, selectedDate)
+      .then((log) => {
+        if (active) {
+          setContent(log.content);
+          setError(null);
+        }
+      })
+      .catch((e: unknown) => {
+        if (active) setError(e instanceof Error ? e.message : "โหลด log ไม่สำเร็จ");
+      })
+      .finally(() => { if (active) setLogLoading(false); });
+    return () => { active = false; };
+  }, [token, selectedDate, refreshKey]);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <div>
+          <h3 className="font-semibold text-white text-lg">System Logs</h3>
+          <p className="mt-1 text-gray-500 text-sm">ไฟล์ server log แยกตามวันที่</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            void loadDates();
+            setLogLoading(true);
+            setRefreshKey((key) => key + 1);
+          }}
+          disabled={datesLoading || logLoading}
+          className="flex items-center gap-2 hover:bg-white/10 disabled:opacity-50 px-3 py-2 border border-white/10 rounded-lg text-gray-300 text-sm"
+        >
+          <RefreshCw size={14} className={datesLoading || logLoading ? "animate-spin" : ""} />
+          รีเฟรช
+        </button>
+      </div>
+
+      {datesLoading ? (
+        <div className="py-8 text-gray-500 text-center">กำลังโหลดวันที่...</div>
+      ) : dates.length === 0 && error ? (
+        <div className="bg-red-500/10 p-4 border border-red-500/30 rounded-xl text-red-400 text-sm">
+          {error}
+        </div>
+      ) : dates.length === 0 ? (
+        <div className="bg-white/[0.03] p-6 border border-white/5 rounded-xl text-gray-500 text-sm text-center">
+          ยังไม่พบไฟล์ server log ในโฟลเดอร์ api/logs
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-2 pb-1 overflow-x-auto">
+            {dates.map((date) => (
+              <button
+                key={date}
+                type="button"
+                onClick={() => {
+                  if (selectedDate === date) setRefreshKey((key) => key + 1);
+                  setSelectedDate(date);
+                  setLogLoading(true);
+                  setError(null);
+                }}
+                className={`shrink-0 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  selectedDate === date
+                    ? "bg-violet-100 text-violet-700 border-violet-300 font-semibold"
+                    : "border-white/10 text-gray-400 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                {date}
+              </button>
+            ))}
+          </div>
+          {error ? (
+            <div className="bg-red-500/10 p-4 border border-red-500/30 rounded-xl text-red-400 text-sm">
+              {error}
+            </div>
+          ) : logLoading ? (
+            <div className="flex justify-center items-center gap-2 py-8 text-gray-500 text-sm">
+              <Loader2 size={16} className="animate-spin" />
+              กำลังโหลด log...
+            </div>
+          ) : (
+            <pre className="bg-black/50 p-4 border border-white/10 rounded-xl max-h-[70vh] overflow-auto font-mono text-gray-300 text-xs whitespace-pre-wrap break-words">
+              {content || "ไฟล์นี้ยังไม่มี log"}
+            </pre>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -1,3 +1,6 @@
+import { constants } from "node:fs";
+import { open, readdir } from "node:fs/promises";
+import path from "node:path";
 import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/types.js";
 import { query, execute } from "../model/query.js";
@@ -6,11 +9,77 @@ import { findUserById } from "../model/user.model.js";
 
 export { getPlatformAnalytics };
 
+const LOG_DIR = path.join(process.cwd(), "logs");
+const MAX_LOG_BYTES = 1024 * 1024;
+
 async function requireSysadmin(req: AuthRequest, res: Response) {
   if (!req.user?.id) { res.status(401).json({ message: "Unauthorized" }); return false; }
   const user = await findUserById(req.user.id);
   if (user?.role !== "sysadmin") { res.status(403).json({ message: "Sysadmin access required" }); return false; }
   return true;
+}
+
+function isLogDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export async function listSystemLogDates(req: AuthRequest, res: Response) {
+  try {
+    if (!await requireSysadmin(req, res)) return;
+    const entries = await readdir(LOG_DIR, { withFileTypes: true });
+    const dates = entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => /^server-(\d{4}-\d{2}-\d{2})\.log$/.exec(entry.name)?.[1])
+      .filter((date): date is string => date !== undefined && isLogDate(date))
+      .sort((a, b) => b.localeCompare(a));
+    return res.json({ dates });
+  } catch (err) {
+    console.error("LIST SYSTEM LOG DATES ERROR:", err);
+    return res.status(500).json({ message: "Error listing system logs" });
+  }
+}
+
+export async function getSystemLogByDate(req: AuthRequest, res: Response) {
+  const date = String(req.params.date ?? "");
+  if (!isLogDate(date)) return res.status(400).json({ message: "Invalid log date" });
+
+  try {
+    if (!await requireSysadmin(req, res)) return;
+    const fileName = `server-${date}.log`;
+    const entries = await readdir(LOG_DIR, { withFileTypes: true });
+    if (!entries.some((entry) => entry.isFile() && entry.name === fileName)) {
+      return res.status(404).json({ message: "Log file not found" });
+    }
+
+    const file = await open(
+      path.join(LOG_DIR, fileName),
+      constants.O_RDONLY | constants.O_NOFOLLOW,
+    );
+    try {
+      const size = (await file.stat()).size;
+      const truncated = size > MAX_LOG_BYTES;
+      const buffer = Buffer.alloc(Math.min(size, MAX_LOG_BYTES));
+      const { bytesRead } = await file.read(
+        buffer,
+        0,
+        buffer.length,
+        Math.max(0, size - MAX_LOG_BYTES),
+      );
+      let content = buffer.subarray(0, bytesRead).toString("utf8");
+      if (truncated) {
+        const firstLineBreak = content.indexOf("\n");
+        content = `[Earlier log lines omitted; showing the latest 1 MB]\n${firstLineBreak >= 0 ? content.slice(firstLineBreak + 1) : content}`;
+      }
+      return res.json({ date, content, truncated });
+    } finally {
+      await file.close();
+    }
+  } catch (err) {
+    console.error("GET SYSTEM LOG ERROR:", err);
+    return res.status(500).json({ message: "Error reading system log" });
+  }
 }
 
 export async function getPlatformFee(req: AuthRequest, res: Response) {

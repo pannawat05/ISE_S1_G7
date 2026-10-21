@@ -147,3 +147,18 @@ export interface PlatformAnalytics {
 export async function fetchPlatformAnalytics(token: string): Promise<PlatformAnalytics> {
   return apiFetch<PlatformAnalytics>("/sysadmin/analytics", { token });
 }
+
+export interface SystemLog {
+  date: string;
+  content: string;
+  truncated: boolean;
+}
+
+export async function fetchSystemLogDates(token: string): Promise<string[]> {
+  const data = await apiFetch<{ dates: string[] }>("/sysadmin/logs", { token });
+  return data.dates ?? [];
+}
+
+export async function fetchSystemLog(token: string, date: string): Promise<SystemLog> {
+  return apiFetch<SystemLog>(`/sysadmin/logs/${encodeURIComponent(date)}`, { token });
+}

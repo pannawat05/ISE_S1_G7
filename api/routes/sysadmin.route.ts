@@ -15,6 +15,8 @@ router.use(authenticate, (req, res, next) =>
 );
 
 router.get("/analytics", (req, res) => sys.getPlatformAnalytics(req as AuthRequest, res));
+router.get("/logs", (req, res) => sys.listSystemLogDates(req as AuthRequest, res));
+router.get("/logs/:date", (req, res) => sys.getSystemLogByDate(req as AuthRequest, res));
 router.get("/platform-fee",    (req, res) => sys.getPlatformFee(req as AuthRequest, res));
 router.patch("/platform-fee",  (req, res) => sys.updatePlatformFee(req as AuthRequest, res));
 router.get("/booking-limit",   (req, res) => sys.getBookingLimit(req as AuthRequest, res));
