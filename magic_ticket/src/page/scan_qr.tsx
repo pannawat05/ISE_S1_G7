@@ -51,7 +51,7 @@ function ScanResultCard({ result, onReset }: { result: ScanResult; onReset: () =
         )}
       </div>
       <button onClick={onReset}
-        className="flex items-center gap-2 bg-white/10 hover:bg-white/20 mx-auto px-5 py-2.5 rounded-xl font-semibold text-white text-sm transition-colors">
+        className="flex items-center gap-2 bg-white hover:bg-gray-100 border border-gray-300 mx-auto px-5 py-2.5 rounded-xl font-semibold text-gray-900 text-sm transition-colors">
         <RefreshCw size={16} /> สแกนต่อ
       </button>
     </div>
@@ -264,7 +264,7 @@ export default function ScanQRPage() {
                       </div>
                     </div>
                     <button onClick={stopCamera}
-                      className="py-2.5 border border-white/10 rounded-xl w-full text-gray-400 hover:text-white text-sm transition-colors">
+                      className="bg-white hover:bg-gray-100 py-2.5 border border-gray-300 rounded-xl w-full font-semibold text-gray-900 text-sm transition-colors">
                       ปิดกล้อง
                     </button>
                   </div>

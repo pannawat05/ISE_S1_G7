@@ -41,7 +41,7 @@ export default function SidebarOrganizerPicker({
           <p className="mt-0.5 text-gray-600 text-xs">สร้าง organizer เพื่อเริ่มจัดงาน</p>
           <button
             onClick={onCreateClick}
-            className="flex justify-center items-center gap-1.5 bg-violet-600/20 hover:bg-violet-600/30 mt-3 px-3 py-2 rounded-lg w-full font-semibold text-violet-300 text-xs transition-colors"
+            className="flex justify-center items-center gap-1.5 bg-violet-100 hover:bg-violet-200 border border-violet-300 mt-3 px-3 py-2 rounded-lg w-full font-semibold text-violet-700 text-xs transition-colors"
           >
             <Plus size={14} />
             สร้าง Organizer ใหม่

@@ -232,7 +232,7 @@ function QRTicketCard({
             {eventName}
           </p>
 
-          <p className="text-violet-300 text-xs">
+          <p className="font-semibold text-violet-700 text-xs">
             {zoneName}
 
             {position
@@ -263,7 +263,7 @@ function QRTicketCard({
         <button
           type="button"
           onClick={download}
-          className="flex items-center gap-1.5 text-violet-400 hover:text-violet-300 text-xs transition-colors"
+          className="flex items-center gap-1.5 font-medium text-violet-700 hover:text-violet-800 text-xs transition-colors"
         >
           <Download size={13} />
 
@@ -601,7 +601,7 @@ export default function PaymentPage() {
                     (s) => (
                       <span
                         key={s.id}
-                        className="bg-violet-500/20 px-2 py-0.5 border border-violet-500/30 rounded-full text-violet-300 text-xs"
+                        className="bg-violet-100 px-2 py-0.5 border border-violet-300 rounded-full font-semibold text-violet-700 text-xs"
                       >
                         {s.position}
                       </span>
@@ -636,7 +636,7 @@ export default function PaymentPage() {
               ยอดรวม
             </span>
 
-            <span className="font-bold text-violet-300 text-xl">
+            <span className="font-bold text-violet-700 text-xl">
 
               {state.totalPrice === 0
                 ? "ฟรี"
@@ -688,7 +688,7 @@ export default function PaymentPage() {
               <button
                 type="button"
                 onClick={() => navigate("/my-tickets")}
-                className="flex-1 hover:bg-white/5 py-3 border border-white/10 rounded-xl font-semibold text-white text-sm"
+                className="flex-1 bg-white hover:bg-gray-100 py-3 border border-gray-300 rounded-xl font-semibold text-gray-900 text-sm transition-colors"
               >
                 ดูตั๋วทั้งหมด
               </button>
@@ -1074,7 +1074,7 @@ export function PaymentReturnPage() {
                 "/my-tickets"
               )
             }
-            className="flex-1 hover:bg-white/5 py-3 border border-white/10 rounded-xl font-semibold text-white text-sm"
+            className="flex-1 bg-white hover:bg-gray-100 py-3 border border-gray-300 rounded-xl font-semibold text-gray-900 text-sm transition-colors"
           >
             ดูตั๋วทั้งหมด
           </button>

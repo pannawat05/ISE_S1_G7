@@ -284,7 +284,7 @@ export default function Profiles() {
                   )}
                 </div>
                 <button onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-1.5 bg-violet-600/20 hover:bg-violet-600/30 px-3 py-1.5 rounded-lg font-semibold text-violet-300 text-xs transition-colors">
+                  className="flex items-center gap-1.5 bg-violet-100 hover:bg-violet-200 border border-violet-300 px-3 py-1.5 rounded-lg font-semibold text-violet-700 text-xs transition-colors">
                   <Plus size={14} /> สร้างใหม่
                 </button>
               </div>
@@ -297,7 +297,7 @@ export default function Profiles() {
                     <p className="mt-0.5 text-gray-600 text-xs">สร้าง organizer เพื่อเริ่มจัดงาน</p>
                   </div>
                   <button onClick={() => setShowCreateModal(true)}
-                    className="flex items-center gap-1.5 bg-violet-600/20 hover:bg-violet-600/30 px-4 py-2 rounded-lg font-semibold text-violet-300 text-sm transition-colors">
+                    className="flex items-center gap-1.5 bg-violet-100 hover:bg-violet-200 border border-violet-300 px-4 py-2 rounded-lg font-semibold text-violet-700 text-sm transition-colors">
                     <Plus size={16} /> สร้าง Organizer ใหม่
                   </button>
                 </div>

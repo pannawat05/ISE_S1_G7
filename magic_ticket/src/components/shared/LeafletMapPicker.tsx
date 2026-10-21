@@ -131,7 +131,7 @@ export default function LeafletMapPicker({
           className="flex-1 mt-input text-sm"
         />
         <button type="button" onClick={doSearch} disabled={searching}
-          className="bg-violet-600/20 hover:bg-violet-600/30 disabled:opacity-50 px-3 py-1.5 rounded-lg font-medium text-violet-300 text-xs shrink-0">
+          className="bg-violet-100 hover:bg-violet-200 border border-violet-300 disabled:opacity-50 px-3 py-1.5 rounded-lg font-semibold text-violet-700 text-xs shrink-0">
           {searching ? "..." : "ค้นหา"}
         </button>
         <button type="button" onClick={locateMe} title="ตำแหน่งของฉัน"

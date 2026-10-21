@@ -171,7 +171,7 @@ function EventImagesEditor({
                   <Trash2 size={13} />
                 </button>
               </div>
-              <span className="right-0 bottom-0 left-0 absolute bg-violet-900/70 px-1 py-0.5 text-violet-300 text-xs text-center pointer-events-none">
+              <span className="right-0 bottom-0 left-0 absolute bg-violet-950/80 px-1 py-0.5 font-medium text-violet-200 text-xs text-center pointer-events-none">
                 ใหม่ {i + 1}
               </span>
             </div>
@@ -628,7 +628,7 @@ export default function EventEditPage() {
             {/* Save */}
             <div className="flex justify-end gap-3 pb-4">
               <button type="button" onClick={() => navigate(-1)}
-                className="hover:bg-white/5 px-5 py-2.5 border border-white/10 rounded-xl font-semibold text-white text-sm">
+                className="bg-white hover:bg-gray-100 px-5 py-2.5 border border-gray-300 rounded-xl font-semibold text-gray-900 text-sm transition-colors">
                 ยกเลิก
               </button>
               <button type="submit" disabled={isSaving}

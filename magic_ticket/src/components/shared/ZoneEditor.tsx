@@ -58,7 +58,7 @@ function typeColor(type: string): string {
     case "VIP":   return "bg-yellow-500/20 text-yellow-300 border-yellow-500/30";
     case "VVIP":  return "bg-amber-500/20 text-amber-300 border-amber-500/30";
     case "ฟรี":  return "bg-green-500/20 text-green-300 border-green-500/30";
-    default:      return "bg-violet-500/20 text-violet-300 border-violet-500/30";
+    default:      return "bg-violet-100 text-violet-700 border-violet-300";
   }
 }
 
@@ -255,7 +255,7 @@ function ZoneFormRow({
             className="mt-input w-36 text-sm"
           />
           {seat_count > 0 && (
-            <span className="bg-violet-500/10 px-2 py-1 border border-violet-500/20 rounded-lg text-violet-300 text-xs">
+            <span className="bg-violet-100 px-2 py-1 border border-violet-300 rounded-lg font-semibold text-violet-700 text-xs">
               {seat_count} ที่นั่ง
             </span>
           )}
@@ -294,7 +294,7 @@ function ZoneDraftList({ drafts, onChange }: {
             <div className="flex items-center gap-2 min-w-0">
               <span className="font-medium text-white text-sm">{draft.name || "โซนใหม่"}</span>
               {draft.seat_count > 0 && (
-                <span className="bg-violet-500/10 px-2 py-0.5 border border-violet-500/20 rounded-full text-violet-300 text-xs">
+                <span className="bg-violet-100 px-2 py-0.5 border border-violet-300 rounded-full font-semibold text-violet-700 text-xs">
                   {draft.seat_count} ที่นั่ง
                 </span>
               )}
@@ -604,7 +604,7 @@ function ZoneLiveList({ organizerId, eventId }: {
                   <span className="text-gray-500 text-xs">{zone.category}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <p className="font-medium text-violet-300 text-sm">
+                  <p className="font-semibold text-violet-700 text-sm">
                     {zone.price === 0 ? "ฟรี" : `฿${zone.price.toLocaleString()}`}
                   </p>
                   <span className="text-gray-500 text-xs">
@@ -646,7 +646,7 @@ function ZoneLiveList({ organizerId, eventId }: {
       {/* Add new zone inline */}
       {newDraft ? (
         <div className="space-y-3 bg-white/[0.02] p-4 border border-violet-500/20 rounded-xl">
-          <p className="font-medium text-violet-300 text-sm">โซนใหม่</p>
+          <p className="font-semibold text-violet-700 text-sm">โซนใหม่</p>
           <ZoneFormRow
             name={newDraft.name} category={newDraft.category}
             type={newDraft.type} price={newDraft.price}

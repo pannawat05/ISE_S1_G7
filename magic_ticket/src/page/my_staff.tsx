@@ -16,7 +16,7 @@ const EVENT_ROLE_COLOR: Record<string, string> = {
   checkin:      "bg-green-500/20 text-green-300 border-green-500/30",
   security:     "bg-red-500/20   text-red-300   border-red-500/30",
   registration: "bg-blue-500/20  text-blue-300  border-blue-500/30",
-  backstage:    "bg-purple-500/20 text-purple-300 border-purple-500/30",
+  backstage:    "bg-purple-100 text-purple-700 border-purple-200",
   manager:      "bg-amber-500/20 text-amber-300  border-amber-500/30",
 };
 const LIFECYCLE_BADGE: Record<string, string> = {

@@ -90,7 +90,7 @@ function RejectModal({ event, onConfirm, onCancel, isSubmitting }: {
         </div>
         <div className="flex gap-3 mt-5">
           <button onClick={onCancel} disabled={isSubmitting}
-            className="flex-1 hover:bg-white/5 disabled:opacity-50 px-4 py-2.5 border border-white/10 rounded-xl font-semibold text-white text-sm">
+            className="flex-1 bg-white hover:bg-gray-100 disabled:opacity-50 px-4 py-2.5 border border-gray-300 rounded-xl font-semibold text-gray-900 text-sm">
             ยกเลิก
           </button>
           <button
@@ -189,7 +189,7 @@ function EventDetailDrawer({ eventId, token, onClose }: {
                 </div>
                 <a href={`https://www.google.com/maps?q=${lat},${lng}`}
                   target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-violet-400 hover:text-violet-300 text-xs">
+                  className="flex items-center gap-1.5 font-medium text-violet-700 hover:text-violet-800 text-xs">
                   <MapPin size={13} /> เปิดใน Google Maps
                 </a>
               </>
@@ -225,7 +225,7 @@ function EventsDashboard({ token, events, isLoading, error, search, setSearch, s
   return (
     <>
       {actionMsg && (
-        <div className="bg-violet-600/10 px-4 py-3 border border-violet-500/30 rounded-xl text-violet-300 text-sm">
+        <div className="bg-violet-100 px-4 py-3 border border-violet-300 rounded-xl font-medium text-violet-700 text-sm">
           {actionMsg}
         </div>
       )}
@@ -371,7 +371,7 @@ function SystemDashboard({ token, isSysAdmin }: { token: string; isSysAdmin: boo
             onClick={() => setSysTab(tab.key)}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               sysTab === tab.key
-                ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+                ? "bg-violet-100 text-violet-700 border border-violet-300 font-semibold"
                 : "text-gray-400 hover:text-white hover:bg-white/5"
             }`}
           >
@@ -406,7 +406,7 @@ function PlatformOverview({ token }: { token: string }) {
     ["ยอดเข้าชม", data.views.toLocaleString(), Eye],
     ["อัตราเช็กอิน", `${data.checkin_rate}%`, Check],
   ] as const;
-  return <div className="space-y-5"><div><h3 className="font-semibold text-white text-lg">Platform Overview</h3><p className="mt-1 text-gray-500 text-sm">สถิติรวมทั้งแพลตฟอร์มสำหรับ sysadmin</p></div><div className="gap-3 grid grid-cols-2 md:grid-cols-4">{cards.map(([label, value, Icon]) => <div key={label} className="bg-white/[0.03] p-4 border border-white/5 rounded-xl"><Icon size={17} className="mb-3 text-violet-400" /><p className="font-bold text-white text-2xl">{value}</p><p className="mt-1 text-gray-500 text-xs">{label}</p></div>)}</div><div className="bg-violet-500/10 p-4 border border-violet-500/20 rounded-xl text-violet-200 text-sm">เช็กอินแล้ว {data.checkins.toLocaleString()} ใบ จากบัตรที่ชำระแล้วและใช้งานได้</div></div>;
+  return <div className="space-y-5"><div><h3 className="font-semibold text-white text-lg">Platform Overview</h3><p className="mt-1 text-gray-500 text-sm">สถิติรวมทั้งแพลตฟอร์มสำหรับ sysadmin</p></div><div className="gap-3 grid grid-cols-2 md:grid-cols-4">{cards.map(([label, value, Icon]) => <div key={label} className="bg-white/[0.03] p-4 border border-white/5 rounded-xl"><Icon size={17} className="mb-3 text-violet-400" /><p className="font-bold text-white text-2xl">{value}</p><p className="mt-1 text-gray-500 text-xs">{label}</p></div>)}</div><div className="bg-violet-100 p-4 border border-violet-300 rounded-xl font-medium text-violet-700 text-sm">เช็กอินแล้ว {data.checkins.toLocaleString()} ใบ จากบัตรที่ชำระแล้วและใช้งานได้</div></div>;
 }
 // ─── Event Types Manager ──────────────────────────────────────────────────────
 function EventTypesManager({ token }: { token: string }) {
@@ -466,7 +466,7 @@ function EventTypesManager({ token }: { token: string }) {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-white text-lg">Event Types</h3>
-        {msg && <p className="text-violet-300 text-sm">{msg}</p>}
+        {msg && <p className="font-medium text-violet-700 text-sm">{msg}</p>}
       </div>
       <div className="flex gap-2">
         <input value={newName} onChange={(e) => setNewName(e.target.value)}
@@ -634,7 +634,7 @@ function PaymentMethodsManager({ token }: { token: string }) {
   const categoryColors: Record<PaymentCategory, string> = {
     "credit card":    "bg-blue-500/20   text-blue-300",
     "prompt pay":     "bg-green-500/20  text-green-300",
-    "mobile banking": "bg-purple-500/20 text-purple-300",
+    "mobile banking": "bg-purple-100 border border-purple-200 text-purple-700",
     "cash":           "bg-orange-500/20 text-orange-300",
   };
 
@@ -701,7 +701,7 @@ function PaymentMethodsManager({ token }: { token: string }) {
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-white text-lg">Payment Methods</h3>
         <div className="flex items-center gap-3">
-          {msg && <p className="text-violet-300 text-sm">{msg}</p>}
+          {msg && <p className="font-medium text-violet-700 text-sm">{msg}</p>}
           <button
             onClick={() => { setShowForm((v) => !v); setForm({ ...EMPTY_PM }); }}
             className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 px-3 py-1.5 rounded-lg text-white text-sm"
@@ -715,7 +715,7 @@ function PaymentMethodsManager({ token }: { token: string }) {
       {/* Add Form */}
       {showForm && (
         <div className="space-y-3 bg-white/[0.03] p-4 border border-violet-500/20 rounded-xl">
-          <p className="font-medium text-violet-300 text-sm">เพิ่ม Payment Method ใหม่</p>
+          <p className="font-semibold text-violet-700 text-sm">เพิ่ม Payment Method ใหม่</p>
           <div className="gap-3 grid grid-cols-1 sm:grid-cols-3">
             {/* Category */}
             <div className="space-y-1">
@@ -872,7 +872,7 @@ function UsersManager({ token }: { token: string }) {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-white text-lg">Users ({users.length})</h3>
-        {msg && <p className="text-violet-300 text-sm">{msg}</p>}
+        {msg && <p className="font-medium text-violet-700 text-sm">{msg}</p>}
       </div>
       <div className="relative">
         <Search size={15} className="top-1/2 left-3 absolute text-gray-500 -translate-y-1/2" />

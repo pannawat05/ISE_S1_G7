@@ -130,12 +130,12 @@
     @apply px-4 py-2
       text-sm
       font-medium
-      text-gray-700
+      text-gray-900
       bg-white
-      border border-gray-200
+      border border-gray-300
       rounded-full
       hover:border-purple-500/40
-      hover:text-purple-600
+      hover:text-purple-700
       transition-all;
   }
 
@@ -273,22 +273,22 @@
 
 
   .mt-badge-success {
-    @apply text-violet-600
-      bg-violet-50
+    @apply text-violet-700
+      bg-violet-100
       border-violet-200;
   }
 
 
   .mt-badge-warning {
-    @apply text-purple-600
-      bg-purple-50
+    @apply text-purple-700
+      bg-purple-100
       border-purple-200;
   }
 
 
   .mt-badge-muted {
-    @apply text-gray-500
-      bg-gray-50
+    @apply text-gray-700
+      bg-gray-100
       border-gray-200;
   }
 
@@ -338,9 +338,35 @@ body {
   background-color: #f8fafc !important;
 }
 
+/* Solid colored buttons preserve crisp white text */
 .light-theme .bg-violet-600.text-white,
+.light-theme .bg-violet-700.text-white,
+.light-theme .bg-purple-600.text-white,
+.light-theme .bg-purple-700.text-white,
 .light-theme .bg-red-600.text-white,
+.light-theme .bg-red-700.text-white,
 .light-theme .bg-green-600.text-white,
-.light-theme button.text-white {
+.light-theme .bg-emerald-600.text-white,
+.light-theme .bg-\[\#635BFF\].text-white,
+.light-theme .mt-btn-primary {
   color: #ffffff !important;
+}
+
+/* White background buttons and outlined buttons must have dark/black text */
+.light-theme button.bg-white,
+.light-theme a.bg-white,
+.light-theme button.mt-btn-outline,
+.light-theme a.mt-btn-outline,
+.light-theme button.bg-transparent,
+.light-theme button.hover\:bg-white\/5,
+.light-theme button.hover\:bg-white\/10 {
+  color: #172033 !important;
+}
+
+/* Ensure light purple in light theme is darkened so it is clear and legible */
+.light-theme .text-violet-200,
+.light-theme .text-violet-300,
+.light-theme .text-purple-200,
+.light-theme .text-purple-300 {
+  color: #6d28d9 !important; /* violet-700 */
 }

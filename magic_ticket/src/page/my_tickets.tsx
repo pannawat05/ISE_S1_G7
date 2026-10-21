@@ -97,7 +97,7 @@ export default function MyTickets() {
             <Ticket size={48} className="mx-auto text-gray-700" />
             <p className="font-medium text-gray-400">ยังไม่มีตั๋วที่ชำระเงินแล้ว</p>
             <p className="text-gray-600 text-sm">ซื้อบัตรจากหน้า Event เพื่อรับตั๋วของคุณ</p>
-            <Link to="/" className="inline-block mt-2 text-violet-400 hover:text-violet-300 text-sm transition-colors">
+            <Link to="/" className="inline-block mt-2 font-semibold text-violet-700 hover:text-violet-800 text-sm transition-colors">
               ดู Events →
             </Link>
           </div>

@@ -354,7 +354,7 @@ export default function Dashboards() {
                   <div className="flex-1 space-y-1.5">
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-medium text-gray-400">ความจุรวมทั้งหมด</span>
-                      <span className="text-violet-300">
+                      <span className="font-semibold text-violet-700">
                         {fmtNum(kpi.total_sold)} / {fmtNum(kpi.total_seats)} ที่นั่ง · {kpi.capacity_rate}%
                       </span>
                     </div>
@@ -425,7 +425,7 @@ export default function Dashboards() {
                     <CalendarDays size={36} className="text-gray-700" />
                     <p className="text-gray-500 text-sm">ไม่พบ Event</p>
                     <Link to={`/profile/events/${organizerId}`}
-                      className="text-violet-400 hover:text-violet-300 text-xs transition-colors">
+                      className="font-medium text-violet-700 hover:text-violet-800 text-xs transition-colors">
                       สร้าง Event ใหม่ →
                     </Link>
                   </div>

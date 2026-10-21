@@ -83,7 +83,7 @@ export default function AttendeesPage() {
         {showStaffMenu && (eventId ? (
           <StaffAssignmentManager organizerId={organizerId} eventId={Number(eventId)} />
         ) : (
-          <div className="bg-violet-500/10 p-4 border border-violet-500/20 rounded-xl text-violet-200 text-sm">
+          <div className="bg-violet-100 p-4 border border-violet-300 rounded-xl font-medium text-violet-700 text-sm">
             กรุณาเลือก Event จากตัวกรองด้านบนก่อน เพื่อ assign staff ให้ event นั้น
           </div>
         ))}

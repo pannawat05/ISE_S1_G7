@@ -225,7 +225,7 @@ export default function CreateOrganizerModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 bg-transparent hover:bg-white/5 disabled:opacity-50 px-4 py-3 border border-white/10 rounded-xl font-semibold text-white text-sm transition-colors"
+              className="flex-1 bg-white hover:bg-gray-100 disabled:opacity-50 px-4 py-3 border border-gray-300 rounded-xl font-semibold text-gray-900 text-sm transition-colors"
             >
               ยกเลิก
             </button>

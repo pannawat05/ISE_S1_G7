@@ -80,7 +80,7 @@ function EventCard({ event }: { event: OrganizerEvent }) {
           {hasCoords && (
             <a href={`https://www.google.com/maps?q=${lat},${lng}`}
               target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors">
+              className="flex items-center gap-1 font-medium text-violet-700 hover:text-violet-800 transition-colors">
               <MapPin size={12} /> เปิดใน Google Maps
             </a>
           )}

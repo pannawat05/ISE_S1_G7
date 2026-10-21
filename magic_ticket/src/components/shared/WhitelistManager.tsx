@@ -128,7 +128,7 @@ function UserSearchDropdown({
                 onClick={() => pickUser(user)}
                 className="flex items-center gap-3 hover:bg-white/5 px-4 py-3 w-full text-left transition-colors"
               >
-                <div className="flex justify-center items-center bg-violet-600/30 border border-violet-500/30 rounded-full w-8 h-8 font-bold text-violet-300 text-xs shrink-0">
+                <div className="flex justify-center items-center bg-violet-100 border border-violet-300 rounded-full w-8 h-8 font-bold text-violet-700 text-xs shrink-0">
                   {user.f_name[0]}{user.l_name[0]}
                 </div>
                 <div className="min-w-0">
@@ -196,7 +196,7 @@ function WhitelistRow({ entry, onRemove }: {
 
   return (
     <div className="flex items-center gap-3 bg-white/[0.02] p-3 border border-white/5 rounded-xl">
-      <div className="flex justify-center items-center bg-violet-600/20 border border-violet-500/20 rounded-full w-9 h-9 font-bold text-violet-300 text-xs shrink-0">
+      <div className="flex justify-center items-center bg-violet-100 border border-violet-300 rounded-full w-9 h-9 font-bold text-violet-700 text-xs shrink-0">
         {entry.f_name[0]}{entry.l_name[0]}
       </div>
       <div className="flex-1 min-w-0">
@@ -385,7 +385,7 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
             Whitelist
           </h2>
           {list.length > 0 && (
-            <span className="bg-violet-500/20 px-2 py-0.5 border border-violet-500/30 rounded-full text-violet-300 text-xs">
+            <span className="bg-violet-100 px-2 py-0.5 border border-violet-300 rounded-full font-semibold text-violet-700 text-xs">
               {list.length} คน
             </span>
           )}
@@ -426,7 +426,7 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
           <button
             type="button"
             onClick={load}
-            className="bg-white/10 hover:bg-white/15 px-4 py-2 rounded-lg text-white text-sm"
+            className="bg-white hover:bg-gray-100 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-900 text-sm transition-colors"
           >
             ลองโหลดอีกครั้ง
           </button>

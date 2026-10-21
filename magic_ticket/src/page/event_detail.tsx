@@ -11,7 +11,7 @@ import BookingDrawer from "@/components/booking";
 const PLACEHOLDER = "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&q=80";
 
 const TYPE_COLORS: Record<string, string> = {
-  Concert: "bg-violet-500/20 text-violet-300 border-violet-500/30",
+  Concert: "bg-violet-100 text-violet-700 border-violet-300",
   Conference: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   Exhibition: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
   Party: "bg-pink-500/20 text-pink-300 border-pink-500/30",
@@ -104,7 +104,7 @@ function MapEmbed({ lat, lng, placeName }: { lat: number; lng: number; placeName
       </div>
       <a href={`https://www.google.com/maps?q=${lat},${lng}`}
         target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-violet-400 hover:text-violet-300 text-xs transition-colors">
+        className="inline-flex items-center gap-1.5 font-medium text-violet-700 hover:text-violet-800 text-xs transition-colors">
         <ExternalLink size={13} />
         เปิดใน Google Maps
       </a>
@@ -155,7 +155,7 @@ export default function EventDetailPage() {
           <div className="space-y-4 mt-surface p-12 rounded-2xl text-center">
             <p className="text-gray-400">{error ?? "ไม่พบกิจกรรมนี้"}</p>
             <button onClick={() => navigate("/")}
-              className="inline-flex items-center gap-2 text-violet-400 hover:text-violet-300 text-sm">
+              className="inline-flex items-center gap-2 font-semibold text-violet-700 hover:text-violet-800 text-sm transition-colors">
               <ArrowLeft size={16} /> กลับหน้าหลัก
             </button>
           </div>

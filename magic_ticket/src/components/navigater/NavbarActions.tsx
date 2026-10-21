@@ -61,7 +61,7 @@ export default function NavbarActions() {
       {(isAdmin || isSysAdmin) && (
         <Link
           to="/admin"
-          className="hidden sm:flex items-center gap-1.5 bg-violet-600/10 hover:bg-violet-600/20 px-3 py-1.5 border border-violet-500/40 rounded-full font-semibold text-violet-300 text-xs transition-colors"
+          className="hidden sm:flex items-center gap-1.5 bg-violet-100 hover:bg-violet-200 px-3 py-1.5 border border-violet-300 rounded-full font-semibold text-violet-700 text-xs transition-colors"
         >
           <ShieldCheck size={14} />
           {user?.role}
@@ -69,16 +69,16 @@ export default function NavbarActions() {
       )}
 
       <Link to="/profile/account">
-        <div className="hidden sm:flex items-center gap-2 pl-2 border-white/10 border-l">
+        <div className="hidden sm:flex items-center gap-2 pl-2 border-purple-200 border-l">
           <img
             src="https://api.dicebear.com/7.x/avataaars/svg?seed=customer"
             alt="User avatar"
-            className="bg-purple-900/50 border border-white/10 rounded-full w-8 h-8"
+            className="bg-purple-100 border border-purple-200 rounded-full w-8 h-8"
           />
           <div className="flex flex-col leading-tight">
-            <span className="font-medium text-white text-xs">{fullname}</span>
+            <span className="font-semibold text-gray-900 text-xs">{fullname}</span>
             {(isAdmin || isSysAdmin) && (
-              <span className="font-medium text-[10px] text-violet-400">{user?.role}</span>
+              <span className="font-semibold text-[10px] text-violet-700">{user?.role}</span>
             )}
           </div>
         </div>
@@ -86,7 +86,7 @@ export default function NavbarActions() {
 
       <button
         onClick={handleLogout}
-        className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+        className="p-2 text-gray-500 hover:text-red-500 transition-colors"
         aria-label="Logout"
       >
         <LogOut size={20} />
@@ -98,7 +98,7 @@ export default function NavbarActions() {
 function AuthenNav() {
   return (
     <div className="flex items-center gap-2 sm:gap-3">
-      <Link to="/signin" className="px-3 sm:px-4 py-2 rounded-full mt-btn-outline text-xs sm:text-sm">
+      <Link to="/signin" className="bg-white hover:bg-purple-50 px-3 sm:px-4 py-2 border border-gray-300 rounded-full font-medium text-gray-900 text-xs sm:text-sm transition-colors">
         เข้าสู่ระบบ
       </Link>
       <Link to="/signup" className="mt-btn-primary px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm">

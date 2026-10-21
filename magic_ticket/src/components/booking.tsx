@@ -24,7 +24,7 @@ function typeColor(type: string) {
     case "VIP":  return "bg-yellow-500/20 text-yellow-300 border-yellow-500/30";
     case "VVIP": return "bg-amber-500/20  text-amber-300  border-amber-500/30";
     case "ฟรี": return "bg-green-500/20  text-green-300  border-green-500/30";
-    default:     return "bg-violet-500/20 text-violet-300 border-violet-500/30";
+    default:     return "bg-violet-100 text-violet-700 border-violet-300";
   }
 }
 
@@ -94,7 +94,7 @@ function ZoneCard({ zone, selected, onSelect }: {
         </div>
 
         <div className="text-right shrink-0">
-          <p className="font-bold text-violet-300 text-base">
+          <p className="font-bold text-violet-700 text-base">
             {zone.price === 0 ? "ฟรี" : `฿${zone.price.toLocaleString()}`}
           </p>
           {!isSoldOut && <ChevronRight size={14} className="mt-0.5 ml-auto text-gray-500" />}
@@ -175,7 +175,7 @@ function SeatGrid({ seats, selected, onToggle, maxSelect = 10 }: {
                       isSelected
                         ? "bg-violet-600 border border-violet-500 text-white scale-105 shadow-lg shadow-violet-500/30"
                         : seat.is_available
-                          ? "bg-violet-600/20 border border-violet-500/40 text-violet-300 hover:bg-violet-600/40 hover:scale-105"
+                          ? "bg-violet-100 border border-violet-300 text-violet-700 hover:bg-violet-200 hover:scale-105"
                           : "bg-white/5 border border-white/10 text-gray-700 cursor-not-allowed"
                     } ${!canSelect ? "opacity-60" : ""}`}
                   >
@@ -396,7 +396,7 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
                     {selectedZone.available_seats} ที่ว่าง
                   </p>
                 </div>
-                <p className="font-bold text-violet-300 text-lg">
+                <p className="font-bold text-violet-700 text-lg">
                   {selectedZone.price === 0 ? "ฟรี" : `฿${selectedZone.price.toLocaleString()}`}
                 </p>
               </div>
@@ -481,7 +481,7 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
                         {seats
                           .filter((s) => selectedSeats.has(s.id))
                           .map((s) => (
-                            <span key={s.id} className="bg-violet-500/20 px-2 py-0.5 border border-violet-500/30 rounded-full text-violet-300 text-xs">
+                            <span key={s.id} className="bg-violet-100 px-2 py-0.5 border border-violet-300 rounded-full text-violet-700 text-xs">
                               {s.position}
                             </span>
                           ))}
@@ -504,7 +504,7 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
 
                 <div className="flex justify-between items-center pt-3 border-white/10 border-t">
                   <span className="font-semibold text-gray-300">ยอดรวม</span>
-                  <span className="font-bold text-violet-300 text-xl">
+                  <span className="font-bold text-violet-700 text-xl">
                     {totalPrice === 0 ? "ฟรี" : `฿${totalPrice.toLocaleString()}`}
                   </span>
                 </div>

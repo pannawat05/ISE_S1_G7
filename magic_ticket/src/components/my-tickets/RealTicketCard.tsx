@@ -47,7 +47,7 @@ function QRModal({ ticket, onClose }: { ticket: MyTicket; onClose: () => void })
           {/* Event info */}
           <div className="space-y-1 text-center">
             <p className="font-bold text-white text-base">{ticket.event_name}</p>
-            <p className="text-violet-300 text-sm">
+            <p className="font-medium text-violet-700 text-sm">
               {ticket.zone_name} · ที่นั่ง {ticket.seat_position}
             </p>
             <p className="text-gray-500 text-xs">{ticket.place_name}</p>
@@ -130,7 +130,7 @@ export default function RealTicketCard({ ticket }: Props) {
 
             {/* Zone + seat + price */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="bg-violet-500/20 px-2 py-0.5 border border-violet-500/30 rounded-full font-medium text-[11px] text-violet-300">
+              <span className="bg-violet-100 px-2 py-0.5 border border-violet-300 rounded-full font-medium text-[11px] text-violet-700">
                 {ticket.zone_name}
               </span>
               <span className="text-gray-500 text-xs">ที่นั่ง {ticket.seat_position}</span>
