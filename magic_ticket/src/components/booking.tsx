@@ -150,39 +150,41 @@ function SeatGrid({ seats, selected, onToggle, maxSelect = 10 }: {
         </div>
       </div>
 
-      {/* Seat rows */}
-      <div className="space-y-1.5 pb-2 overflow-x-auto">
+      {/* Seat rows — wraps nicely without horizontal overflow scrollbar */}
+      <div className="space-y-3 pb-2">
         {rows.map(([rowLetter, rowSeats]) => (
-          <div key={rowLetter} className="flex justify-center items-center gap-1.5 mx-auto min-w-max">
-            <span className="w-5 text-gray-600 text-xs text-right shrink-0">{rowLetter}</span>
-            {rowSeats
-              .sort((a, b) => {
-                const na = parseInt(a.position.replace(/\D/g, "")) || 0;
-                const nb = parseInt(b.position.replace(/\D/g, "")) || 0;
-                return na - nb;
-              })
-              .map((seat) => {
-                const isSelected = selected.has(seat.id);
-                const canSelect = seat.is_available || isSelected;
-                return (
-                  <button
-                    key={seat.id}
-                    type="button"
-                    disabled={!canSelect}
-                    onClick={() => canSelect && onToggle(seat.id)}
-                    title={`${seat.position}${!seat.is_available ? " (ถูกจองแล้ว)" : ""}`}
-                    className={`w-7 h-7 rounded text-xs font-medium transition-all ${
-                      isSelected
-                        ? "bg-violet-600 border border-violet-500 text-white scale-105 shadow-lg shadow-violet-500/30"
-                        : seat.is_available
-                          ? "bg-violet-100 border border-violet-300 text-violet-700 hover:bg-violet-200 hover:scale-105"
-                          : "bg-white/5 border border-white/10 text-gray-700 cursor-not-allowed"
-                    } ${!canSelect ? "opacity-60" : ""}`}
-                  >
-                    {parseInt(seat.position.replace(/\D/g, "")) || seat.position.slice(-2)}
-                  </button>
-                );
-              })}
+          <div key={rowLetter} className="flex items-start justify-center gap-2 max-w-full">
+            <span className="w-5 h-7 flex items-center justify-end text-gray-600 text-xs shrink-0 font-semibold">{rowLetter}</span>
+            <div className="flex flex-wrap items-center gap-1.5 max-w-full">
+              {rowSeats
+                .sort((a, b) => {
+                  const na = parseInt(a.position.replace(/\D/g, "")) || 0;
+                  const nb = parseInt(b.position.replace(/\D/g, "")) || 0;
+                  return na - nb;
+                })
+                .map((seat) => {
+                  const isSelected = selected.has(seat.id);
+                  const canSelect = seat.is_available || isSelected;
+                  return (
+                    <button
+                      key={seat.id}
+                      type="button"
+                      disabled={!canSelect}
+                      onClick={() => canSelect && onToggle(seat.id)}
+                      title={`${seat.position}${!seat.is_available ? " (ถูกจองแล้ว)" : ""}`}
+                      className={`w-7 h-7 rounded text-xs font-medium transition-all ${
+                        isSelected
+                          ? "bg-violet-600 border border-violet-500 text-white scale-105 shadow-lg shadow-violet-500/30"
+                          : seat.is_available
+                            ? "bg-violet-100 border border-violet-300 text-violet-700 hover:bg-violet-200 hover:scale-105"
+                            : "bg-white/5 border border-white/10 text-gray-700 cursor-not-allowed"
+                      } ${!canSelect ? "opacity-60" : ""}`}
+                    >
+                      {parseInt(seat.position.replace(/\D/g, "")) || seat.position.slice(-2)}
+                    </button>
+                  );
+                })}
+            </div>
           </div>
         ))}
       </div>
@@ -191,7 +193,8 @@ function SeatGrid({ seats, selected, onToggle, maxSelect = 10 }: {
         <p className="text-orange-400 text-xs text-center">
           เลือกได้สูงสุด {maxSelect} ที่นั่งต่อครั้ง
         </p>
-      )}    </div>
+      )}
+    </div>
   );
 }
 
