@@ -403,6 +403,7 @@ function SystemLogsManager({ token }: { token: string }) {
   const [logLoading, setLogLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [logSearch, setLogSearch] = useState("");
 
   const loadDates = useCallback(async () => {
     setDatesLoading(true);
@@ -456,6 +457,32 @@ function SystemLogsManager({ token }: { token: string }) {
       .finally(() => { if (active) setLogLoading(false); });
     return () => { active = false; };
   }, [token, selectedDate, refreshKey]);
+
+  const logLines = content
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((raw, index) => {
+      const match = raw.match(/^\[([^\]]+)\]\s+\[(DEBUG|INFO|HTTP|WARN|ERROR)\s*\]\s+\[([^\]]+)\]\s*(.*?)(?:\s+\|\s+(.*))?$/);
+      return {
+        number: index + 1,
+        raw,
+        timestamp: match?.[1] ?? "",
+        level: match?.[2] ?? "",
+        scope: match?.[3] ?? "",
+        message: match?.[4] ?? raw,
+        meta: match?.[5] ?? "",
+      };
+    });
+  const visibleLogLines = logLines.filter((line) =>
+    line.raw.toLowerCase().includes(logSearch.trim().toLowerCase()),
+  );
+  const levelStyles: Record<string, string> = {
+    DEBUG: "border-slate-400/20 bg-slate-400/10 text-slate-300",
+    INFO: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
+    HTTP: "border-sky-400/20 bg-sky-400/10 text-sky-300",
+    WARN: "border-amber-400/20 bg-amber-400/10 text-amber-300",
+    ERROR: "border-rose-400/20 bg-rose-400/10 text-rose-300",
+  };
 
   return (
     <div className="space-y-5">
@@ -522,9 +549,83 @@ function SystemLogsManager({ token }: { token: string }) {
               กำลังโหลด log...
             </div>
           ) : (
-            <pre className="bg-black/50 p-4 border border-white/10 rounded-xl max-h-[70vh] overflow-auto font-mono text-gray-300 text-xs whitespace-pre-wrap break-words">
-              {content || "ไฟล์นี้ยังไม่มี log"}
-            </pre>
+            <section className="bg-[#080b12] border border-white/10 rounded-2xl overflow-hidden shadow-2xl shadow-black/20">
+              <div className="flex flex-wrap justify-between items-center gap-3 bg-white/[0.03] px-4 py-3 border-white/10 border-b">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex gap-1.5 shrink-0" aria-hidden="true">
+                    <span className="bg-rose-400/80 rounded-full w-2.5 h-2.5" />
+                    <span className="bg-amber-300/80 rounded-full w-2.5 h-2.5" />
+                    <span className="bg-emerald-400/80 rounded-full w-2.5 h-2.5" />
+                  </div>
+                  <span className="font-mono text-gray-300 text-xs truncate">
+                    server-{selectedDate}.log
+                  </span>
+                </div>
+                <span className="text-gray-500 text-xs">
+                  {visibleLogLines.length.toLocaleString()} / {logLines.length.toLocaleString()} บรรทัด
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 bg-black/20 px-4 py-3 border-white/5 border-b">
+                <Search size={15} className="text-gray-500 shrink-0" />
+                <input
+                  value={logSearch}
+                  onChange={(e) => setLogSearch(e.target.value)}
+                  placeholder="ค้นหาใน log..."
+                  aria-label="ค้นหาใน log"
+                  className="bg-transparent outline-none w-full text-gray-200 text-sm placeholder-gray-600"
+                />
+                {logSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setLogSearch("")}
+                    className="hover:text-white text-gray-500 text-xs"
+                  >
+                    ล้าง
+                  </button>
+                )}
+              </div>
+
+              <div className="max-h-[70vh] overflow-auto">
+                {visibleLogLines.length === 0 ? (
+                  <p className="px-4 py-10 text-gray-500 text-sm text-center">
+                    {logLines.length ? "ไม่พบบรรทัดที่ตรงกับคำค้น" : "ไฟล์นี้ยังไม่มี log"}
+                  </p>
+                ) : (
+                  <div className="min-w-max divide-y divide-white/[0.04] font-mono text-xs">
+                    {visibleLogLines.map((line) => (
+                      <div key={line.number} className="flex items-start gap-3 hover:bg-white/[0.025] px-4 py-2.5">
+                        <span className="pt-0.5 w-10 text-right text-gray-700 select-none">
+                          {line.number}
+                        </span>
+                        {line.timestamp ? (
+                          <>
+                            <span className="pt-0.5 text-gray-500 whitespace-nowrap">{line.timestamp}</span>
+                            <span className={`px-1.5 py-0.5 border rounded-md text-[10px] font-semibold tracking-wide ${levelStyles[line.level] ?? "border-white/10 bg-white/5 text-gray-400"}`}>
+                              {line.level || "LOG"}
+                            </span>
+                            <span className="pt-0.5 text-violet-300 whitespace-nowrap">[{line.scope}]</span>
+                            <span className="pt-0.5 text-gray-200">{line.message}</span>
+                            {line.meta && (
+                              <details className="ml-1 max-w-[min(36rem,70vw)]">
+                                <summary className="pt-0.5 text-sky-300/80 hover:text-sky-200 cursor-pointer">
+                                  รายละเอียด
+                                </summary>
+                                <pre className="bg-black/40 mt-2 p-3 border border-white/10 rounded-lg max-w-[min(36rem,70vw)] text-gray-400 whitespace-pre-wrap break-all">
+                                  {line.meta}
+                                </pre>
+                              </details>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-gray-300 whitespace-pre-wrap">{line.raw}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
           )}
         </>
       )}
