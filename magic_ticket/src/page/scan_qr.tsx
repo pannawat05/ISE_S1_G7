@@ -17,20 +17,28 @@ const EVENT_ROLE_LABEL: Record<string, string> = {
 function ScanResultCard({ result, onReset }: { result: ScanResult; onReset: () => void }) {
   const isOk        = result.status === "ok";
   const isDuplicate = result.status === "already_checked_in";
+  const isEnded     = result.status === "event_ended";
 
   return (
     <div className={`rounded-2xl border p-6 text-center space-y-4 ${
       isOk        ? "bg-green-500/10  border-green-500/30" :
       isDuplicate ? "bg-yellow-500/10 border-yellow-500/30" :
+      isEnded     ? "bg-orange-500/10 border-orange-500/30" :
                    "bg-red-500/10    border-red-500/30"
     }`}>
       <div className="flex justify-center">
         {isOk        && <CheckCircle2  size={56} className="text-green-400" />}
         {isDuplicate && <AlertTriangle size={56} className="text-yellow-400" />}
-        {!isOk && !isDuplicate && <XCircle size={56} className="text-red-400" />}
+        {isEnded     && <AlertTriangle size={56} className="text-orange-400" />}
+        {!isOk && !isDuplicate && !isEnded && <XCircle size={56} className="text-red-400" />}
       </div>
       <div className="space-y-1">
-        <p className={`font-bold text-xl ${isOk ? "text-green-300" : isDuplicate ? "text-yellow-300" : "text-red-300"}`}>
+        <p className={`font-bold text-xl ${
+          isOk        ? "text-green-300"  :
+          isDuplicate ? "text-yellow-300" :
+          isEnded     ? "text-orange-300" :
+                        "text-red-300"
+        }`}>
           {result.message}
         </p>
         {result.holder && <p className="font-semibold text-white text-lg">{result.holder}</p>}

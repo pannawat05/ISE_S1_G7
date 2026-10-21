@@ -14,6 +14,7 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/types.js";
 import { query, execute } from "../model/query.js";
+import { logger } from "../lib/logger.js";
 
 // ─── POST /checkin/scan ───────────────────────────────────────────────────────
 export async function scanTicket(req: AuthRequest, res: Response) {
@@ -43,6 +44,7 @@ export async function scanTicket(req: AuthRequest, res: Response) {
     );
 
     if (!permRows[0] || permRows[0].count === 0) {
+      req.log?.warn("Ticket scan rejected: User has no permission", { userId, event_id });
       return res.status(403).json({
         status: "forbidden",
         message: "คุณไม่มีสิทธิ์ตรวจบัตรในงานนี้",
@@ -81,16 +83,21 @@ export async function scanTicket(req: AuthRequest, res: Response) {
     );
 
     if (!tickets.length) {
+      req.log?.warn("Ticket scan rejected: Ticket not found", { qrcode, event_id });
       return res.status(404).json({
         status: "invalid",
         message: "ไม่พบบัตรนี้ในระบบ",
       });
     }
 
-    const ticket = tickets[0];
+    const ticket = tickets[0]!;
 
     // 3. Verify ticket belongs to this event
     if (ticket.event_id !== Number(event_id)) {
+      req.log?.warn("Ticket scan rejected: Wrong event", {
+        ticketEventId: ticket.event_id,
+        requestedEventId: event_id,
+      });
       return res.status(422).json({
         status: "wrong_event",
         message: `บัตรนี้เป็นของงาน "${ticket.event_name}" ไม่ใช่งานที่กำลังตรวจอยู่`,
@@ -98,8 +105,22 @@ export async function scanTicket(req: AuthRequest, res: Response) {
       });
     }
 
+    // 3.5 Verify event has not ended
+    const eventRows = await query<{ end_date: Date }[]>(
+      `SELECT end_date FROM events WHERE id = ? LIMIT 1`,
+      [Number(event_id)],
+    );
+    if (eventRows.length && eventRows[0] && new Date(eventRows[0].end_date) < new Date()) {
+      req.log?.warn("Ticket scan rejected: Event already ended", { event_id });
+      return res.status(410).json({
+        status: "event_ended",
+        message: `งาน "${ticket.event_name}" จบไปแล้ว ไม่สามารถ check-in ได้`,
+      });
+    }
+
     // 4. Check ticket status
     if (ticket.status === "checked_in") {
+      req.log?.warn("Ticket scan rejected: Already checked in", { ticketId: ticket.id });
       return res.status(409).json({
         status: "already_checked_in",
         message: "บัตรนี้ถูก check-in ไปแล้ว",
@@ -111,6 +132,7 @@ export async function scanTicket(req: AuthRequest, res: Response) {
     }
 
     if (ticket.status === "cancelled") {
+      req.log?.warn("Ticket scan rejected: Ticket cancelled", { ticketId: ticket.id });
       return res.status(410).json({
         status: "cancelled",
         message: "บัตรนี้ถูกยกเลิกแล้ว",
@@ -118,6 +140,7 @@ export async function scanTicket(req: AuthRequest, res: Response) {
     }
 
     if (ticket.status === "reserved") {
+      req.log?.warn("Ticket scan rejected: Ticket unpaid", { ticketId: ticket.id });
       return res.status(402).json({
         status: "not_paid",
         message: "บัตรนี้ยังไม่ได้ชำระเงิน",
@@ -125,6 +148,10 @@ export async function scanTicket(req: AuthRequest, res: Response) {
     }
 
     if (ticket.status !== "paid") {
+      req.log?.warn("Ticket scan rejected: Invalid ticket status", {
+        ticketId: ticket.id,
+        status: ticket.status,
+      });
       return res.status(422).json({
         status: "invalid_status",
         message: `สถานะบัตรไม่ถูกต้อง: ${ticket.status}`,
@@ -137,6 +164,14 @@ export async function scanTicket(req: AuthRequest, res: Response) {
       [ticket.id],
     );
 
+    req.log?.info("Ticket check-in completed successfully", {
+      ticketId: ticket.id,
+      eventId: event_id,
+      seat: ticket.seat_position,
+      zone: ticket.zone_name,
+      holderEmail: ticket.holder_email,
+    });
+
     return res.json({
       status: "ok",
       message: "✅ Check-in สำเร็จ!",
@@ -148,7 +183,7 @@ export async function scanTicket(req: AuthRequest, res: Response) {
       is_wl: Boolean(ticket.is_wl),
     });
   } catch (err) {
-    console.error("SCAN TICKET ERROR:", err);
+    logger.error("SCAN TICKET ERROR:", err, "CHECKIN");
     return res.status(500).json({ message: "Error scanning ticket" });
   }
 }

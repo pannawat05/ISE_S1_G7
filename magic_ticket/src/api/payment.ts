@@ -94,6 +94,8 @@ export interface MyTicket {
 
   event_start: string;
 
+  event_end: string;
+
   place_name: string;
 
   qr_data_url: string | null;

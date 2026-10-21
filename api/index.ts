@@ -12,6 +12,8 @@ import paymentRouter from "./routes/payment.route.js";
 import checkinRouter from "./routes/checkin.route.js";
 import { execute } from "./model/query.js";
 import "./middlewares/notificationScheduler.js";
+import { logger } from "./lib/logger.js";
+import { requestLogger, errorLogger } from "./middlewares/logger.middleware.js";
 
 const app = express();
 const port: number = Number(process.env.PORT) || 5001;
@@ -27,6 +29,9 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization", "token"],
   }),
 );
+
+// Global HTTP Request Logger middleware
+app.use(requestLogger);
 
 // Files
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
@@ -45,6 +50,9 @@ app.use("/checkin", checkinRouter);
 app.get("/", (_req, res) => {
   res.send("ISE API is running");
 });
+
+// Global Error Logger middleware
+app.use(errorLogger);
 
 async function start() {
   try {
@@ -66,10 +74,15 @@ async function start() {
     await execute(
       "INSERT IGNORE INTO platform_settings (setting_key, setting_value) VALUES ('platform_fee_percent', 10.00)",
     );
+    await execute(
+      "INSERT IGNORE INTO platform_settings (setting_key, setting_value) VALUES ('booking_limit', 4.00)",
+    );
   } catch (err) {
-    console.error("ANALYTICS SCHEMA ERROR:", err);
+    logger.error("ANALYTICS SCHEMA ERROR:", err, "DATABASE");
   }
-  app.listen(port, () => console.log(`API listening on port ${port}`));
+  app.listen(port, () => {
+    logger.info(`API server started and listening on port ${port}`, { port }, "SYSTEM");
+  });
 }
 
 start();

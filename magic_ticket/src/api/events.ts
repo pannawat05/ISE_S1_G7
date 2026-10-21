@@ -89,3 +89,12 @@ export async function fetchZoneSeats(eventId: number, zoneId: number): Promise<P
   const data = await apiFetch<{ seats: PublicSeat[] }>(`/events/${eventId}/zones/${zoneId}/seats`);
   return data.seats ?? [];
 }
+
+export async function fetchBookingConfig(): Promise<{ booking_limit: number }> {
+  return apiFetch<{ booking_limit: number }>("/events/booking-config");
+}
+
+export async function fetchMyTicketCount(eventId: number, token: string): Promise<number> {
+  const data = await apiFetch<{ count: number }>(`/events/${eventId}/my-ticket-count`, { token });
+  return Number(data.count ?? 0);
+}

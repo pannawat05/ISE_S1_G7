@@ -45,6 +45,40 @@ export async function updatePlatformFee(req: AuthRequest, res: Response) {
   }
 }
 
+// ─── Booking Limit ────────────────────────────────────────────────────────────
+
+export async function getBookingLimit(req: AuthRequest, res: Response) {
+  try {
+    if (!await requireSysadmin(req, res)) return;
+    const rows = await query<{ setting_value: number }[]>(
+      "SELECT setting_value FROM platform_settings WHERE setting_key = 'booking_limit' LIMIT 1",
+    );
+    return res.json({ booking_limit: Math.floor(Number(rows[0]?.setting_value ?? 5)) });
+  } catch (err) {
+    console.error("GET BOOKING LIMIT ERROR:", err);
+    return res.status(500).json({ message: "Error fetching booking limit" });
+  }
+}
+
+export async function updateBookingLimit(req: AuthRequest, res: Response) {
+  const value = Math.floor(Number(req.body.booking_limit));
+  if (!Number.isFinite(value) || value < 0) {
+    return res.status(400).json({ message: "Booking limit must be a non-negative integer (0 = unlimited)" });
+  }
+  try {
+    if (!await requireSysadmin(req, res)) return;
+    await execute(
+      `INSERT INTO platform_settings (setting_key, setting_value) VALUES ('booking_limit', ?)
+       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+      [value],
+    );
+    return res.json({ message: "Booking limit updated", booking_limit: value });
+  } catch (err) {
+    console.error("UPDATE BOOKING LIMIT ERROR:", err);
+    return res.status(500).json({ message: "Error updating booking limit" });
+  }
+}
+
 // ─── Event Types ──────────────────────────────────────────────────────────────
 export async function listEventTypes(_req: AuthRequest, res: Response) {
   try {

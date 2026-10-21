@@ -2,8 +2,12 @@ import express from "express";
 import * as userController from "../controllers/user.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import type { AuthRequest } from "../middlewares/types.js";
+import { createRouteLogger } from "../middlewares/logger.middleware.js";
 
 const router = express.Router();
+
+// Route-level logger for Users
+router.use(createRouteLogger("USERS"));
 
 router.get("/me", authenticate, (req, res) =>
   userController.getMe(req as AuthRequest, res),

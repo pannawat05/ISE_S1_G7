@@ -1,6 +1,48 @@
 import type { Request, Response } from "express";
 import { query } from "../model/query.js";
+import type { AuthRequest } from "../middlewares/types.js";
 import type { EventImages, ListEvent, PublicEvent, PublicEventList, Total } from "../model/types.js";
+
+// ─── Booking config (public) ──────────────────────────────────────────────────
+export async function getBookingConfig(_req: Request, res: Response) {
+  try {
+    const rows = await query<{ setting_value: number }[]>(
+      "SELECT setting_value FROM platform_settings WHERE setting_key = 'booking_limit' LIMIT 1",
+    );
+    const limit = Math.floor(Number(rows[0]?.setting_value ?? 5));
+    return res.json({ booking_limit: limit });
+  } catch {
+    return res.json({ booking_limit: 5 });
+  }
+}
+
+// ─── My ticket count for an event (requires auth) ────────────────────────────
+export async function getMyTicketCount(req: Request, res: Response) {
+  const authReq = req as AuthRequest;
+  const userId = authReq.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  const eventId = Number(req.params.id);
+  if (isNaN(eventId)) return res.status(400).json({ message: "Invalid event ID" });
+
+  try {
+    const rows = await query<{ cnt: number }[]>(
+      `SELECT COUNT(t.id) AS cnt
+       FROM tickets t
+       JOIN seats s ON s.id = t.seat_id
+       JOIN zones z ON z.id = s.zone_id
+       WHERE t.users_id = ? AND z.event_id = ?
+         AND (
+           t.status IN ('paid', 'checked_in')
+           OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+         )`,
+      [userId, eventId],
+    );
+    return res.json({ count: Number(rows[0]?.cnt ?? 0) });
+  } catch {
+    return res.status(500).json({ message: "Error" });
+  }
+}
 
 // ─── Public zone/seat data for booking ───────────────────────────────────────
 export async function listEventZones(req: Request, res: Response) {
@@ -167,8 +209,8 @@ export async function listPublicEvents(req: Request, res: Response) {
   const offset   = Math.max(Number(req.query.offset ?? 0),  0);
 
   try {
-    // Show only approved and active events for public
-    const conditions: string[] = ["e.status = 'approved'", "e.is_active = 1"];
+    // Show only approved, active, and not yet ended events for public
+    const conditions: string[] = ["e.status = 'approved'", "e.is_active = 1", "e.end_date > NOW()"];
     const params: unknown[] = [];
 
     if (search) {

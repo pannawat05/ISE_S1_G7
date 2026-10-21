@@ -14,11 +14,13 @@ import {
   findOrganizerByOwnerId,
 } from "../model/organizer.model.js";
 import fs from "fs";
+import { logger } from "../lib/logger.js";
 
 export async function signup(req: Request, res: Response) {
   const { fname, lname, email, password } = req.body;
 
   if (!fname || !lname || !email || !password) {
+    req.log?.warn("Signup validation failed: Missing required fields", { email });
     return res
       .status(400)
       .json({ message: "All fields are required", status: 400 });
@@ -27,16 +29,18 @@ export async function signup(req: Request, res: Response) {
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     await createUser(fname, lname, email, hashedPassword);
+    req.log?.info("User registered successfully", { email, fname, lname });
     return res
       .status(201)
       .json({ message: "User registered successfully", status: 201 });
   } catch (err: unknown) {
     if ((err as { code?: string }).code === "ER_DUP_ENTRY") {
+      req.log?.warn("Signup failed: Email already exists", { email });
       return res
         .status(400)
         .json({ message: "Email already exists", status: 400 });
     }
-    console.error("SIGNUP ERROR:", err);
+    logger.error("SIGNUP ERROR:", err, "AUTH");
     return res.status(500).json({ error: "Internal server error", status: 500 });
   }
 }
@@ -45,6 +49,7 @@ export async function login(req: Request, res: Response) {
   const { email, password } = req.body;
 
   if (!email || !password) {
+    req.log?.warn("Login validation failed: Missing email or password");
     return res
       .status(400)
       .json({ message: "Email and password are required", status: 400 });
@@ -54,6 +59,7 @@ export async function login(req: Request, res: Response) {
     const user = await findUserByEmail(email);
 
     if (!user) {
+      req.log?.warn("Login failed: User email not found", { email });
       return res
         .status(401)
         .json({ message: "Invalid email or password", status: 401 });
@@ -62,6 +68,7 @@ export async function login(req: Request, res: Response) {
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
+      req.log?.warn("Login failed: Invalid password", { email, userId: user.id });
       return res
         .status(401)
         .json({ message: "Invalid email or password", status: 401 });
@@ -70,6 +77,12 @@ export async function login(req: Request, res: Response) {
     const organizer = await findOrganizerByOwnerId(user.id);
     const token = signToken({ userId: user.id, email: user.email });
 
+    req.log?.info("User login successful", {
+      email: user.email,
+      userId: user.id,
+      role: organizer ? "organizer" : user.role,
+    });
+
     return res.json({
       message: "Login successful",
       token,
@@ -77,7 +90,7 @@ export async function login(req: Request, res: Response) {
       status: 200,
     });
   } catch (err) {
-    console.error("LOGIN ERROR:", err);
+    logger.error("LOGIN ERROR:", err, "AUTH");
     return res.status(500).json({ error: "Internal server error", status: 500 });
   }
 }
@@ -103,20 +116,23 @@ export async function resetPassword(req: Request, res: Response) {
     const user = await findUserByEmail(email);
 
     if (!user) {
+      req.log?.warn("Reset password failed: User not found", { email });
       return res.status(400).json({ message: "Unable to reset password", status: 400 });
     }
 
     const otpError = await verifyOtp(email, otp.toString());
     if (otpError) {
+      req.log?.warn("Reset password failed: Invalid OTP", { email, error: otpError });
       return res.status(400).json({ error: otpError, status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     await updateUserPassword(user.id, hashedPassword);
 
+    req.log?.info("Password reset successfully", { email, userId: user.id });
     return res.json({ message: "Password reset successfully", status: 200 });
   } catch (err) {
-    console.error("RESET PASSWORD ERROR:", err);
+    logger.error("RESET PASSWORD ERROR:", err, "AUTH");
     return res.status(500).json({ error: "Internal server error", status: 500 });
   }
 }
@@ -145,7 +161,7 @@ export async function getUserData(req: AuthRequest, res: Response) {
       },
     });
   } catch (err) {
-    console.error("GET USER DATA ERROR:", err);
+    logger.error("GET USER DATA ERROR:", err, "AUTH");
     return res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -200,6 +216,12 @@ export async function registerOrganizer(
     const logoUrl = `/${uploadedFilePath.replace(/\\/g, "/")}`;
     const organizerId = await createOrganizer(teamName, logoUrl, req.user.id);
 
+    req.log?.info("Organizer registered successfully", {
+      organizerId,
+      teamName,
+      userId: req.user.id,
+    });
+
     return res.status(201).json({
       message: "Organizer registered successfully!",
       data: {
@@ -209,7 +231,7 @@ export async function registerOrganizer(
       },
     });
   } catch (error) {
-    console.error("ORGANIZER REGISTER ERROR:", error);
+    logger.error("ORGANIZER REGISTER ERROR:", error, "AUTH");
     if (uploadedFilePath && fs.existsSync(uploadedFilePath)) {
       fs.unlinkSync(uploadedFilePath);
     }

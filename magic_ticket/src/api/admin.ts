@@ -8,7 +8,7 @@ export interface AdminEvent {
   start_date: string;
   end_date: string;
   place_name: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "deleted";
   is_active: number;
   type_name: string;
   organizer_id: number;

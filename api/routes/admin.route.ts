@@ -3,8 +3,12 @@ import { authenticate } from "../middlewares/auth.middleware.js";
 import { requireAdmin } from "../middlewares/admin.middleware.js";
 import * as adminController from "../controllers/admin.controller.js";
 import type { AuthRequest } from "../middlewares/types.js";
+import { createRouteLogger } from "../middlewares/logger.middleware.js";
 
 const router = express.Router();
+
+// Route-level logger for Admin
+router.use(createRouteLogger("ADMIN"));
 
 // All admin routes require auth + admin role
 router.use(authenticate, (req, res, next) =>

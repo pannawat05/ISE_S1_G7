@@ -2,8 +2,12 @@ import express from "express";
 import * as authController from "../controllers/auth.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { uploadOrganizerLogo } from "../middlewares/upload.middleware.js";
+import { createRouteLogger } from "../middlewares/logger.middleware.js";
 
 const router = express.Router();
+
+// Route-level logger for Auth
+router.use(createRouteLogger("AUTH"));
 
 router.post("/signup", authController.signup);
 router.post("/login", authController.login);

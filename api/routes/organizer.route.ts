@@ -6,8 +6,12 @@ import * as staffController from "../controllers/staff.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { uploadOrganizerLogo, uploadEventImages, uploadZoneImages } from "../middlewares/upload.middleware.js";
 import type { AuthRequest } from "../middlewares/types.js";
+import { createRouteLogger } from "../middlewares/logger.middleware.js";
 
 const router = express.Router();
+
+// Route-level logger for Organizer
+router.use(createRouteLogger("ORGANIZER"));
 
 // ─── Organizer CRUD ───────────────────────────────────────────────────────────
 router.post(

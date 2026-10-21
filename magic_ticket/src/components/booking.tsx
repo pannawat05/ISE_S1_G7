@@ -10,9 +10,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, ChevronRight, ArrowLeft, Loader2, Users } from "lucide-react";
+import Cookies from "js-cookie";
 import { API_BASE } from "@/api/client";
 import {
-  fetchEventZones, fetchZoneSeats,
+  fetchEventZones, fetchZoneSeats, fetchBookingConfig, fetchMyTicketCount,
   type PublicZone, type PublicSeat,
 } from "@/api/events";
 
@@ -190,8 +191,7 @@ function SeatGrid({ seats, selected, onToggle, maxSelect = 10 }: {
         <p className="text-orange-400 text-xs text-center">
           เลือกได้สูงสุด {maxSelect} ที่นั่งต่อครั้ง
         </p>
-      )}
-    </div>
+      )}    </div>
   );
 }
 
@@ -218,6 +218,10 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
   const [seatsLoading, setSeatsLoading] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<Set<number>>(new Set());
 
+  // Booking limit
+  const [bookingLimit, setBookingLimit] = useState(10); // 0 = unlimited
+  const [alreadyOwned, setAlreadyOwned] = useState(0);
+
   // Load zones when drawer opens
   useEffect(() => {
     if (!isOpen) return;
@@ -225,8 +229,19 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
     setSelectedZone(null);
     setSelectedSeats(new Set());
     setZonesLoading(true);
-    fetchEventZones(eventId)
-      .then(setZones)
+
+    const token = Cookies.get("authToken");
+
+    Promise.all([
+      fetchEventZones(eventId),
+      fetchBookingConfig(),
+      token ? fetchMyTicketCount(eventId, token) : Promise.resolve(0),
+    ])
+      .then(([zones, config, owned]) => {
+        setZones(zones);
+        setBookingLimit(config.booking_limit);
+        setAlreadyOwned(owned);
+      })
       .catch((e: Error) => setZonesError(e.message))
       .finally(() => setZonesLoading(false));
   }, [isOpen, eventId]);
@@ -251,12 +266,15 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
     }
   }, [eventId]);
 
+  // remaining = limit - already owned (0 limit = unlimited → use large number)
+  const maxCanSelect = bookingLimit === 0 ? 99 : Math.max(0, bookingLimit - alreadyOwned);
+
   function toggleSeat(seatId: number) {
     setSelectedSeats((prev) => {
       const next = new Set(prev);
       if (next.has(seatId)) {
         next.delete(seatId);
-      } else if (next.size < 10) {
+      } else if (next.size < maxCanSelect) {
         next.add(seatId);
       }
       return next;
@@ -408,19 +426,33 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
               )}
               {!seatsLoading && (
                 <>
-                  <SeatGrid
-                    seats={seats}
-                    selected={selectedSeats}
-                    onToggle={toggleSeat}
-                  />
-                  {selectedSeats.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setStep("confirm")}
-                      className="bg-violet-600 hover:bg-violet-700 py-3 rounded-xl w-full font-semibold text-white text-sm transition-colors"
-                    >
-                      ยืนยันที่นั่ง ({selectedSeats.size} ที่) →
-                    </button>
+                  {maxCanSelect === 0 ? (
+                    <div className="bg-orange-500/10 px-4 py-8 border border-orange-500/20 rounded-xl text-orange-300 text-sm text-center">
+                      คุณมีบัตรในงานนี้ครบ {bookingLimit} ใบแล้ว (จำนวนสูงสุดที่อนุญาต)
+                    </div>
+                  ) : (
+                    <>
+                      {bookingLimit > 0 && (
+                        <p className="text-gray-500 text-xs text-center">
+                          จองได้อีก {maxCanSelect} ที่ (มีบัตรแล้ว {alreadyOwned}/{bookingLimit} ใบ)
+                        </p>
+                      )}
+                      <SeatGrid
+                        seats={seats}
+                        selected={selectedSeats}
+                        onToggle={toggleSeat}
+                        maxSelect={maxCanSelect}
+                      />
+                      {selectedSeats.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setStep("confirm")}
+                          className="bg-violet-600 hover:bg-violet-700 py-3 rounded-xl w-full font-semibold text-white text-sm transition-colors"
+                        >
+                          ยืนยันที่นั่ง ({selectedSeats.size} ที่) →
+                        </button>
+                      )}
+                    </>
                   )}
                 </>
               )}

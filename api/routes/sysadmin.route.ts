@@ -3,16 +3,22 @@ import { authenticate } from "../middlewares/auth.middleware.js";
 import { requireAdmin } from "../middlewares/admin.middleware.js";
 import * as sys from "../controllers/sysadmin.controller.js";
 import type { AuthRequest } from "../middlewares/types.js";
+import { createRouteLogger } from "../middlewares/logger.middleware.js";
 
 const router = express.Router();
+
+// Route-level logger for Sysadmin
+router.use(createRouteLogger("SYSADMIN"));
 
 router.use(authenticate, (req, res, next) =>
   requireAdmin(req as AuthRequest, res, next),
 );
 
 router.get("/analytics", (req, res) => sys.getPlatformAnalytics(req as AuthRequest, res));
-router.get("/platform-fee", (req, res) => sys.getPlatformFee(req as AuthRequest, res));
-router.patch("/platform-fee", (req, res) => sys.updatePlatformFee(req as AuthRequest, res));
+router.get("/platform-fee",    (req, res) => sys.getPlatformFee(req as AuthRequest, res));
+router.patch("/platform-fee",  (req, res) => sys.updatePlatformFee(req as AuthRequest, res));
+router.get("/booking-limit",   (req, res) => sys.getBookingLimit(req as AuthRequest, res));
+router.patch("/booking-limit", (req, res) => sys.updateBookingLimit(req as AuthRequest, res));
 
 // Event Types
 router.get   ("/event-types",      (req, res) => sys.listEventTypes(req as AuthRequest, res));

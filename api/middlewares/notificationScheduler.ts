@@ -1,13 +1,9 @@
 import cron from "node-cron";
 import db from "../model/db.js";
 import { transporter } from "../lib/mailer.js";
+import { logger } from "../lib/logger.js";
 
-console.log("========================================");
-console.log("🔔 Notification Scheduler");
-console.log("========================================");
-console.log("Status   : STARTED");
-console.log("Schedule : Every 5 minutes");
-console.log("========================================");
+logger.info("Notification Scheduler started (Every 5 minutes)", undefined, "SCHEDULER");
 
 async function checkNotifications(): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -55,22 +51,13 @@ async function checkNotifications(): Promise<void> {
       `,
       async (err, results: any[]) => {
         if (err) {
-          console.error(
-            "❌ Database error:",
-            err
-          );
-
+          logger.error("Scheduler database error:", err, "SCHEDULER");
           resolve();
           return;
         }
 
-        console.log(
-          `📋 Found ${results.length} unsent ticket(s)`
-        );
-
         const now = Date.now();
-        const oneDayMs =
-          24 * 60 * 60 * 1000;
+        const oneDayMs = 24 * 60 * 60 * 1000;
 
         let checked = 0;
         let sent = 0;
@@ -79,69 +66,21 @@ async function checkNotifications(): Promise<void> {
         for (const ticket of results) {
           checked++;
 
-          const targetDate =
-            new Date(
-              ticket.start_date
-            ).getTime();
+          const targetDate = new Date(ticket.start_date).getTime();
+          const diffMs = targetDate - now;
 
-          const diffMs =
-            targetDate - now;
-
-          const hoursRemaining =
-            diffMs /
-            (1000 * 60 * 60);
-
-          const userName =
-            `${ticket.f_name} ${ticket.l_name}`;
-
-          console.log("");
-          console.log(
-            "----------------------------------------"
-          );
-          console.log(
-            `👤 User: ${userName}`
-          );
-          console.log(
-            `📧 Email: ${ticket.user_email}`
-          );
-          console.log(
-            `🎫 Ticket: ${ticket.ticket_id}`
-          );
-          console.log(
-            `🎫 Event: ${ticket.event_name}`
-          );
-          console.log(
-            `🕐 Start: ${ticket.start_date}`
-          );
-          console.log(
-            `⏳ Remaining: ${hoursRemaining.toFixed(
-              2
-            )} hours`
-          );
-
-          const isWithin24Hours =
-            diffMs > 0 &&
-            diffMs <= oneDayMs;
+          const isWithin24Hours = diffMs > 0 && diffMs <= oneDayMs;
 
           if (!isWithin24Hours) {
-            console.log(
-              "⏭️ Skip - Event is not within 24 hours"
-            );
-
             skipped++;
             continue;
           }
 
+          const userName = `${ticket.f_name} ${ticket.l_name}`;
           const mailOptions = {
-            from:
-              process.env.EMAIL_USER,
-
-            to:
-              ticket.user_email,
-
-            subject:
-              `Notification - ${ticket.event_name}`,
-
+            from: process.env.EMAIL_USER,
+            to: ticket.user_email,
+            subject: `Notification - ${ticket.event_name}`,
             html: `
               <div
                 style="
@@ -153,146 +92,55 @@ async function checkNotifications(): Promise<void> {
                   border-radius: 10px;
                 "
               >
-
                 <h2 style="color: #7c3aed;">
                   🎫 Magic Ticket
                 </h2>
-
-                <p>
-                  Hello
-                  <strong>
-                    ${userName}
-                  </strong>
-                </p>
-
-                <p>
-                  Your event
-                  "<strong>
-                    ${ticket.event_name}
-                  </strong>"
-                  is starting soon!
-                </p>
-
-                <p>
-                  <strong>
-                    📅 Start Date:
-                  </strong>
-                  ${ticket.start_date}
-                </p>
-
-                <p>
-                  <strong>
-                    📍 Location:
-                  </strong>
-                  ${ticket.place_name}
-                </p>
-
-                <p>
-                  <strong>
-                    Description:
-                  </strong>
-                  ${
-                    ticket.description ||
-                    "No description"
-                  }
-                </p>
-
-                <p>
-                  <strong>
-                    🎫 Ticket ID:
-                  </strong>
-                  ${ticket.ticket_id}
-                </p>
-
+                <p>Hello <strong>${userName}</strong></p>
+                <p>Your event "<strong>${ticket.event_name}</strong>" is starting soon!</p>
+                <p><strong>📅 Start Date:</strong> ${ticket.start_date}</p>
+                <p><strong>📍 Location:</strong> ${ticket.place_name}</p>
+                <p><strong>Description:</strong> ${ticket.description || "No description"}</p>
+                <p><strong>🎫 Ticket ID:</strong> ${ticket.ticket_id}</p>
                 <hr />
-
-                <p
-                  style="
-                    color: #666;
-                    font-size: 14px;
-                  "
-                >
-                  Please make sure you are ready
-                  before the event starts.
-                </p>
-
+                <p style="color: #666; font-size: 14px;">Please make sure you are ready before the event starts.</p>
               </div>
             `,
           };
 
           try {
-            await transporter.sendMail(
-              mailOptions
-            );
+            await transporter.sendMail(mailOptions);
 
-            await new Promise<void>(
-              (resolveInsert, rejectInsert) => {
-                db.query(
-                  `
-                  INSERT INTO event_notifications
-                    (
-                      ticket_id,
-                      event_id,
-                      user_id,
-                      sent_at
-                    )
-                  VALUES (?, ?, ?, NOW())
-                  `,
-                  [
-                    ticket.ticket_id,
-                    ticket.event_id,
-                    ticket.user_id,
-                  ],
-                  (insertErr) => {
-                    if (insertErr) {
-                      rejectInsert(insertErr);
-                      return;
-                    }
-
-                    resolveInsert();
+            await new Promise<void>((resolveInsert, rejectInsert) => {
+              db.query(
+                `
+                INSERT INTO event_notifications
+                  (ticket_id, event_id, user_id, sent_at)
+                VALUES (?, ?, ?, NOW())
+                `,
+                [ticket.ticket_id, ticket.event_id, ticket.user_id],
+                (insertErr) => {
+                  if (insertErr) {
+                    rejectInsert(insertErr);
+                    return;
                   }
-                );
-              }
-            );
+                  resolveInsert();
+                },
+              );
+            });
 
             sent++;
-
-            console.log(
-              `✅ Notification sent and recorded for ${ticket.user_email}`
-            );
+            logger.info(`Notification sent to ${ticket.user_email}`, { ticketId: ticket.ticket_id }, "SCHEDULER");
           } catch (mailError) {
-            console.error(
-              `❌ Failed to send notification to ${ticket.user_email}:`,
-              mailError
-            );
+            logger.error(`Failed to send notification to ${ticket.user_email}:`, mailError, "SCHEDULER");
           }
         }
 
-        console.log("");
-        console.log(
-          "========================================"
-        );
-        console.log(
-          "📊 Notification Check Result"
-        );
-        console.log(
-          "========================================"
-        );
-        console.log(
-          `Tickets checked : ${checked}`
-        );
-        console.log(
-          `Emails sent     : ${sent}`
-        );
-        console.log(
-          `Skipped         : ${skipped}`
-        );
-        console.log(
-          "========================================"
-        );
+        if (checked > 0) {
+          logger.info(`Notification check completed: ${checked} checked, ${sent} sent, ${skipped} skipped`, undefined, "SCHEDULER");
+        }
 
         resolve();
-      }
+      },
     );
   });
 }
@@ -300,49 +148,15 @@ async function checkNotifications(): Promise<void> {
 cron.schedule(
   "*/5 * * * *",
   async () => {
-    const startTime =
-      Date.now();
-
-    console.log("");
-    console.log(
-      "========================================"
-    );
-    console.log(
-      "🔔 Running Notification Check"
-    );
-    console.log(
-      "Time:",
-      new Date().toLocaleString(
-        "th-TH",
-        {
-          timeZone:
-            "Asia/Bangkok",
-        }
-      )
-    );
-    console.log(
-      "========================================"
-    );
-
     try {
       await checkNotifications();
-
-      const elapsed =
-        Date.now() - startTime;
-
-      console.log(
-        `⏱️ Execution time: ${elapsed} ms`
-      );
     } catch (error) {
-      console.error(
-        "❌ Scheduler error:",
-        error
-      );
+      logger.error("Notification scheduler error:", error, "SCHEDULER");
     }
   },
   {
     timezone: "Asia/Bangkok",
-  }
+  },
 );
 
 // ─── Expired Reservation Cleanup ─────────────────────────────────────────────
@@ -358,15 +172,15 @@ async function cancelExpiredReservations(): Promise<void> {
         (err, res: any) => {
           if (err) reject(err);
           else resolve(res);
-        }
+        },
       );
     });
 
     if (result.affectedRows > 0) {
-      console.log(`🗑️  Cancelled ${result.affectedRows} expired reservation(s)`);
+      logger.info(`Cancelled ${result.affectedRows} expired reservation(s)`, undefined, "CLEANUP");
     }
   } catch (err) {
-    console.error("❌ Failed to cancel expired reservations:", err);
+    logger.error("Failed to cancel expired reservations:", err, "CLEANUP");
   }
 }
 
@@ -375,5 +189,5 @@ cron.schedule(
   async () => {
     await cancelExpiredReservations();
   },
-  { timezone: "Asia/Bangkok" }
+  { timezone: "Asia/Bangkok" },
 );

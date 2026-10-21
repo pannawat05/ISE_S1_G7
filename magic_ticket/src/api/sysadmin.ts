@@ -74,6 +74,18 @@ export async function updatePlatformFee(token: string, value: number): Promise<n
   return Number(data.platform_fee_percent);
 }
 
+export async function fetchBookingLimit(token: string): Promise<number> {
+  const data = await apiFetch<{ booking_limit: number }>("/sysadmin/booking-limit", { token });
+  return Number(data.booking_limit ?? 5);
+}
+
+export async function updateBookingLimit(token: string, value: number): Promise<number> {
+  const data = await apiFetch<{ booking_limit: number }>("/sysadmin/booking-limit", {
+    method: "PATCH", token, body: JSON.stringify({ booking_limit: value }),
+  });
+  return Number(data.booking_limit);
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 export interface SysUser {
   id: number;

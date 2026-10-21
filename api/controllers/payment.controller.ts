@@ -19,6 +19,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 // ============================================================
 
 const DEFAULT_PLATFORM_FEE_PERCENT = 10;
+const DEFAULT_BOOKING_LIMIT = 5;
 const RESERVATION_MINUTES = 5;
 
 async function getPlatformFeePercent(): Promise<number> {
@@ -32,6 +33,18 @@ async function getPlatformFeePercent(): Promise<number> {
       : DEFAULT_PLATFORM_FEE_PERCENT;
   } catch {
     return DEFAULT_PLATFORM_FEE_PERCENT;
+  }
+}
+
+async function getBookingLimit(): Promise<number> {
+  try {
+    const rows = await query<{ setting_value: number }[]>(
+      "SELECT setting_value FROM platform_settings WHERE setting_key = 'booking_limit' LIMIT 1",
+    );
+    const value = Math.floor(Number(rows[0]?.setting_value));
+    return Number.isFinite(value) && value >= 0 ? value : DEFAULT_BOOKING_LIMIT;
+  } catch {
+    return DEFAULT_BOOKING_LIMIT;
   }
 }
 
@@ -73,12 +86,12 @@ export async function setupOrganizerStripe(req: AuthRequest, res: Response) {
     if (!organizers.length) return res.status(404).json({ message: "Organizer not found" });
 
     const organizer = organizers[0];
-    let stripeAccountId = organizer.stripe_id?.trim();
+    let stripeAccountId = organizer?.stripe_id?.trim();
 
     if (!stripeAccountId || !stripeAccountId.startsWith("acct_")) {
       const account = await stripe.accounts.create({
         type: "express",
-        email: organizer.email,
+        email: organizer?.email || "",
         capabilities: {
           card_payments: { requested: true },
           transfers: { requested: true },
@@ -140,7 +153,7 @@ export async function checkout(req: AuthRequest, res: Response) {
     const zone = zones[0];
 
     // ── 2. Validate Organizer Stripe Account ──
-    const stripeAccountId = zone.stripe_id?.trim();
+    const stripeAccountId = zone?.stripe_id?.trim();
     if (!stripeAccountId || !stripeAccountId.startsWith("acct_")) {
       return res.status(400).json({ message: "ผู้จัดงานยังไม่ได้เชื่อมต่อ Stripe" });
     }
@@ -171,6 +184,30 @@ export async function checkout(req: AuthRequest, res: Response) {
 
     // ── 4. Calculate amount ──
     const qty = Array.isArray(seat_ids) && seat_ids.length > 0 ? seat_ids.length : 1;
+
+    // ── 4.1 Booking limit check ──
+    const bookingLimit = await getBookingLimit();
+    if (bookingLimit > 0) {
+      const ownedRows = await query<{ cnt: number }[]>(
+        `SELECT COUNT(t.id) AS cnt
+         FROM tickets t
+         JOIN seats s ON s.id = t.seat_id
+         JOIN zones z ON z.id = s.zone_id
+         WHERE t.users_id = ? AND z.event_id = ?
+           AND (
+             t.status IN ('paid', 'checked_in')
+             OR (t.status = 'reserved' AND t.reserved_at > DATE_SUB(NOW(), INTERVAL ${RESERVATION_MINUTES} MINUTE))
+           )`,
+        [userId, Number(event_id)],
+      );
+      const alreadyOwned = Number(ownedRows[0]?.cnt ?? 0);
+      if (alreadyOwned + qty > bookingLimit) {
+        return res.status(409).json({
+          message: `จองได้สูงสุด ${bookingLimit} บัตรต่อคนต่อ 1 งาน (คุณมีบัตรในงานนี้แล้ว ${alreadyOwned} ใบ)`,
+        });
+      }
+    }
+
     const amount = Number(zone.price) * qty;
     const amountSatang = Math.round(amount * 100);
 
@@ -456,13 +493,13 @@ export async function getMyTickets(req: AuthRequest, res: Response) {
     const tickets = await query<{
       id: number; qrcode: string; status: string; created_at: string;
       seat_position: string | null; zone_name: string; zone_type: string;
-      zone_price: number; event_name: string; event_start: string; place_name: string;
+      zone_price: number; event_name: string; event_start: string; event_end: string; place_name: string;
     }[]>(
       `SELECT
          t.id, t.qrcode, t.status, t.created_at,
          s.position AS seat_position,
          z.name AS zone_name, z.type AS zone_type, z.price AS zone_price,
-         e.name AS event_name, e.start_date AS event_start, e.place_name
+         e.name AS event_name, e.start_date AS event_start, e.end_date AS event_end, e.place_name
        FROM tickets t
        JOIN seats s ON s.id = t.seat_id
        JOIN zones z ON z.id = s.zone_id

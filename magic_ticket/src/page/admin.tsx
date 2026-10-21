@@ -16,6 +16,7 @@ import {
   fetchPaymentMethods, createPaymentMethod, updatePaymentMethod,
   togglePaymentMethod, deletePaymentMethod,
   fetchPlatformFee, updatePlatformFee,
+  fetchBookingLimit, updateBookingLimit,
   fetchUsers, updateUserRole,
   fetchSysOrganizers,
   fetchPlatformAnalytics,
@@ -24,15 +25,28 @@ import {
 import { API_BASE } from "@/api/client";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, endDate }: { status: string; endDate?: string }) {
   const s: Record<string, string> = {
     pending:  "bg-yellow-400/10 text-yellow-400 border-yellow-400/20",
     approved: "bg-green-400/10  text-green-400  border-green-400/20",
     rejected: "bg-red-400/10   text-red-400   border-red-400/20",
+    deleted:  "bg-gray-500/10  text-gray-400  border-gray-500/20",
   };
   const l: Record<string, string> = {
-    pending: "Pending", approved: "Approved", rejected: "Rejected",
+    pending: "Pending", approved: "Approved", rejected: "Rejected", deleted: "Deleted",
   };
+
+  // event จบแล้ว (approved + end_date ผ่านแล้ว)
+  const isEnded = status === "approved" && endDate && new Date(endDate) < new Date();
+
+  if (isEnded) {
+    return (
+      <span className="bg-gray-500/10 mt-badge border-gray-500/20 text-gray-400">
+        Expired
+      </span>
+    );
+  }
+
   return (
     <span className={`mt-badge ${s[status] ?? "bg-gray-400/10 text-gray-400 border-gray-400/20"}`}>
       {l[status] ?? status}
@@ -295,20 +309,20 @@ function EventsDashboard({ token, events, isLoading, error, search, setSearch, s
                       <p className="text-gray-600 text-xs">{ev.owner_email}</p>
                     </td>
                     <td className="hidden lg:table-cell px-4 py-3 text-gray-400">{dateStr}</td>
-                    <td className="px-4 py-3"><StatusBadge status={ev.status} /></td>
+                    <td className="px-4 py-3"><StatusBadge status={ev.status} endDate={ev.end_date} /></td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end items-center gap-1.5">
                         <button onClick={() => onViewClick(ev.id)} title="ดูรายละเอียด"
                           className="hover:bg-white/10 p-1.5 rounded-lg text-gray-400 hover:text-white">
                           <Eye size={16} />
                         </button>
-                        {ev.status !== "approved" && (
+                        {ev.status !== "approved" && ev.status !== "deleted" && (
                           <button onClick={() => onApprove(ev)} title="Approve"
                             className="hover:bg-green-500/20 p-1.5 rounded-lg text-gray-400 hover:text-green-400">
                             <Check size={16} />
                           </button>
                         )}
-                        {ev.status !== "rejected" && (
+                        {ev.status !== "rejected" && ev.status !== "deleted" && !(ev.status === "approved" && new Date(ev.end_date) < new Date()) && (
                           <button onClick={() => onRejectClick(ev)} title="Reject"
                             className="hover:bg-red-500/20 p-1.5 rounded-lg text-gray-400 hover:text-red-400">
                             <X size={16} />
@@ -523,6 +537,10 @@ function PaymentMethodsManager({ token }: { token: string }) {
   const [feeInput, setFeeInput] = useState("10");
   const [feeLoading, setFeeLoading] = useState(true);
   const [feeSaving, setFeeSaving] = useState(false);
+  const [bookingLimit, setBookingLimit] = useState(5);
+  const [limitInput, setLimitInput] = useState("5");
+  const [limitLoading, setLimitLoading] = useState(true);
+  const [limitSaving, setLimitSaving] = useState(false);
 
   function load() { fetchPaymentMethods(token).then(setMethods).catch(console.error).finally(() => setLoading(false)); }
   useEffect(() => {
@@ -531,6 +549,10 @@ function PaymentMethodsManager({ token }: { token: string }) {
       .then((value) => { setPlatformFee(value); setFeeInput(String(value)); })
       .catch(console.error)
       .finally(() => setFeeLoading(false));
+    fetchBookingLimit(token)
+      .then((value) => { setBookingLimit(value); setLimitInput(String(value)); })
+      .catch(console.error)
+      .finally(() => setLimitLoading(false));
   }, []);
 
   async function handleFeeSave() {
@@ -547,6 +569,22 @@ function PaymentMethodsManager({ token }: { token: string }) {
       flash("✅ อัปเดต Platform Fee สำเร็จ");
     } catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
     finally { setFeeSaving(false); }
+  }
+
+  async function handleLimitSave() {
+    const value = Math.floor(Number(limitInput));
+    if (!Number.isFinite(value) || value < 0) {
+      flash("❌ จำนวนต้องเป็นจำนวนเต็มที่ไม่ติดลบ (0 = ไม่จำกัด)");
+      return;
+    }
+    setLimitSaving(true);
+    try {
+      const updated = await updateBookingLimit(token, value);
+      setBookingLimit(updated);
+      setLimitInput(String(updated));
+      flash("✅ อัปเดต Booking Limit สำเร็จ");
+    } catch (e: unknown) { flash(`❌ ${e instanceof Error ? e.message : "Error"}`); }
+    finally { setLimitSaving(false); }
   }
 
   async function handleAdd() {
@@ -628,6 +666,37 @@ function PaymentMethodsManager({ token }: { token: string }) {
           </button>
         </div>
       </div>
+
+      {/* Booking Limit Card */}
+      <div className="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-4 bg-violet-500/10 p-4 border border-violet-500/20 rounded-xl">
+        <div>
+          <h3 className="font-semibold text-white">Booking Limit</h3>
+          <p className="mt-1 text-gray-500 text-xs">จำนวนตั๋วสูงสุดที่ผู้ใช้ 1 คนจองได้ต่อ 1 งาน (0 = ไม่จำกัด)</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={limitInput}
+              onChange={(e) => setLimitInput(e.target.value)}
+              disabled={limitLoading || limitSaving}
+              className="mt-input pr-12 w-32 text-right"
+              aria-label="Booking limit per user per event"
+            />
+            <span className="top-1/2 right-3 absolute text-gray-400 text-xs whitespace-nowrap -translate-y-1/2">ใบ</span>
+          </div>
+          <button
+            onClick={handleLimitSave}
+            disabled={limitLoading || limitSaving || Math.floor(Number(limitInput)) === bookingLimit}
+            className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-4 py-2 rounded-lg font-semibold text-white text-sm"
+          >
+            {limitSaving ? "กำลังบันทึก..." : "บันทึก"}
+          </button>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-white text-lg">Payment Methods</h3>

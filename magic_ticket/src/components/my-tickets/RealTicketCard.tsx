@@ -26,26 +26,26 @@ function QRModal({ ticket, onClose }: { ticket: MyTicket; onClose: () => void })
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      className="z-[200] fixed inset-0 flex justify-center items-center bg-black/80 backdrop-blur-sm p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-[#111] border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+      <div className="bg-[#111] shadow-2xl border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+        <div className="flex justify-between items-center px-5 py-4 border-white/10 border-b">
           <div className="flex items-center gap-2">
             <Ticket size={18} className="text-violet-400" />
             <span className="font-semibold text-white text-sm">บัตรเข้างาน</span>
           </div>
           <button onClick={onClose}
-            className="p-1.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
+            className="hover:bg-white/10 p-1.5 rounded-lg text-gray-400 hover:text-white transition-colors">
             <X size={18} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="space-y-4 p-6">
           {/* Event info */}
-          <div className="text-center space-y-1">
+          <div className="space-y-1 text-center">
             <p className="font-bold text-white text-base">{ticket.event_name}</p>
             <p className="text-violet-300 text-sm">
               {ticket.zone_name} · ที่นั่ง {ticket.seat_position}
@@ -56,7 +56,7 @@ function QRModal({ ticket, onClose }: { ticket: MyTicket; onClose: () => void })
           {/* QR Code */}
           {ticket.qr_data_url ? (
             <div className="flex flex-col items-center gap-3">
-              <div className="bg-white p-4 rounded-2xl shadow-lg">
+              <div className="bg-white shadow-lg p-4 rounded-2xl">
                 <img
                   src={ticket.qr_data_url}
                   alt="QR Code"
@@ -68,14 +68,14 @@ function QRModal({ ticket, onClose }: { ticket: MyTicket; onClose: () => void })
               </p>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-52 bg-white/5 rounded-2xl border border-white/10">
+            <div className="flex justify-center items-center bg-white/5 border border-white/10 rounded-2xl h-52">
               <p className="text-gray-500 text-sm">ไม่มี QR Code</p>
             </div>
           )}
 
           {/* Status */}
           {ticket.status === "checked_in" && (
-            <div className="flex items-center justify-center gap-2 text-blue-400 text-sm">
+            <div className="flex justify-center items-center gap-2 text-blue-400 text-sm">
               <CheckCircle2 size={16} />
               <span>Check-in เรียบร้อยแล้ว</span>
             </div>
@@ -85,7 +85,7 @@ function QRModal({ ticket, onClose }: { ticket: MyTicket; onClose: () => void })
           {ticket.qr_data_url && (
             <button
               onClick={download}
-              className="w-full flex items-center justify-center gap-2 py-2.5 border border-white/10 hover:border-violet-500/40 rounded-xl text-gray-400 hover:text-violet-400 text-sm transition-colors"
+              className="flex justify-center items-center gap-2 py-2.5 border border-white/10 hover:border-violet-500/40 rounded-xl w-full text-gray-400 hover:text-violet-400 text-sm transition-colors"
             >
               <Download size={15} />
               บันทึก QR Code
@@ -112,66 +112,59 @@ export default function RealTicketCard({ ticket }: Props) {
 
   return (
     <>
-      <article className="flex flex-col sm:flex-row bg-surface border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 transition-colors">
+      <article className="flex bg-surface border border-white/5 hover:border-white/10 rounded-xl overflow-hidden transition-colors">
         {/* Left accent bar */}
-        <div className={`sm:w-1.5 h-1.5 sm:h-auto shrink-0 ${
+        <div className={`w-1 shrink-0 ${
           ticket.status === "paid" ? "bg-green-500" :
           ticket.status === "checked_in" ? "bg-blue-500" : "bg-red-500"
         }`} />
 
         {/* Content */}
-        <div className="flex flex-1 flex-col sm:flex-row p-5 gap-4">
-          <div className="flex-1 min-w-0 space-y-3">
-            {/* Booking ref */}
-            <p className="text-xs text-gray-600 font-mono">
-              #{ticket.qrcode.slice(0, 20)}...
-            </p>
-
+        <div className="flex flex-1 items-center gap-3 px-4 py-3 min-w-0">
+          {/* Main info */}
+          <div className="flex-1 space-y-1 min-w-0">
             {/* Event name */}
-            <h3 className="font-bold text-white text-lg leading-tight line-clamp-2">
+            <h3 className="font-semibold text-white text-sm truncate leading-tight">
               {ticket.event_name}
             </h3>
 
-            {/* Zone + seat */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="bg-violet-500/20 border border-violet-500/30 text-violet-300 text-xs px-2.5 py-1 rounded-full font-medium">
+            {/* Zone + seat + price */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="bg-violet-500/20 px-2 py-0.5 border border-violet-500/30 rounded-full font-medium text-[11px] text-violet-300">
                 {ticket.zone_name}
               </span>
-              <span className="text-gray-400 text-xs">
-                ที่นั่ง {ticket.seat_position}
-              </span>
+              <span className="text-gray-500 text-xs">ที่นั่ง {ticket.seat_position}</span>
               <span className="text-gray-600 text-xs">·</span>
               <span className="text-gray-400 text-xs">
                 {ticket.zone_price === 0 ? "ฟรี" : `฿${Number(ticket.zone_price).toLocaleString()}`}
               </span>
             </div>
 
-            {/* Date + location */}
-            <div className="space-y-1.5 text-sm text-gray-500">
-              <div className="flex items-center gap-2">
-                <Calendar size={14} className="text-violet-400 shrink-0" />
-                <span>{dateStr} · {timeStr}</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <MapPin size={14} className="text-violet-400 shrink-0 mt-0.5" />
-                <span className="line-clamp-1">{ticket.place_name}</span>
-              </div>
+            {/* Date + location in one line */}
+            <div className="flex items-center gap-3 text-gray-500 text-xs">
+              <span className="flex items-center gap-1">
+                <Calendar size={11} className="text-violet-400 shrink-0" />
+                {dateStr}
+              </span>
+              <span className="flex items-center gap-1 min-w-0">
+                <MapPin size={11} className="text-violet-400 shrink-0" />
+                <span className="max-w-[120px] truncate">{ticket.place_name}</span>
+              </span>
             </div>
           </div>
 
           {/* Right: status + QR button */}
-          <div className="flex flex-col items-end justify-between gap-4 sm:min-w-[160px] shrink-0">
-            <span className={`mt-badge ${status.cls}`}>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <span className={`mt-badge text-[11px] py-0.5 px-2 ${status.cls}`}>
               {status.label}
             </span>
-
             {(ticket.status === "paid" || ticket.status === "checked_in") && (
               <button
                 onClick={() => setShowQR(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 rounded-xl text-white text-sm font-semibold transition-colors w-full sm:w-auto justify-center"
+                className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 px-3 py-1.5 rounded-lg font-medium text-white text-xs transition-colors"
               >
-                <QrCode size={16} />
-                แสดง QR
+                <QrCode size={13} />
+                QR
               </button>
             )}
           </div>

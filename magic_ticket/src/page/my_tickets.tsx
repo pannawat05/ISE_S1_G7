@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Ticket, Loader2, RefreshCw } from "lucide-react";
+import { Ticket, Loader2, RefreshCw, Search } from "lucide-react";
 import Cookies from "js-cookie";
 import { getMyTickets, confirmPayment, type MyTicket } from "@/api/payment";
 import { TicketListHeader } from "@/components/my-tickets";
@@ -10,6 +10,7 @@ export default function MyTickets() {
   const [tickets, setTickets] = useState<MyTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const [searchParams, setSearchParams] = useSearchParams();
   const paymentIntentId = searchParams.get("payment_intent");
@@ -31,7 +32,11 @@ export default function MyTickets() {
       }
 
       const data = await getMyTickets(token);
-      setTickets(data.filter((t) => t.status === "paid" || t.status === "checked_in"));
+      setTickets(
+        data
+          .filter((t) => t.status === "paid" || t.status === "checked_in")
+          .filter((t) => !t.event_end || new Date(t.event_end) > new Date())
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "โหลดตั๋วไม่สำเร็จ");
     } finally {
@@ -59,7 +64,7 @@ export default function MyTickets() {
         </div>
 
         {loading && (
-          <div className="flex flex-col justify-center items-center py-24 space-y-3">
+          <div className="flex flex-col justify-center items-center space-y-3 py-24">
             <Loader2 size={28} className="text-violet-400 animate-spin" />
             <p className="text-gray-400 text-sm">กำลังอัปเดตและดึงข้อมูลตั๋ว...</p>
           </div>
@@ -99,11 +104,40 @@ export default function MyTickets() {
         )}
 
         {!loading && !error && tickets.length > 0 && (
-          <div className="space-y-4">
-            <p className="text-gray-500 text-sm">{tickets.length} ใบ</p>
-            {tickets.map((ticket) => (
-              <RealTicketCard key={ticket.id} ticket={ticket} />
-            ))}
+          <div className="space-y-3">
+            {/* Search */}
+            <div className="relative">
+              <Search size={15} className="top-1/2 left-3 absolute text-gray-500 -translate-y-1/2 pointer-events-none" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="ค้นหาชื่อ event..."
+                className="bg-white/5 py-2.5 pr-4 pl-9 border border-white/10 focus:border-violet-500/50 rounded-xl outline-none w-full text-white text-sm transition-colors placeholder-gray-500"
+              />
+            </div>
+
+            {(() => {
+              const filtered = tickets.filter((t) =>
+                t.event_name.toLowerCase().includes(search.toLowerCase())
+              );
+              return (
+                <>
+                  <p className="text-gray-500 text-sm">
+                    {filtered.length} ใบ{search ? ` จาก "${search}"` : ""}
+                  </p>
+                  {filtered.length === 0 ? (
+                    <div className="space-y-2 py-12 text-center">
+                      <Ticket size={36} className="mx-auto text-gray-700" />
+                      <p className="text-gray-500 text-sm">ไม่พบตั๋วที่ตรงกับ "{search}"</p>
+                    </div>
+                  ) : (
+                    filtered.map((ticket) => (
+                      <RealTicketCard key={ticket.id} ticket={ticket} />
+                    ))
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
