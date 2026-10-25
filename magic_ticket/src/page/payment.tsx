@@ -60,6 +60,7 @@ interface PaymentState {
   }[];
 
   totalPrice: number;
+  invitationToken?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -293,11 +294,6 @@ export default function PaymentPage() {
   ] = useState<string | null>(null);
 
   const [
-    paymentIntentId,
-    setPaymentIntentId,
-  ] = useState<string>("");
-
-  const [
     stripeAccountId,
     setStripeAccountId,
   ] = useState<string | null>(null);
@@ -339,6 +335,7 @@ export default function PaymentPage() {
 
       return;
     }
+    const checkoutState = state;
 
     async function init() {
 
@@ -349,11 +346,10 @@ export default function PaymentPage() {
         Cookies.get("authToken");
 
       if (!token) {
-        navigate("/signin", {
-          state: {
-            from: "/payment",
-          },
-        });
+        const redirect = checkoutState.invitationToken
+          ? `/events/${checkoutState.eventId}?ticket_invite=${encodeURIComponent(checkoutState.invitationToken)}`
+          : "/";
+        navigate(`/signin?redirect=${encodeURIComponent(redirect)}`);
 
         return;
       }
@@ -363,15 +359,16 @@ export default function PaymentPage() {
         const res =
           await checkout(token, {
             event_id:
-              state.eventId,
+              checkoutState.eventId,
 
             zone_id:
-              state.zone.id,
+              checkoutState.zone.id,
 
             seat_ids:
-              state.seats.map(
+              checkoutState.seats.map(
                 (s) => s.id
               ),
+            bulk_invitation_token: checkoutState.invitationToken,
           });
 
         // ─────────────────────────────────────────────────────────────────────
@@ -448,13 +445,10 @@ export default function PaymentPage() {
         // PaymentIntent
         // ─────────────────────────────────────────────────────────────────────
 
-        setClientSecret(
-          res.client_secret
-        );
-
-        setPaymentIntentId(
-          res.payment_intent_id ?? ""
-        );
+        if (!res.client_secret) {
+          throw new Error("ไม่พบข้อมูลเริ่มต้นการชำระเงิน");
+        }
+        setClientSecret(res.client_secret);
 
         // Start reservation timer
         setTicketIds(res.ticket_ids ?? []);
@@ -893,6 +887,12 @@ export function PaymentReturnPage() {
 
       const token =
         Cookies.get("authToken");
+
+      if (!intentId) {
+        setError("ไม่พบรายการชำระเงิน");
+        setStep("failed");
+        return;
+      }
 
       if (!token) {
 

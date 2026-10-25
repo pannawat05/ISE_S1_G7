@@ -9,6 +9,7 @@ export interface CheckoutRequest {
   zone_id: number;
   seat_ids: number[];
   payment_method_id?: number;
+  bulk_invitation_token?: string;
 }
 
 export interface CheckoutResponse {

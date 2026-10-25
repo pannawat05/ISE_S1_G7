@@ -1,11 +1,17 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import Cookies from "js-cookie";
 import {
   ArrowLeft, Calendar, MapPin, Building2, Tag,
   Ticket, ChevronLeft, ChevronRight, ExternalLink,
 } from "lucide-react";
-import { fetchEventBookingAccess, fetchPublicEventById, getCoverUrl, type PublicEvent } from "@/api/events";
+import {
+  fetchEventBookingAccess,
+  fetchPublicEventById,
+  getCoverUrl,
+  validateBulkTicketInvitation,
+  type PublicEvent,
+} from "@/api/events";
 import { API_BASE } from "@/api/client";
 import BookingDrawer from "@/components/booking";
 
@@ -117,11 +123,14 @@ function MapEmbed({ lat, lng, placeName }: { lat: number; lng: number; placeName
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const invitationToken = searchParams.get("ticket_invite") ?? "";
   const [event, setEvent] = useState<PublicEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [bookingAccess, setBookingAccess] = useState<"checking" | "allowed" | "denied" | "error">("checking");
+  const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const eventId = Number(id);
@@ -134,6 +143,19 @@ export default function EventDetailPage() {
         if (cancelled) return;
 
         setEvent(loadedEvent);
+        if (invitationToken) {
+          const invitation = await validateBulkTicketInvitation(eventId, invitationToken);
+          if (cancelled) return;
+          setInvitedEmail(invitation.invited_email);
+          const token = Cookies.get("authToken");
+          if (!token) {
+            setBookingAccess("allowed");
+            return;
+          }
+          const canBook = await fetchEventBookingAccess(eventId, token, invitationToken);
+          if (!cancelled) setBookingAccess(canBook ? "allowed" : "denied");
+          return;
+        }
         if (!loadedEvent.whitelist_enabled) {
           setBookingAccess("allowed");
           return;
@@ -162,7 +184,7 @@ export default function EventDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, invitationToken]);
 
   // ── Loading ──
   if (loading) {
@@ -204,6 +226,7 @@ export default function EventDetailPage() {
   const end = new Date(event.end_date);
   const isEnded = new Date() > end;
   const isWhitelistDenied = event.whitelist_enabled && bookingAccess === "denied";
+  const isInvitationDenied = Boolean(invitationToken) && bookingAccess === "denied";
   const isBookingUnavailable = isEnded || bookingAccess === "denied" || bookingAccess === "checking" || bookingAccess === "error";
   const lat = parseFloat(event.latitude);
   const lng = parseFloat(event.longitude);
@@ -339,7 +362,9 @@ export default function EventDetailPage() {
               <Ticket size={18} />
               {isEnded
                 ? "งานนี้จบแล้ว"
-                : isWhitelistDenied
+                : isInvitationDenied
+                  ? "คำเชิญนี้ส่งถึงอีเมลอื่น"
+                  : isWhitelistDenied
                   ? "คุณไม่ใช่ whitelist"
                   : bookingAccess === "checking"
                     ? "กำลังตรวจสอบสิทธิ์..."
@@ -350,13 +375,17 @@ export default function EventDetailPage() {
             <p className="text-gray-600 text-xs text-center">
               {isEnded
                 ? "ไม่สามารถซื้อบัตรได้เนื่องจากงานสิ้นสุดแล้ว"
-                : isWhitelistDenied
+                : isInvitationDenied
+                  ? `กรุณาเข้าสู่ระบบด้วยอีเมล ${invitedEmail ?? "ที่ได้รับคำเชิญ"}`
+                  : isWhitelistDenied
                   ? "คุณไม่อยู่ในรายชื่อ whitelist จึงไม่สามารถจองงานนี้ได้"
                   : bookingAccess === "checking"
                     ? "กำลังตรวจสอบสิทธิ์การจอง"
                     : bookingAccess === "error"
                       ? "ไม่สามารถตรวจสอบสิทธิ์การจองได้ กรุณาโหลดหน้าใหม่"
-                      : "เลือกโซนและที่นั่งที่ต้องการ"}
+                      : invitedEmail
+                        ? `คำเชิญส่งถึง ${invitedEmail} · ซื้อได้ 1 ใบ`
+                        : "เลือกโซนและที่นั่งที่ต้องการ"}
             </p>
           </div>
         </div>
@@ -368,6 +397,7 @@ export default function EventDetailPage() {
         <BookingDrawer
           eventId={event.id}
           eventName={event.name}
+          invitationToken={invitationToken || undefined}
           isOpen={bookingOpen}
           onClose={() => setBookingOpen(false)}
         />

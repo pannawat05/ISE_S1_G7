@@ -129,6 +129,14 @@ export default function ForgotPassword() {
             <button type="submit" disabled={isSubmitting} className="disabled:opacity-50 mt-btn-primary py-3 w-full">
               {isSubmitting ? "กำลังส่ง OTP..." : "ส่งรหัส OTP"}
             </button>
+            <button
+              type="button"
+              disabled={!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())}
+              onClick={() => setStep("reset")}
+              className="disabled:opacity-50 w-full text-violet-400 hover:text-violet-300 text-sm"
+            >
+              มี OTP แล้ว — กรอกรหัส
+            </button>
           </form>
         ) : (
           <form onSubmit={resetPassword} className="space-y-5">

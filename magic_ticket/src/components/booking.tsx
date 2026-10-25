@@ -202,13 +202,14 @@ function SeatGrid({ seats, selected, onToggle, maxSelect = 10 }: {
 interface BookingDrawerProps {
   eventId: number;
   eventName: string;
+  invitationToken?: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
 type Step = "zone" | "seat" | "confirm";
 
-export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: BookingDrawerProps) {
+export default function BookingDrawer({ eventId, eventName, invitationToken, isOpen, onClose }: BookingDrawerProps) {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>("zone");
@@ -270,7 +271,9 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
   }, [eventId]);
 
   // remaining = limit - already owned (0 limit = unlimited → use large number)
-  const maxCanSelect = bookingLimit === 0 ? 99 : Math.max(0, bookingLimit - alreadyOwned);
+  const maxCanSelect = invitationToken
+    ? 1
+    : bookingLimit === 0 ? 99 : Math.max(0, bookingLimit - alreadyOwned);
 
   function toggleSeat(seatId: number) {
     setSelectedSeats((prev) => {
@@ -291,6 +294,7 @@ export default function BookingDrawer({ eventId, eventName, isOpen, onClose }: B
       state: {
         eventId,
         eventName,
+        invitationToken,
         zone: { id: selectedZone.id, name: selectedZone.name, type: selectedZone.type, price: selectedZone.price },
         seats: seatList.map((s) => ({ id: s.id, position: s.position, name: s.name })),
         totalPrice: selectedZone.price * (seatList.length || 1),

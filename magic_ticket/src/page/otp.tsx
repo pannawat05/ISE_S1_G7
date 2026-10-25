@@ -7,6 +7,11 @@ function Otp() {
   const [otpValues, setOtpValues] = useState<string[]>(new Array(6).fill(""));
   const [timeLeft, setTimeLeft] = useState<number>(300);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
+  const safeRedirect = redirect?.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+  const signupUrl = safeRedirect === "/"
+    ? "/signup"
+    : `/signup?redirect=${encodeURIComponent(safeRedirect)}`;
 
   const isExpired = timeLeft === 0;
   const inputRefs = useRef<HTMLInputElement[]>([]);
@@ -38,12 +43,12 @@ function Otp() {
           timerProgressBar: true,
         });
 
-        window.location.href = "/signup";
+        window.location.href = signupUrl;
       };
 
       redirect();
     }
-  }, [timeLeft]);
+  }, [signupUrl, timeLeft]);
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
@@ -111,7 +116,7 @@ function Otp() {
           timer: 3500,
           timerProgressBar: true,
         }).then(() => {
-          window.location.href = "/signup";
+          window.location.href = signupUrl;
         });
 
         return;
@@ -143,7 +148,7 @@ function Otp() {
           timer: 3500,
           timerProgressBar: true,
         }).then(() => {
-          window.location.href = "/signup";
+          window.location.href = signupUrl;
         });
 
         return;
@@ -177,7 +182,11 @@ function Otp() {
                     timerProgressBar: true,
                   });
                   localStorage.removeItem("signupData");
-                  window.location.href = "/signin";
+                  const redirect = new URLSearchParams(window.location.search).get("redirect");
+                  const signinUrl = redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+                    ? `/signin?redirect=${encodeURIComponent(redirect)}`
+                    : "/signin";
+                  window.location.href = signinUrl;
                 } else {
                   Swal.fire({
                     toast: true,
@@ -231,7 +240,7 @@ function Otp() {
           setIsSubmitting(false);
         });
     },
-    [otpValues, isSubmitting, isExpired]
+    [otpValues, isSubmitting, isExpired, signupUrl]
   );
 
   const otpInputClassName =
@@ -288,7 +297,7 @@ function Otp() {
 
         <div className="mt-6 text-gray-500 text-xs text-center">
           ไม่ได้รับรหัส?{" "}
-          <Link to="/signup" className="mt-link font-medium underline underline-offset-4">
+          <Link to={signupUrl} className="mt-link font-medium underline underline-offset-4">
             กลับไปสมัครใหม่
           </Link>
         </div>

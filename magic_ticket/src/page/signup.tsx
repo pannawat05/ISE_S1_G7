@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/api/client";
+import { validateBulkTicketInvitation } from "@/api/events";
 import Swal from "sweetalert2";
 
 export default function SignUp() {
@@ -11,6 +12,24 @@ export default function SignUp() {
     password: "",
     confirmPassword: "",
   });
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect") ?? "/";
+  const safeRedirect = redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+  const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const invitationMatch = safeRedirect.match(/^\/events\/(\d+)\?ticket_invite=([^&]+)/);
+    if (!invitationMatch?.[1] || !invitationMatch[2]) return;
+    validateBulkTicketInvitation(Number(invitationMatch[1]), invitationMatch[2])
+      .then((invitation) => {
+        setInvitedEmail(invitation.invited_email);
+        setFormData((previous) => ({ ...previous, email: invitation.invited_email }));
+      })
+      .catch(() => setInvitedEmail(null));
+  }, [safeRedirect]);
+  const signinUrl = safeRedirect === "/"
+    ? "/signin"
+    : `/signin?redirect=${encodeURIComponent(safeRedirect)}`;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -55,7 +74,10 @@ export default function SignUp() {
 
         console.log("OTP sent:", data);
         localStorage.setItem("signupData", JSON.stringify(formData));
-        window.location.href = "/otp";
+        const otpUrl = safeRedirect === "/"
+          ? "/otp"
+          : `/otp?redirect=${encodeURIComponent(safeRedirect)}`;
+        window.location.href = otpUrl;
       })
       .catch((error) => {
         console.error("Error sending OTP:", error);
@@ -121,12 +143,18 @@ export default function SignUp() {
             <input
               type="email"
               name="email"
+              readOnly={invitedEmail !== null}
               value={formData.email}
               onChange={handleChange}
               placeholder="yourmail@magic.com"
               className="mt-input"
               required
             />
+            {invitedEmail && (
+              <p className="mt-1 text-gray-500 text-xs">
+                ใช้อีเมลสมาชิกที่ได้รับคำเชิญ: {invitedEmail}
+              </p>
+            )}
           </div>
 
           <div>
@@ -166,7 +194,7 @@ export default function SignUp() {
         <div className="mt-6 text-gray-500 text-xs text-center">
           มีบัญชีอยู่แล้วใช่ไหม?{" "}
           <Link
-            to="/signin"
+            to={signinUrl}
             className="mt-link font-medium underline underline-offset-4"
           >
             เข้าสู่ระบบที่นี่

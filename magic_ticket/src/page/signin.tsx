@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/api/client";
 import { fetchUser } from "@/api/user";
 import Cookies from "js-cookie";
@@ -19,6 +19,12 @@ function Signin() {
   };
 
   const goto = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect") ?? "/";
+  const safeRedirect = redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+  const signupUrl = safeRedirect === "/"
+    ? "/signup"
+    : `/signup?redirect=${encodeURIComponent(safeRedirect)}`;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +40,7 @@ function Signin() {
           await fetchUser(data.token);
           // Notify Navbar to re-read localStorage
           window.dispatchEvent(new Event("user-updated"));
-          goto("/");
+          goto(safeRedirect);
         } else {
           Swal.fire({
             toast: true,
@@ -139,7 +145,7 @@ function Signin() {
         <div className="mt-6 text-gray-500 text-xs text-center">
           ยังไม่มีบัญชีใช่ไหม?{" "}
           <Link
-            to="/signup"
+            to={signupUrl}
             className="mt-link font-medium underline underline-offset-4"
           >
             สมัครสมาชิกใหม่ที่นี่

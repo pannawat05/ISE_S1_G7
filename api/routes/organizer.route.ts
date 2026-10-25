@@ -3,6 +3,7 @@ import * as organizerController from "../controllers/organizer.controller.js";
 import * as whitelistController from "../controllers/whitelist.controller.js";
 import * as analyticsController from "../controllers/analytics.controller.js";
 import * as staffController from "../controllers/staff.controller.js";
+import * as bulkTicketController from "../controllers/bulkTicket.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { uploadOrganizerLogo, uploadEventImages, uploadZoneImages } from "../middlewares/upload.middleware.js";
 import type { AuthRequest } from "../middlewares/types.js";
@@ -153,9 +154,24 @@ router.delete("/:id/events/:eventId/staff/:assignmentId", authenticate, (req, re
 router.post("/:id/events/:eventId/whitelist", authenticate, (req, res) =>
   whitelistController.addToWhitelist(req as AuthRequest, res),
 );
+router.post("/:id/events/:eventId/whitelist/import", authenticate, (req, res) =>
+  whitelistController.importGroupWhitelist(req as AuthRequest, res),
+);
 
 router.delete("/:id/events/:eventId/whitelist/:wlId", authenticate, (req, res) =>
   whitelistController.removeFromWhitelist(req as AuthRequest, res),
+);
+router.post("/:id/events/:eventId/bulk-ticket-batches/preview", authenticate, (req, res) =>
+  bulkTicketController.previewGroupMembers(req as AuthRequest, res),
+);
+router.post("/:id/events/:eventId/bulk-ticket-batches", authenticate, (req, res) =>
+  bulkTicketController.createGroupInvitations(req as AuthRequest, res),
+);
+router.get("/:id/events/:eventId/bulk-ticket-batches/:batchId", authenticate, (req, res) =>
+  bulkTicketController.getInvitationBatch(req as AuthRequest, res),
+);
+router.post("/:id/events/:eventId/bulk-ticket-invitations/:invitationId/retry", authenticate, (req, res) =>
+  bulkTicketController.retryInvitationDelivery(req as AuthRequest, res),
 );
 router.post("/:id/stripe/onboard", authenticate, (req, res) =>
   organizerController.createStripeOnboardLinkHandler(req as AuthRequest, res),

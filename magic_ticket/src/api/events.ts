@@ -103,10 +103,28 @@ export async function fetchMyTicketCount(eventId: number, token: string): Promis
 export async function fetchEventBookingAccess(
   eventId: number,
   token: string,
+  invitationToken?: string,
 ): Promise<boolean> {
   const data = await apiFetch<{ can_book: boolean }>(
     `/events/${eventId}/booking-access`,
-    { token },
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(invitationToken ? { invitation_token: invitationToken } : {}),
+    },
   );
   return data.can_book;
+}
+
+export async function validateBulkTicketInvitation(
+  eventId: number,
+  invitationToken: string,
+): Promise<{ event_id: number; event_name: string; invited_email: string }> {
+  return apiFetch(
+    `/events/${eventId}/bulk-ticket-invitations/validate`,
+    {
+      method: "POST",
+      body: JSON.stringify({ token: invitationToken }),
+    },
+  );
 }

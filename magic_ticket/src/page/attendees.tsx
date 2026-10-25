@@ -6,6 +6,7 @@ import Swal from "sweetalert2";
 import { fetchDashboard, fetchOrganizerAnalytics, cancelTicket, type AnalyticsRow, type DashboardData } from "@/api/organizer";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 import { StaffAssignmentManager } from "@/components/shared";
+import BulkTicketDistribution from "@/components/organizer/BulkTicketDistribution";
 
 export default function AttendeesPage() {
   const { id } = useParams<{ id: string }>();
@@ -116,6 +117,14 @@ export default function AttendeesPage() {
             <option value="checked_in">Checked-in</option>
           </select>
         </div>
+
+        {eventId && (
+          <BulkTicketDistribution
+            token={token}
+            organizerId={organizerId}
+            eventId={Number(eventId)}
+          />
+        )}
 
         {showStaffMenu && (eventId ? (
           <StaffAssignmentManager organizerId={organizerId} eventId={Number(eventId)} />

@@ -4,10 +4,10 @@
  * ไม่นับรวมกับ seat/ticket stats บน dashboard
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Search, UserPlus, X, Loader2, UserCheck, ShieldCheck } from "lucide-react";
+import { Search, UserPlus, X, Loader2, UserCheck, ShieldCheck, Upload } from "lucide-react";
 import Cookies from "js-cookie";
 import {
-  fetchWhitelist, addToWhitelist, removeFromWhitelist, searchUsers,
+  fetchWhitelist, addToWhitelist, removeFromWhitelist, searchUsers, importGroupWhitelistCsv,
   type WhitelistEntry, type UserSearchResult,
 } from "@/api/organizer";
 import Swal from "sweetalert2";
@@ -239,6 +239,9 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
   const [list, setList] = useState<WhitelistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   async function showToast(
     icon: "success" | "error",
@@ -371,6 +374,50 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
     }
   }
 
+  async function handleImportCsv() {
+    if (!csvFile) return;
+    const token = Cookies.get("authToken");
+    if (!token) {
+      await showToast("error", "กรุณาเข้าสู่ระบบอีกครั้ง");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const result = await importGroupWhitelistCsv(
+        token,
+        organizerId,
+        eventId,
+        await csvFile.text(),
+      );
+      setList(result.whitelist);
+      const { summary } = result;
+      const rowIssues = result.results
+        .filter((item) => item.status === "invalid" || item.status === "failed")
+        .slice(0, 20)
+        .map((item) => `แถว ${item.row} (${item.email || "-"}): ${item.message ?? item.status}`)
+        .join("\n");
+      const emailFailureNote = summary.emailFailures
+        ? ` อีเมลตั้งค่ารหัสผ่านส่งไม่สำเร็จ ${summary.emailFailures} รายการ (สมาชิกสามารถใช้ลืมรหัสผ่านได้)`
+        : "";
+      await Swal.fire({
+        icon: summary.failed ? "warning" : "success",
+        title: "นำเข้ารายชื่อเสร็จแล้ว",
+        text: `ทั้งหมด ${summary.total} รายการ: เพิ่ม whitelist ${summary.added}, สร้างบัญชีใหม่ ${summary.createdAccounts}, ข้าม ${summary.skipped}, ผิดพลาด ${summary.failed}.${emailFailureNote}${rowIssues ? `\n${rowIssues}` : ""}`,
+        confirmButtonText: "ตกลง",
+      });
+      setCsvFile(null);
+      if (csvInputRef.current) csvInputRef.current.value = "";
+    } catch (error) {
+      await showToast(
+        "error",
+        error instanceof Error ? error.message : "นำเข้า CSV ไม่สำเร็จ",
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const excludeIds = useMemo(
     () => new Set(list.map((e) => e.users_id)),
     [list]
@@ -412,6 +459,34 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
         excludeIds={excludeIds}
       />
 
+      <div className="space-y-3 bg-white/[0.03] p-4 border border-white/10 rounded-xl">
+        <div>
+          <h3 className="font-medium text-gray-200 text-sm">นำเข้ารายชื่อกลุ่มจาก CSV</h3>
+          <p className="mt-1 text-gray-500 text-xs">
+            ไฟล์ต้องมีหัวคอลัมน์ <code>email,name</code> สมาชิกใหม่จะได้รับอีเมล OTP เพื่อตั้งรหัสผ่าน และถูกเพิ่มพร้อมบัตร whitelist ฟรี
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            disabled={importing}
+            onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
+            className="min-w-0 flex-1 text-gray-400 text-xs file:bg-white/10 file:mr-3 file:px-3 file:py-2 file:border-0 file:rounded-lg file:text-gray-200"
+          />
+          <button
+            type="button"
+            onClick={handleImportCsv}
+            disabled={!csvFile || importing}
+            className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-4 py-2 rounded-lg font-medium text-white text-sm"
+          >
+            {importing ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+            {importing ? "กำลังนำเข้า..." : "นำเข้า CSV"}
+          </button>
+        </div>
+        {csvFile && <p className="text-gray-500 text-xs">เลือกไฟล์: {csvFile.name}</p>}
+      </div>
 
       {/* List */}
       {loading ? (

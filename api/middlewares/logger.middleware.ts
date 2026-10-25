@@ -31,9 +31,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 
     // Check if authenticated user info is attached
     const authReq = req as AuthRequest;
-    const userInfo = authReq.user
-      ? `${authReq.user.email} (ID: ${authReq.user.id})`
-      : undefined;
+    const userInfo = authReq.user ? `ID: ${authReq.user.id}` : undefined;
 
     // Log payload metadata
     const meta: Record<string, unknown> = {

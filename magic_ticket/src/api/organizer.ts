@@ -451,6 +451,41 @@ export async function addToWhitelist(
   return data.whitelist ?? [];
 }
 
+export interface GroupWhitelistImportResult {
+  summary: {
+    total: number;
+    added: number;
+    createdAccounts: number;
+    skipped: number;
+    failed: number;
+    emailFailures: number;
+  };
+  results: {
+    row: number;
+    email: string;
+    status: "added" | "already_whitelisted" | "duplicate_import" | "invalid" | "failed";
+    account_email?: "sent" | "failed" | "not_needed";
+    message?: string;
+  }[];
+  whitelist: WhitelistEntry[];
+}
+
+export async function importGroupWhitelistCsv(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  csv: string,
+): Promise<GroupWhitelistImportResult> {
+  return apiFetch<GroupWhitelistImportResult>(
+    `/organizer/${organizerId}/events/${eventId}/whitelist/import`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify({ csv }),
+    },
+  );
+}
+
 export async function removeFromWhitelist(
   token: string,
   organizerId: number,
@@ -462,6 +497,94 @@ export async function removeFromWhitelist(
     { method: "DELETE", token },
   );
   return data.whitelist ?? [];
+}
+
+export interface GoogleGroupPreview {
+  email: string;
+  status: "already_ticketed" | "already_invited" | "will_invite";
+}
+
+export interface BulkTicketPreview {
+  group_email: string;
+  total: number;
+  duplicateEmails: number;
+  existingTickets: number;
+  activeInvitations: number;
+  members: GoogleGroupPreview[];
+}
+
+export interface BulkTicketInvitation {
+  id: number;
+  invited_email: string;
+  status: "issued" | "paid" | "cancelled";
+  invitation_email_status: "pending" | "sent" | "failed";
+  ticket_email_status: "pending" | "sent" | "failed" | null;
+  expires_at: string;
+}
+
+export interface BulkTicketBatch {
+  batch_id: string | null;
+  total_records: number;
+  invitations_created: number;
+  skipped_duplicates: number;
+  email_failures: number;
+  invitations: BulkTicketInvitation[];
+}
+
+export async function previewGoogleGroupMembers(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  groupEmail: string,
+): Promise<BulkTicketPreview> {
+  return apiFetch(
+    `/organizer/${organizerId}/events/${eventId}/bulk-ticket-batches/preview`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify({ group_email: groupEmail }),
+    },
+  );
+}
+
+export async function createGoogleGroupTicketBatch(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  groupEmail: string,
+): Promise<BulkTicketBatch> {
+  return apiFetch(
+    `/organizer/${organizerId}/events/${eventId}/bulk-ticket-batches`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify({ group_email: groupEmail }),
+    },
+  );
+}
+
+export async function fetchBulkTicketBatch(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  batchId: string,
+): Promise<{ batch_id: string; invitations: BulkTicketInvitation[] }> {
+  return apiFetch(
+    `/organizer/${organizerId}/events/${eventId}/bulk-ticket-batches/${batchId}`,
+    { token },
+  );
+}
+
+export async function retryBulkTicketEmail(
+  token: string,
+  organizerId: number,
+  eventId: number,
+  invitationId: number,
+): Promise<{ message: string; sent: boolean }> {
+  return apiFetch(
+    `/organizer/${organizerId}/events/${eventId}/bulk-ticket-invitations/${invitationId}/retry`,
+    { method: "POST", token },
+  );
 }
 
 export interface EventStaffAssignment {

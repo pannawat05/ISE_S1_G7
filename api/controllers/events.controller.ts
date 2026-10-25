@@ -1,7 +1,15 @@
 import type { Request, Response } from "express";
+import type { RowDataPacket } from "mysql2";
 import { query } from "../model/query.js";
 import type { AuthRequest } from "../middlewares/types.js";
 import type { EventImages, ListEvent, PublicEvent, PublicEventList, Total } from "../model/types.js";
+import { hashInvitationToken } from "../lib/bulkTicketTokens.js";
+
+interface EventBookingAccessRow extends RowDataPacket {
+  whitelist_enabled: boolean | number;
+  is_whitelisted: number;
+  has_invitation: number;
+}
 
 // ─── Booking config (public) ──────────────────────────────────────────────────
 export async function getBookingConfig(_req: Request, res: Response) {
@@ -50,30 +58,48 @@ export async function getEventBookingAccess(req: Request, res: Response) {
 
   const eventId = Number(req.params.id);
   if (isNaN(eventId)) return res.status(400).json({ message: "Invalid event ID" });
+  const invitationToken = typeof req.body?.invitation_token === "string"
+    ? req.body.invitation_token
+    : "";
 
   res.set("Cache-Control", "private, no-store");
 
   try {
-    const rows = await query<{
-      whitelist_enabled: boolean | number;
-      is_whitelisted: number;
-    }[]>(
+    const rows = await query<EventBookingAccessRow[]>(
       `SELECT e.whitelist_enabled,
               EXISTS (
                 SELECT 1
                 FROM white_list wl
                 WHERE wl.event_id = e.id AND wl.users_id = ?
-              ) AS is_whitelisted
+              ) AS is_whitelisted,
+              EXISTS (
+                SELECT 1
+                FROM bulk_ticket_invitations i
+                JOIN users u ON LOWER(u.email) = LOWER(i.invited_email)
+                WHERE i.event_id = e.id AND i.token_hash = ?
+                  AND i.status = 'issued' AND i.expires_at > NOW()
+                  AND u.id = ?
+              ) AS has_invitation
        FROM events e
        WHERE e.id = ? AND e.status = 'approved' AND e.is_active = 1
        LIMIT 1`,
-      [userId, eventId],
+      [userId, invitationToken ? hashInvitationToken(invitationToken) : "", userId, eventId],
     );
     const access = rows[0];
     if (!access) return res.status(404).json({ message: "Event not found" });
 
-    const canBook = !access.whitelist_enabled || Boolean(access.is_whitelisted);
-    return res.json({ can_book: canBook });
+    const hasInvitation = Boolean(access.has_invitation);
+    const canBook = invitationToken
+      ? hasInvitation
+      : !access.whitelist_enabled || Boolean(access.is_whitelisted);
+    return res.json({
+      can_book: canBook,
+      reason: invitationToken && !hasInvitation
+        ? "invitation_invalid_or_email_mismatch"
+        : !canBook
+          ? "not_whitelisted"
+          : null,
+    });
   } catch (err) {
     console.error("GET EVENT BOOKING ACCESS ERROR:", err);
     return res.status(500).json({ message: "Error checking event booking access" });
