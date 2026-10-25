@@ -215,7 +215,7 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
 
   const {
     name, place_name, address, latitude, longitude,
-    description, theme, type, type_id, start_date, end_date, is_active,
+    description, theme, type, type_id, start_date, end_date, is_active, whitelist_enabled,
   } = req.body;
 
   if (!name?.trim() || !place_name?.trim() || !start_date || !end_date) {
@@ -252,6 +252,7 @@ export async function createEventForOrganizer(req: AuthRequest, res: Response) {
       theme: theme ?? null,
       status: "pending",
       is_active: is_active !== false,
+      whitelist_enabled: whitelist_enabled === true || whitelist_enabled === "true" || whitelist_enabled === "1",
       start_date,
       end_date,
       organizer_id: organizerId,
@@ -302,7 +303,7 @@ export async function updateEventHandler(req: AuthRequest, res: Response) {
 
   const {
     name, place_name, address, latitude, longitude,
-    description, theme, type, start_date, end_date, is_active,
+    description, theme, type, start_date, end_date, is_active, whitelist_enabled,
   } = req.body;
   const files = getFiles(req);
   const coverFile = files["cover_image"]?.[0];
@@ -324,6 +325,10 @@ export async function updateEventHandler(req: AuthRequest, res: Response) {
     if (longitude !== undefined)   updates.longitude   = Number(longitude);
     if (description !== undefined) updates.description = description ?? null;
     if (theme !== undefined)       updates.theme       = theme ?? null;
+    if (whitelist_enabled !== undefined) {
+      updates.whitelist_enabled =
+        whitelist_enabled === true || whitelist_enabled === "true" || whitelist_enabled === "1";
+    }
     if (start_date)                updates.start_date  = start_date;
     if (end_date)                  updates.end_date    = end_date;
     if (is_active !== undefined)   updates.is_active   = is_active !== false && is_active !== "false";
