@@ -31,7 +31,7 @@ import {
   setSeatCount,
   countSeats,
 } from "../model/zone.model.js";
-import { query } from "../model/query.js";
+import { execute, query } from "../model/query.js";
 
 import Stripe from "stripe";
 
@@ -827,40 +827,45 @@ export async function cancelTicket(req: AuthRequest, res: Response) {
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
   const organizerId = Number(req.params.id);
+  if (!Number.isInteger(organizerId) || organizerId <= 0) {
+    return res.status(400).json({ message: "Invalid organizer ID" });
+  }
   const { ticket_id } = req.body as { ticket_id: number };
 
-  if (!ticket_id) {
+  if (!Number.isInteger(Number(ticket_id)) || Number(ticket_id) <= 0) {
     return res.status(400).json({ message: "ticket_id is required" });
   }
 
   try {
+    const organizer = await resolveOrganizerOwner(req, res, organizerId);
+    if (!organizer) return;
+
     // Verify this ticket belongs to an event owned by this organizer
-    const ticketCheck = await query<{ id: number; organizer_id: number; status: string }[]>(
-      `SELECT t.id, e.organizer_id, t.status
+    const ticketCheck = await query<{ id: number; status: string }[]>(
+      `SELECT t.id, t.status
        FROM tickets t
-       JOIN zones z ON z.id = t.zone_id
-       JOIN events e ON e.id = z.event_id
-       WHERE t.id = ?
+       JOIN events e ON e.id = t.event_id
+       WHERE t.id = ? AND e.organizer_id = ?
        LIMIT 1`,
-      [ticket_id],
+      [Number(ticket_id), organizerId],
     );
 
     if (!ticketCheck.length) {
       return res.status(404).json({ message: "Ticket not found" });
     }
 
-    if (ticketCheck[0].organizer_id !== organizerId) {
-      return res.status(403).json({ message: "This ticket does not belong to your event" });
-    }
-
-    if (ticketCheck[0].status === "cancelled") {
+    const ticket = ticketCheck[0];
+    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+    if (ticket.status === "cancelled") {
       return res.status(400).json({ message: "Ticket already cancelled" });
     }
 
     // Cancel the ticket
-    await query(
-      `UPDATE tickets SET status = 'cancelled', updated_at = NOW() WHERE id = ?`,
-      [ticket_id],
+    await execute(
+      `UPDATE tickets SET status = 'cancelled' WHERE id = ? AND event_id IN (
+         SELECT id FROM events WHERE organizer_id = ?
+       )`,
+      [Number(ticket_id), organizerId],
     );
 
     return res.json({ message: "Ticket cancelled successfully" });
