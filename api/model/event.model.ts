@@ -37,9 +37,9 @@ export async function createEvent(input: CreateEventInput): Promise<number> {
   const result = await execute(
     `INSERT INTO events (
       name, place_name, address, latitude, longitude, cover_image,
-      description, theme, status, is_active, start_date, end_date,
+      description, theme, status, is_active, whitelist_enabled, start_date, end_date,
       organizer_id, type_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.name,
       input.place_name,
@@ -51,6 +51,7 @@ export async function createEvent(input: CreateEventInput): Promise<number> {
       input.theme ?? null,
       input.status ?? "pending",
       input.is_active ?? true,
+      input.whitelist_enabled ?? false,
       input.start_date,
       input.end_date,
       input.organizer_id,

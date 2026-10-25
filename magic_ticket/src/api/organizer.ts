@@ -127,6 +127,7 @@ export interface OrganizerEvent {
   cover_image: string;
   description: string | null;
   theme: string | null;
+  whitelist_enabled?: boolean;
   status: "pending" | "approved" | "rejected" | "deleted";
   is_active: boolean | number;
   start_date: string;
@@ -510,6 +511,23 @@ export async function generateStripeOnboardingLink(
     {
       method: "POST",
       token,
+    },
+  );
+}
+
+// ─── Cancel Ticket ───────────────────────────────────────────────────────────
+
+export async function cancelTicket(
+  token: string,
+  organizerId: number,
+  ticketId: number,
+): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(
+    `/organizer/${organizerId}/cancel-ticket`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify({ ticket_id: ticketId }),
     },
   );
 }

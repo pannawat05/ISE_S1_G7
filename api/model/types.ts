@@ -43,6 +43,7 @@ export interface EventRow extends RowDataPacket {
   theme: string | null;
   status: EventStatus;
   is_active: boolean;
+  whitelist_enabled: boolean;
   start_date: Date;
   end_date: Date;
   organizer_id: number;
@@ -105,6 +106,7 @@ export interface CreateEventInput {
   theme?: string | null;
   status?: EventStatus;
   is_active?: boolean;
+  whitelist_enabled?: boolean;
   start_date: string;
   end_date: string;
   organizer_id: number;

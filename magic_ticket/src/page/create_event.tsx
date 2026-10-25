@@ -14,6 +14,7 @@ interface CreateEventForm {
   description: string;
   type_id: number;
   theme: string;
+  whitelist_enabled: boolean;
   start_date: string;
   end_date: string;
   place_name: string;
@@ -23,7 +24,7 @@ interface CreateEventForm {
 }
 
 const EMPTY_FORM: CreateEventForm = {
-  name: "", description: "", type_id: 0, theme: "",
+  name: "", description: "", type_id: 0, theme: "", whitelist_enabled: false,
   start_date: "", end_date: "",
   place_name: "", address: "",
   latitude: 13.7563, longitude: 100.5018,
@@ -104,6 +105,7 @@ export default function CreateEventPage() {
       fd.append("end_date", form.end_date);
       fd.append("latitude", String(form.latitude));
       fd.append("longitude", String(form.longitude));
+      fd.append("whitelist_enabled", String(form.whitelist_enabled));
       if (form.description.trim()) fd.append("description", form.description.trim());
       if (form.theme.trim())       fd.append("theme", form.theme.trim());
       if (form.address.trim())     fd.append("address", form.address.trim());
@@ -228,6 +230,29 @@ export default function CreateEventPage() {
                   <input value={form.theme} onChange={(e) => set("theme", e.target.value)}
                     placeholder="เช่น Cyberpunk, Fantasy..." className="mt-input" />
                 </div>
+              </div>
+
+              {/* Whitelist Toggle */}
+              <div className="flex items-center justify-between bg-white/5 px-4 py-3 border border-white/10 rounded-xl">
+                <div className="flex-1">
+                  <label className="block font-medium text-white text-sm">Whitelist Mode</label>
+                  <p className="mt-1 text-gray-500 text-xs">
+                    เปิดใช้งานเพื่อให้เฉพาะคนในรายชื่อเท่านั้นที่สามารถซื้อตั๋วได้
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => set("whitelist_enabled", !form.whitelist_enabled)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 ${
+                    form.whitelist_enabled ? "bg-violet-600" : "bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      form.whitelist_enabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
               </div>
             </section>
 

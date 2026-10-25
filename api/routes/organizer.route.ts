@@ -161,4 +161,9 @@ router.post("/:id/stripe/onboard", authenticate, (req, res) =>
   organizerController.createStripeOnboardLinkHandler(req as AuthRequest, res),
 );
 
+// Cancel ticket
+router.post("/:id/cancel-ticket", authenticate, (req, res) =>
+  organizerController.cancelTicket(req as AuthRequest, res),
+);
+
 export default router;

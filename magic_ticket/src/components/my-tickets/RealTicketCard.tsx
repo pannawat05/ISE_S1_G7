@@ -106,9 +106,6 @@ export default function RealTicketCard({ ticket }: Props) {
   const dateStr = eventDate.toLocaleDateString("th-TH", {
     day: "numeric", month: "short", year: "numeric",
   });
-  const timeStr = eventDate.toLocaleTimeString("th-TH", {
-    hour: "2-digit", minute: "2-digit",
-  });
 
   return (
     <>

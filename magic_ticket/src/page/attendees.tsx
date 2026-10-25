@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Menu, Search, Users, RefreshCw, Loader2, UserPlus } from "lucide-react";
+import { Menu, Search, Users, RefreshCw, Loader2, UserPlus, X } from "lucide-react";
 import Cookies from "js-cookie";
-import { fetchDashboard, fetchOrganizerAnalytics, type AnalyticsRow, type DashboardData } from "@/api/organizer";
+import Swal from "sweetalert2";
+import { fetchDashboard, fetchOrganizerAnalytics, cancelTicket, type AnalyticsRow, type DashboardData } from "@/api/organizer";
 import { useProfileSidebar } from "@/components/layout/ProfileLayout";
 import { StaffAssignmentManager } from "@/components/shared";
 
@@ -50,6 +51,42 @@ export default function AttendeesPage() {
     return !term || row.attendee_name.toLowerCase().includes(term) || row.email.toLowerCase().includes(term);
   });
 
+  async function handleCancelTicket(ticketId: number, attendeeName: string) {
+    const result = await Swal.fire({
+      title: "ยกเลิกตั๋ว?",
+      html: `คุณต้องการยกเลิกตั๋วของ <strong>${attendeeName}</strong> หรือไม่?<br/><small class="text-gray-500">การยกเลิกจะไม่สามารถกู้คืนได้</small>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "ยกเลิกตั๋ว",
+      cancelButtonText: "ปิด",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await cancelTicket(token, organizerId, ticketId);
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "ยกเลิกตั๋วสำเร็จ",
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+      });
+      load();
+    } catch (err) {
+      await Swal.fire({
+        icon: "error",
+        title: "เกิดข้อผิดพลาด",
+        text: err instanceof Error ? err.message : "ไม่สามารถยกเลิกตั๋วได้",
+        confirmButtonText: "ตกลง",
+      });
+    }
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <header className="mt-dashboard-header shrink-0">
@@ -91,9 +128,41 @@ export default function AttendeesPage() {
         {error && <div className="bg-red-500/10 p-4 border border-red-500/20 rounded-xl text-red-300 text-sm">{error}</div>}
         {loading ? <div className="flex justify-center py-20"><Loader2 className="text-violet-400 animate-spin" /></div> : (
           <section className="mt-surface rounded-2xl overflow-x-auto">
-            <table className="w-full min-w-[850px] text-sm">
-              <thead><tr className="border-white/5 border-b text-gray-500 text-left"><th className="px-4 py-3">ผู้เข้าร่วม</th><th className="px-4 py-3">Event</th><th className="px-4 py-3">โซน</th><th className="px-4 py-3">การชำระเงิน</th><th className="px-4 py-3">สถานะบัตร</th><th className="px-4 py-3">เช็กอิน</th></tr></thead>
-              <tbody>{filteredRows.map((row) => <tr key={row.ticket_id} className="hover:bg-white/[0.02] border-white/5 border-b"><td className="px-4 py-3"><p className="text-white">{row.attendee_name}</p><p className="text-gray-500 text-xs">{row.email}</p></td><td className="px-4 py-3 text-gray-300">{row.event_name}</td><td className="px-4 py-3 text-gray-300">{row.zone_name}<span className="text-gray-500"> · {row.ticket_type}</span></td><td className="px-4 py-3 text-gray-300">{row.payment_status}</td><td className="px-4 py-3 text-gray-300">{row.ticket_status}</td><td className="px-4 py-3 text-gray-400">{row.checked_in_at ? new Date(row.checked_in_at).toLocaleString("th-TH") : "-"}</td></tr>)}</tbody>
+            <table className="w-full min-w-[900px] text-sm">
+              <thead><tr className="border-white/5 border-b text-gray-500 text-left"><th className="px-4 py-3">ผู้เข้าร่วม</th><th className="px-4 py-3">Event</th><th className="px-4 py-3">โซน</th><th className="px-4 py-3">การชำระเงิน</th><th className="px-4 py-3">สถานะบัตร</th><th className="px-4 py-3">เช็กอิน</th><th className="px-4 py-3 text-center">จัดการ</th></tr></thead>
+              <tbody>{filteredRows.map((row) => (
+                <tr key={row.ticket_id} className="hover:bg-white/[0.02] border-white/5 border-b">
+                  <td className="px-4 py-3"><p className="text-white">{row.attendee_name}</p><p className="text-gray-500 text-xs">{row.email}</p></td>
+                  <td className="px-4 py-3 text-gray-300">{row.event_name}</td>
+                  <td className="px-4 py-3 text-gray-300">{row.zone_name}<span className="text-gray-500"> · {row.ticket_type}</span></td>
+                  <td className="px-4 py-3 text-gray-300">{row.payment_status}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                      row.ticket_status === "cancelled"
+                        ? "bg-red-500/10 text-red-400"
+                        : row.ticket_status === "checked_in"
+                        ? "bg-green-500/10 text-green-400"
+                        : "bg-gray-500/10 text-gray-400"
+                    }`}>
+                      {row.ticket_status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-400">{row.checked_in_at ? new Date(row.checked_in_at).toLocaleString("th-TH") : "-"}</td>
+                  <td className="px-4 py-3 text-center">
+                    {row.ticket_status !== "cancelled" ? (
+                      <button
+                        onClick={() => handleCancelTicket(row.ticket_id, row.attendee_name)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
+                      >
+                        <X size={13} />
+                        ยกเลิก
+                      </button>
+                    ) : (
+                      <span className="text-gray-600 text-xs">-</span>
+                    )}
+                  </td>
+                </tr>
+              ))}</tbody>
             </table>
             {!filteredRows.length && <div className="flex flex-col items-center gap-3 py-14 text-center"><Users size={30} className="text-gray-600" /><p className="text-gray-500 text-sm">ไม่พบรายชื่อผู้เข้าร่วม</p></div>}
           </section>

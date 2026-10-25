@@ -6,11 +6,14 @@ import { getMyTickets, confirmPayment, type MyTicket } from "@/api/payment";
 import { TicketListHeader } from "@/components/my-tickets";
 import RealTicketCard from "@/components/my-tickets/RealTicketCard";
 
+type TabType = "active" | "history";
+
 export default function MyTickets() {
   const [tickets, setTickets] = useState<MyTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<TabType>("active");
 
   const [searchParams, setSearchParams] = useSearchParams();
   const paymentIntentId = searchParams.get("payment_intent");
@@ -32,11 +35,7 @@ export default function MyTickets() {
       }
 
       const data = await getMyTickets(token);
-      setTickets(
-        data
-          .filter((t) => t.status === "paid" || t.status === "checked_in")
-          .filter((t) => !t.event_end || new Date(t.event_end) > new Date())
-      );
+      setTickets(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "โหลดตั๋วไม่สำเร็จ");
     } finally {
@@ -104,7 +103,31 @@ export default function MyTickets() {
         )}
 
         {!loading && !error && tickets.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Tabs */}
+            <div className="flex gap-2 border-b border-white/10">
+              <button
+                onClick={() => setActiveTab("active")}
+                className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
+                  activeTab === "active"
+                    ? "border-violet-500 text-white"
+                    : "border-transparent text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                ตั๋วพร้อมใช้
+              </button>
+              <button
+                onClick={() => setActiveTab("history")}
+                className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
+                  activeTab === "history"
+                    ? "border-violet-500 text-white"
+                    : "border-transparent text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                ประวัติ
+              </button>
+            </div>
+
             {/* Search */}
             <div className="relative">
               <Search size={15} className="top-1/2 left-3 absolute text-gray-500 -translate-y-1/2 pointer-events-none" />
@@ -117,9 +140,27 @@ export default function MyTickets() {
             </div>
 
             {(() => {
-              const filtered = tickets.filter((t) =>
+              // Filter by tab
+              const tabFiltered = tickets.filter((t) => {
+                if (activeTab === "active") {
+                  // Active: paid or checked_in, not expired
+                  const isValidStatus = t.status === "paid" || t.status === "checked_in";
+                  const isNotExpired = !t.event_end || new Date(t.event_end) > new Date();
+                  return isValidStatus && isNotExpired;
+                } else {
+                  // History: cancelled, expired, or checked_in
+                  const isCancelled = t.status === "cancelled";
+                  const isExpired = t.event_end && new Date(t.event_end) <= new Date();
+                  const isUsed = t.status === "checked_in";
+                  return isCancelled || isExpired || isUsed;
+                }
+              });
+
+              // Filter by search
+              const filtered = tabFiltered.filter((t) =>
                 t.event_name.toLowerCase().includes(search.toLowerCase())
               );
+
               return (
                 <>
                   <p className="text-gray-500 text-sm">
@@ -128,7 +169,14 @@ export default function MyTickets() {
                   {filtered.length === 0 ? (
                     <div className="space-y-2 py-12 text-center">
                       <Ticket size={36} className="mx-auto text-gray-700" />
-                      <p className="text-gray-500 text-sm">ไม่พบตั๋วที่ตรงกับ "{search}"</p>
+                      <p className="text-gray-500 text-sm">
+                        {search
+                          ? `ไม่พบตั๋วที่ตรงกับ "${search}"`
+                          : activeTab === "active"
+                          ? "ยังไม่มีตั๋วพร้อมใช้"
+                          : "ยังไม่มีประวัติการใช้ตั๋ว"
+                        }
+                      </p>
                     </div>
                   ) : (
                     filtered.map((ticket) => (

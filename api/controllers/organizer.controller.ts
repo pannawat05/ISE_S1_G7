@@ -812,3 +812,57 @@ export async function createStripeOnboardLinkHandler(req: AuthRequest, res: Resp
     });
   }
 }
+
+/**
+ * Cancel a ticket (organizer only)
+ * POST /organizer/:id/cancel-ticket
+ */
+export async function cancelTicket(req: AuthRequest, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  const organizerId = Number(req.params.id);
+  const { ticket_id } = req.body as { ticket_id: number };
+
+  if (!ticket_id) {
+    return res.status(400).json({ message: "ticket_id is required" });
+  }
+
+  try {
+    // Verify this ticket belongs to an event owned by this organizer
+    const ticketCheck = await query<{ id: number; organizer_id: number; status: string }[]>(
+      `SELECT t.id, e.organizer_id, t.status
+       FROM tickets t
+       JOIN zones z ON z.id = t.zone_id
+       JOIN events e ON e.id = z.event_id
+       WHERE t.id = ?
+       LIMIT 1`,
+      [ticket_id],
+    );
+
+    if (!ticketCheck.length) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    if (ticketCheck[0].organizer_id !== organizerId) {
+      return res.status(403).json({ message: "This ticket does not belong to your event" });
+    }
+
+    if (ticketCheck[0].status === "cancelled") {
+      return res.status(400).json({ message: "Ticket already cancelled" });
+    }
+
+    // Cancel the ticket
+    await query(
+      `UPDATE tickets SET status = 'cancelled', updated_at = NOW() WHERE id = ?`,
+      [ticket_id],
+    );
+
+    return res.json({ message: "Ticket cancelled successfully" });
+  } catch (err: any) {
+    console.error("CANCEL TICKET ERROR:", err);
+    return res.status(500).json({
+      message: err.message || "Error cancelling ticket",
+    });
+  }
+}

@@ -137,6 +137,21 @@ export async function checkout(req: AuthRequest, res: Response) {
   }
 
   try {
+    // ── 0. Check whitelist if enabled ──
+    const eventCheck = await query<{ whitelist_enabled: boolean }[]>(
+      `SELECT whitelist_enabled FROM events WHERE id = ? LIMIT 1`,
+      [event_id],
+    );
+    if (eventCheck.length && eventCheck[0].whitelist_enabled) {
+      const whitelistCheck = await query<{ id: number }[]>(
+        `SELECT id FROM whitelist WHERE event_id = ? AND email = (SELECT email FROM users WHERE id = ?) LIMIT 1`,
+        [event_id, userId],
+      );
+      if (!whitelistCheck.length) {
+        return res.status(403).json({ message: "คุณไม่อยู่ในรายชื่อผู้มีสิทธิ์ซื้อตั๋วงานนี้" });
+      }
+    }
+
     // ── 1. Get zone + organizer Stripe account ──
     const zones = await query<ZoneQuery[]>(
       `SELECT z.id, z.price, z.event_id, o.stripe_id
@@ -506,7 +521,7 @@ export async function getMyTickets(req: AuthRequest, res: Response) {
        LEFT JOIN seats s ON s.id = t.seat_id
        LEFT JOIN zones z ON z.id = s.zone_id
        JOIN events e ON e.id = t.event_id
-       WHERE t.users_id = ? AND t.status != 'cancelled'
+       WHERE t.users_id = ?
        ORDER BY t.created_at DESC`,
       [userId],
     );

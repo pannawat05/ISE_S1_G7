@@ -207,6 +207,7 @@ export default function EventEditPage() {
   const [typeId, setTypeId] = useState(0);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [theme, setTheme] = useState("");
+  const [whitelistEnabled, setWhitelistEnabled] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [placeName, setPlaceName] = useState("");
@@ -277,6 +278,7 @@ export default function EventEditPage() {
         // Match type name to ID from eventTypes after fetch, fallback uses type_name lookup later
         setTypeId(0); // reset; will be set after types load via effect below
         setTheme(ev.theme ?? "");
+        setWhitelistEnabled(ev.whitelist_enabled ?? false);
         setStartDate(toDatetimeLocal(ev.start_date));
         setEndDate(toDatetimeLocal(ev.end_date));
         setPlaceName(ev.place_name);
@@ -348,6 +350,7 @@ export default function EventEditPage() {
       fd.append("description", description.trim());
       fd.append("type_id", String(typeId));
       fd.append("theme", theme.trim());
+      fd.append("whitelist_enabled", String(whitelistEnabled));
       fd.append("start_date", startDate);
       fd.append("end_date", endDate);
       fd.append("place_name", placeName.trim());
@@ -372,6 +375,7 @@ export default function EventEditPage() {
       setDescription(updated.description ?? "");
       // typeId will resync via effect
       setTheme(updated.theme ?? "");
+      setWhitelistEnabled(updated.whitelist_enabled ?? false);
       setStartDate(toDatetimeLocal(updated.start_date));
       setEndDate(toDatetimeLocal(updated.end_date));
       setPlaceName(updated.place_name);
@@ -480,6 +484,30 @@ export default function EventEditPage() {
                   <input value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="ไม่บังคับ" className="mt-input" />
                 </div>
               </div>
+
+              {/* Whitelist Toggle */}
+              <div className="flex items-center justify-between bg-white/5 px-4 py-3 border border-white/10 rounded-xl">
+                <div className="flex-1">
+                  <label className="block font-medium text-white text-sm">Whitelist Mode</label>
+                  <p className="mt-1 text-gray-500 text-xs">
+                    เปิดใช้งานเพื่อให้เฉพาะคนในรายชื่อเท่านั้นที่สามารถซื้อตั๋วได้
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWhitelistEnabled(!whitelistEnabled)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 ${
+                    whitelistEnabled ? "bg-violet-600" : "bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      whitelistEnabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
               <div className="gap-3 grid grid-cols-2">
                 <div className="space-y-1.5">
                   <label className="mt-label">วันเวลาเริ่มงาน <span className="text-red-400">*</span></label>
