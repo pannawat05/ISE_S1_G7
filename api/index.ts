@@ -10,13 +10,18 @@ import adminRouter from "./routes/admin.route.js";
 import sysadminRouter from "./routes/sysadmin.route.js";
 import paymentRouter from "./routes/payment.route.js";
 import checkinRouter from "./routes/checkin.route.js";
-import { execute } from "./model/query.js";
+import { execute, query } from "./model/query.js";
+import type { RowDataPacket } from "mysql2";
 import "./middlewares/notificationScheduler.js";
 import { logger } from "./lib/logger.js";
 import { requestLogger, errorLogger } from "./middlewares/logger.middleware.js";
 
 const app = express();
 const port: number = Number(process.env.PORT) || 5001;
+
+interface EventColumnRow extends RowDataPacket {
+  COLUMN_NAME: string;
+}
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -72,9 +77,14 @@ async function ensureEventSchema() {
     )
   `);
 
-  await execute(
-    "ALTER TABLE events ADD COLUMN IF NOT EXISTS whitelist_enabled BOOLEAN NOT NULL DEFAULT FALSE",
+  const whitelistColumn = await query<EventColumnRow[]>(
+    "SHOW COLUMNS FROM events LIKE 'whitelist_enabled'",
   );
+  if (whitelistColumn.length === 0) {
+    await execute(
+      "ALTER TABLE events ADD COLUMN whitelist_enabled BOOLEAN NOT NULL DEFAULT FALSE",
+    );
+  }
 
   await execute(
     "ALTER TABLE events MODIFY COLUMN status ENUM('pending', 'approved', 'rejected', 'deleted') NOT NULL DEFAULT 'pending'",

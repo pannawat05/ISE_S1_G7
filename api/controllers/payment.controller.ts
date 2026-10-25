@@ -63,6 +63,11 @@ interface SeatId extends RowDataPacket {
   id: number;
 }
 
+interface EventBookingAccess extends RowDataPacket {
+  whitelist_enabled: boolean | number;
+  is_whitelisted: number;
+}
+
 interface OrganizerQuery extends RowDataPacket {
   id: number;
   email: string;
@@ -138,18 +143,24 @@ export async function checkout(req: AuthRequest, res: Response) {
 
   try {
     // ── 0. Check whitelist if enabled ──
-    const eventCheck = await query<{ whitelist_enabled: boolean }[]>(
-      `SELECT whitelist_enabled FROM events WHERE id = ? LIMIT 1`,
-      [event_id],
+    const eventAccess = await query<EventBookingAccess[]>(
+      `SELECT e.whitelist_enabled,
+              EXISTS (
+                SELECT 1
+                FROM white_list wl
+                WHERE wl.event_id = e.id AND wl.users_id = ?
+              ) AS is_whitelisted
+       FROM events e
+       WHERE e.id = ?
+       LIMIT 1`,
+      [userId, event_id],
     );
-    if (eventCheck.length && eventCheck[0].whitelist_enabled) {
-      const whitelistCheck = await query<{ id: number }[]>(
-        `SELECT id FROM whitelist WHERE event_id = ? AND email = (SELECT email FROM users WHERE id = ?) LIMIT 1`,
-        [event_id, userId],
-      );
-      if (!whitelistCheck.length) {
-        return res.status(403).json({ message: "คุณไม่อยู่ในรายชื่อผู้มีสิทธิ์ซื้อตั๋วงานนี้" });
-      }
+    const access = eventAccess[0];
+    if (!access) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+    if (access.whitelist_enabled && !access.is_whitelisted) {
+      return res.status(403).json({ message: "คุณไม่อยู่ในรายชื่อผู้มีสิทธิ์ซื้อตั๋วงานนี้" });
     }
 
     // ── 1. Get zone + organizer Stripe account ──
