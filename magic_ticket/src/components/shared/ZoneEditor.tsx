@@ -276,14 +276,36 @@ function ZoneDraftList({ drafts, onChange }: {
   drafts: ZoneDraft[];
   onChange: (drafts: ZoneDraft[]) => void;
 }) {
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(() => new Set());
+
   function update(key: string, field: string, val: string | number) {
     onChange(drafts.map((d) => d._key === key ? { ...d, [field]: val } : d));
+    setSavedKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
   }
   function updateImages(key: string, files: File[]) {
     onChange(drafts.map((d) => d._key === key ? { ...d, imageFiles: files } : d));
+    setSavedKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
   }
   function remove(key: string) {
     onChange(drafts.filter((d) => d._key !== key));
+    setSavedKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }
+  function save(key: string) {
+    if (!drafts.find((draft) => draft._key === key)?.name.trim()) return;
+    onChange(drafts);
+    setSavedKeys((prev) => new Set(prev).add(key));
   }
 
   return (
@@ -310,6 +332,17 @@ function ZoneDraftList({ drafts, onChange }: {
             onChange={(f, v) => update(draft._key, f, v)}
             onImageChange={(files) => updateImages(draft._key, files)}
           />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => save(draft._key)}
+              disabled={!draft.name.trim()}
+              className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-3 py-1.5 rounded-lg text-white text-xs disabled:cursor-not-allowed"
+            >
+              <Check size={13} />
+              {savedKeys.has(draft._key) ? "บันทึกแล้ว" : "บันทึกโซน"}
+            </button>
+          </div>
         </div>
       ))}
       <button
@@ -707,7 +740,7 @@ export default function ZoneEditor({ organizerId, eventId, onDraftsChange }: Zon
         // CREATE MODE — draft list ส่งกลับไปยัง parent
         <>
           <p className="bg-white/[0.02] px-3 py-2 border border-white/5 rounded-lg text-gray-500 text-xs">
-            💡 กำหนดโซนล่วงหน้าได้ที่นี่ โซนจะถูกบันทึกพร้อมกับ Event โดยอัตโนมัติ
+            💡 บันทึกแต่ละโซนไว้ในหน้านี้ได้ โซนจะถูกบันทึกพร้อมกับ Event เมื่อกดสร้าง Event
           </p>
           <ZoneDraftList drafts={drafts} onChange={handleDraftsChange} />
         </>
