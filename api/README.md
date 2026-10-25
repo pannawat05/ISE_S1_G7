@@ -146,7 +146,10 @@ invitation are skipped.
 
 An organizer owner can upload a CSV from an event's **Whitelist** section.
 Use the `email,name` headers; `name` is split into the existing first-name and
-last-name fields. Existing accounts are added without changing their profile.
+last-name fields. Enter the group name in the form, or include it in the CSV
+title rows before the headers (for example, `OS_g2` or `สมาชิกของกลุ่ม OS_g2`).
+The group name is saved with each whitelist entry and shown in the list.
+Existing accounts are added without changing their profile.
 New accounts receive an email OTP and use the **Forgot password** page to set
 their password; the import never sends a password. Each successfully added
 member also receives the same free, no-seat whitelist ticket as a manual

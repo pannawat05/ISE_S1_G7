@@ -475,13 +475,14 @@ export async function importGroupWhitelistCsv(
   organizerId: number,
   eventId: number,
   csv: string,
+  groupName: string,
 ): Promise<GroupWhitelistImportResult> {
   return apiFetch<GroupWhitelistImportResult>(
     `/organizer/${organizerId}/events/${eventId}/whitelist/import`,
     {
       method: "POST",
       token,
-      body: JSON.stringify({ csv }),
+      body: JSON.stringify({ csv, group_name: groupName }),
     },
   );
 }

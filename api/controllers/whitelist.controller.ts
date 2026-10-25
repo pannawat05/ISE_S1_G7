@@ -157,9 +157,19 @@ export async function importGroupWhitelist(req: AuthRequest, res: Response) {
     return res.status(400).json({ message: "CSV is required and must be smaller than 80 KB" });
   }
 
-  let rows;
+  let members;
+  let groupName;
   try {
-    rows = validateGroupWhitelistRows(parseGroupWhitelistCsv(req.body.csv));
+    const parsed = parseGroupWhitelistCsv(req.body.csv);
+    const requestedGroupName =
+      typeof req.body.group_name === "string" ? req.body.group_name.trim() : "";
+    groupName = requestedGroupName || parsed.groupName;
+    if (!groupName || groupName.length > 100) {
+      return res.status(400).json({
+        message: "Group name is required and must be 100 characters or fewer",
+      });
+    }
+    members = validateGroupWhitelistRows(parsed.members);
   } catch (error) {
     return res.status(400).json({
       message: error instanceof Error ? error.message : "Invalid CSV",
@@ -189,7 +199,7 @@ export async function importGroupWhitelist(req: AuthRequest, res: Response) {
     let failed = 0;
     let emailFailures = 0;
 
-    for (const member of rows) {
+    for (const member of members) {
       if (member.error === "Duplicate email in CSV") {
         results.push({
           row: member.row,
@@ -257,7 +267,7 @@ export async function importGroupWhitelist(req: AuthRequest, res: Response) {
 
         await connection.execute(
           "INSERT INTO white_list (users_id, event_id, note, add_by) VALUES (?, ?, ?, ?)",
-          [userId, eventId, "Group whitelist import", req.user.id],
+          [userId, eventId, `Group: ${groupName}`, req.user.id],
         );
         await connection.execute(
           `INSERT INTO tickets (qrcode, status, users_id, seat_id, event_id, ticket_type, gross_amount, net_amount)
@@ -348,7 +358,7 @@ export async function importGroupWhitelist(req: AuthRequest, res: Response) {
 
     return res.json({
       summary: {
-        total: rows.length,
+        total: members.length,
         added,
         createdAccounts,
         skipped,

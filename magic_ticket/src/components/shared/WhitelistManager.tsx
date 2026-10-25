@@ -240,6 +240,7 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [groupName, setGroupName] = useState("");
   const [importing, setImporting] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -389,6 +390,7 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
         organizerId,
         eventId,
         await csvFile.text(),
+        groupName.trim(),
       );
       setList(result.whitelist);
       const { summary } = result;
@@ -407,6 +409,7 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
         confirmButtonText: "ตกลง",
       });
       setCsvFile(null);
+      setGroupName("");
       if (csvInputRef.current) csvInputRef.current.value = "";
     } catch (error) {
       await showToast(
@@ -463,9 +466,18 @@ export default function WhitelistManager({ organizerId, eventId }: WhitelistMana
         <div>
           <h3 className="font-medium text-gray-200 text-sm">นำเข้ารายชื่อกลุ่มจาก CSV</h3>
           <p className="mt-1 text-gray-500 text-xs">
-            ไฟล์ต้องมีหัวคอลัมน์ <code>email,name</code> สมาชิกใหม่จะได้รับอีเมล OTP เพื่อตั้งรหัสผ่าน และถูกเพิ่มพร้อมบัตร whitelist ฟรี
+            ไฟล์ต้องมีหัวคอลัมน์ <code>email,name</code> ชื่อกลุ่มจะใช้กำกับสมาชิกใน whitelist สมาชิกใหม่จะได้รับอีเมล OTP เพื่อตั้งรหัสผ่าน และถูกเพิ่มพร้อมบัตร whitelist ฟรี
           </p>
         </div>
+        <input
+          type="text"
+          value={groupName}
+          onChange={(event) => setGroupName(event.target.value)}
+          maxLength={100}
+          placeholder="ชื่อกลุ่ม (ถ้าเว้นว่าง จะใช้ชื่อที่ระบุใน CSV)"
+          disabled={importing}
+          className="mt-input w-full text-sm"
+        />
         <div className="flex flex-wrap items-center gap-3">
           <input
             ref={csvInputRef}

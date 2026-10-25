@@ -10,17 +10,34 @@ test("parses CSV headers, quoted commas and normalizes member emails", () => {
     '\uFEFFemail,name\r\nAlice@example.com,"Alice, Smith"\r\nbob@example.com,Bob',
   );
 
-  assert.deepEqual(rows, [
-    { email: "alice@example.com", name: "Alice, Smith", row: 2 },
-    { email: "bob@example.com", name: "Bob", row: 3 },
-  ]);
+  assert.deepEqual(rows, {
+    groupName: "",
+    members: [
+      { email: "alice@example.com", name: "Alice, Smith", row: 2 },
+      { email: "bob@example.com", name: "Bob", row: 3 },
+    ],
+  });
+});
+
+test("reads a group name from the title rows before the CSV headers", () => {
+  assert.deepEqual(
+    parseGroupWhitelistCsv(
+      "OS_g2,,,,\nสมาชิกของกลุ่ม OS_g2,,,,\nemail,name,,,\nalice@example.edu,Alice Smith,,,\n",
+    ),
+    {
+      groupName: "OS_g2",
+      members: [
+        { email: "alice@example.edu", name: "Alice Smith", row: 4 },
+      ],
+    },
+  );
 });
 
 test("reports malformed and duplicate group whitelist rows", () => {
   const rows = validateGroupWhitelistRows(
     parseGroupWhitelistCsv(
       "email,name\nnot-an-email,Invalid\nperson@example.com,Person\nPERSON@example.com,Duplicate\n",
-    ),
+    ).members,
   );
 
   assert.equal(rows[0]?.error, "Invalid email address");
@@ -38,15 +55,12 @@ test("rejects unsupported CSV headers and oversized imports", () => {
     () => parseGroupWhitelistCsv('email,name\nuser@example.com,"User"x'),
     /characters after a quoted field/,
   );
-  assert.throws(
-    () => validateGroupWhitelistRows(
-      Array.from({ length: 2 }, (_, index) => ({
-        email: `person${index}@example.com`,
-        name: "Person",
-        row: index + 2,
-      })),
-      1,
-    ),
-    /at most 1 members/,
-  );
+  assert.throws(() => validateGroupWhitelistRows(
+    Array.from({ length: 2 }, (_, index) => ({
+      email: `person${index}@example.com`,
+      name: "Person",
+      row: index + 2,
+    })),
+    1,
+  ), /at most 1 members/);
 });

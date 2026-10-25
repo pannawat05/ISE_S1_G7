@@ -8,7 +8,12 @@ export interface GroupWhitelistCsvRow extends GroupWhitelistMember {
   error?: string;
 }
 
-export function parseGroupWhitelistCsv(csv: string): GroupWhitelistCsvRow[] {
+export interface ParsedGroupWhitelistCsv {
+  groupName: string;
+  members: GroupWhitelistCsvRow[];
+}
+
+export function parseGroupWhitelistCsv(csv: string): ParsedGroupWhitelistCsv {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -72,22 +77,41 @@ export function parseGroupWhitelistCsv(csv: string): GroupWhitelistCsvRow[] {
   if (row.some((value) => value.trim() !== "")) rows.push(row);
   if (rows.length === 0) throw new Error("CSV is empty");
 
-  const headers = rows[0]!.map((header, index) =>
-    (index === 0 ? header.replace(/^\uFEFF/, "") : header).trim().toLowerCase(),
-  );
-  const emailColumn = headers.indexOf("email");
-  const nameColumn = headers.indexOf("name");
-  if (emailColumn === -1 || nameColumn === -1) {
+  const headerIndex = rows.slice(0, 10).findIndex((values, rowIndex) => {
+    const headers = values.map((header, columnIndex) =>
+      rowIndex === 0 && columnIndex === 0
+        ? header.replace(/^\uFEFF/, "").trim().toLowerCase()
+        : header.trim().toLowerCase(),
+    );
+    return headers.includes("email") && headers.includes("name");
+  });
+  if (headerIndex === -1) {
     throw new Error("CSV must include email and name columns");
   }
 
-  const members = rows.slice(1).map((values, index) => ({
+  const headers = rows[headerIndex]!.map((header, columnIndex) =>
+    headerIndex === 0 && columnIndex === 0
+      ? header.replace(/^\uFEFF/, "").trim().toLowerCase()
+      : header.trim().toLowerCase(),
+  );
+  const emailColumn = headers.indexOf("email");
+  const nameColumn = headers.indexOf("name");
+  const preambleRows = rows.slice(0, headerIndex);
+  const groupLabel = preambleRows
+    .map((values) => values.map((value) => value.trim()).filter(Boolean).join(" "))
+    .find((value) => value && !/^สมาชิกของกลุ่ม\s*/i.test(value));
+  const groupDescription = preambleRows
+    .map((values) => values.map((value) => value.trim()).filter(Boolean).join(" "))
+    .find((value) => /^สมาชิกของกลุ่ม\s*/i.test(value));
+  const describedGroupName = groupDescription?.replace(/^สมาชิกของกลุ่ม\s*/i, "").trim();
+  const groupName = describedGroupName || groupLabel || "";
+  const members = rows.slice(headerIndex + 1).map((values, index) => ({
     email: (values[emailColumn] ?? "").trim().toLowerCase(),
     name: (values[nameColumn] ?? "").trim(),
-    row: index + 2,
+    row: headerIndex + index + 2,
   }));
   if (members.length === 0) throw new Error("CSV contains no members");
-  return members;
+  return { groupName, members };
 }
 
 export function validateGroupWhitelistRows(
