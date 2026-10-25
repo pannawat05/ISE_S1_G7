@@ -54,31 +54,45 @@ app.get("/", (_req, res) => {
 // Global Error Logger middleware
 app.use(errorLogger);
 
+async function ensureEventSchema() {
+  await execute(`
+    CREATE TABLE IF NOT EXISTS event_views (
+      event_id INT PRIMARY KEY,
+      view_count INT NOT NULL DEFAULT 0,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_event_views_event FOREIGN KEY (event_id)
+        REFERENCES events(id) ON DELETE CASCADE
+    )
+  `);
+
+  await execute(`
+    CREATE TABLE IF NOT EXISTS platform_settings (
+      setting_key VARCHAR(100) PRIMARY KEY,
+      setting_value DECIMAL(5,2) NOT NULL
+    )
+  `);
+
+  await execute(
+    "ALTER TABLE events ADD COLUMN IF NOT EXISTS whitelist_enabled BOOLEAN NOT NULL DEFAULT FALSE",
+  );
+
+  await execute(
+    "ALTER TABLE events MODIFY COLUMN status ENUM('pending', 'approved', 'rejected', 'deleted') NOT NULL DEFAULT 'pending'",
+  );
+
+  await execute(
+    "INSERT IGNORE INTO platform_settings (setting_key, setting_value) VALUES ('platform_fee_percent', 10.00)",
+  );
+  await execute(
+    "INSERT IGNORE INTO platform_settings (setting_key, setting_value) VALUES ('booking_limit', 4.00)",
+  );
+}
+
 async function start() {
   try {
-    await execute(`
-      CREATE TABLE IF NOT EXISTS event_views (
-        event_id INT PRIMARY KEY,
-        view_count INT NOT NULL DEFAULT 0,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_event_views_event FOREIGN KEY (event_id)
-          REFERENCES events(id) ON DELETE CASCADE
-      )
-    `);
-    await execute(`
-      CREATE TABLE IF NOT EXISTS platform_settings (
-        setting_key VARCHAR(100) PRIMARY KEY,
-        setting_value DECIMAL(5,2) NOT NULL
-      )
-    `);
-    await execute(
-      "INSERT IGNORE INTO platform_settings (setting_key, setting_value) VALUES ('platform_fee_percent', 10.00)",
-    );
-    await execute(
-      "INSERT IGNORE INTO platform_settings (setting_key, setting_value) VALUES ('booking_limit', 4.00)",
-    );
+    await ensureEventSchema();
   } catch (err) {
-    logger.error("ANALYTICS SCHEMA ERROR:", err, "DATABASE");
+    logger.error("EVENT SCHEMA ERROR:", err, "DATABASE");
   }
   app.listen(port, () => {
     logger.info(`API server started and listening on port ${port}`, { port }, "SYSTEM");
