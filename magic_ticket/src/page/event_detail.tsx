@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import Cookies from "js-cookie";
 import {
   ArrowLeft, Calendar, MapPin, Building2, Tag,
   Ticket, ChevronLeft, ChevronRight, ExternalLink,
 } from "lucide-react";
-import { fetchPublicEventById, getCoverUrl, type PublicEvent } from "@/api/events";
+import { fetchEventBookingAccess, fetchPublicEventById, getCoverUrl, type PublicEvent } from "@/api/events";
 import { API_BASE } from "@/api/client";
 import BookingDrawer from "@/components/booking";
 
@@ -120,14 +121,47 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingAccess, setBookingAccess] = useState<"checking" | "allowed" | "denied" | "error">("checking");
 
   useEffect(() => {
     const eventId = Number(id);
     if (isNaN(eventId)) { setError("Invalid event ID"); setLoading(false); return; }
-    fetchPublicEventById(eventId)
-      .then(setEvent)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
+
+    let cancelled = false;
+    async function loadEvent() {
+      try {
+        const loadedEvent = await fetchPublicEventById(eventId);
+        if (cancelled) return;
+
+        setEvent(loadedEvent);
+        if (!loadedEvent.whitelist_enabled) {
+          setBookingAccess("allowed");
+          return;
+        }
+
+        const token = Cookies.get("authToken");
+        if (!token) {
+          setBookingAccess("denied");
+          return;
+        }
+
+        try {
+          const canBook = await fetchEventBookingAccess(eventId, token);
+          if (!cancelled) setBookingAccess(canBook ? "allowed" : "denied");
+        } catch {
+          if (!cancelled) setBookingAccess("error");
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "โหลดกิจกรรมไม่สำเร็จ");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadEvent();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // ── Loading ──
@@ -169,6 +203,8 @@ export default function EventDetailPage() {
   const start = new Date(event.start_date);
   const end = new Date(event.end_date);
   const isEnded = new Date() > end;
+  const isWhitelistDenied = event.whitelist_enabled && bookingAccess === "denied";
+  const isBookingUnavailable = isEnded || bookingAccess === "denied" || bookingAccess === "checking" || bookingAccess === "error";
   const lat = parseFloat(event.latitude);
   const lng = parseFloat(event.longitude);
   const hasCoords = !isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0);
@@ -293,18 +329,34 @@ export default function EventDetailPage() {
             {/* CTA */}
             <button
               onClick={() => setBookingOpen(true)}
-              disabled={isEnded}
+              disabled={isBookingUnavailable}
               className={`flex justify-center items-center gap-2 py-3 rounded-xl w-full font-semibold text-sm transition-colors ${
-                isEnded
+                isBookingUnavailable
                   ? "bg-white/10 text-gray-500 cursor-not-allowed"
                   : "bg-violet-600 hover:bg-violet-700 text-white"
               }`}
             >
               <Ticket size={18} />
-              {isEnded ? "งานนี้จบแล้ว" : "ซื้อบัตร"}
+              {isEnded
+                ? "งานนี้จบแล้ว"
+                : isWhitelistDenied
+                  ? "คุณไม่ใช่ whitelist"
+                  : bookingAccess === "checking"
+                    ? "กำลังตรวจสอบสิทธิ์..."
+                    : bookingAccess === "error"
+                      ? "ตรวจสอบสิทธิ์ไม่สำเร็จ"
+                      : "ซื้อบัตร"}
             </button>
             <p className="text-gray-600 text-xs text-center">
-              {isEnded ? "ไม่สามารถซื้อบัตรได้เนื่องจากงานสิ้นสุดแล้ว" : "เลือกโซนและที่นั่งที่ต้องการ"}
+              {isEnded
+                ? "ไม่สามารถซื้อบัตรได้เนื่องจากงานสิ้นสุดแล้ว"
+                : isWhitelistDenied
+                  ? "คุณไม่อยู่ในรายชื่อ whitelist จึงไม่สามารถจองงานนี้ได้"
+                  : bookingAccess === "checking"
+                    ? "กำลังตรวจสอบสิทธิ์การจอง"
+                    : bookingAccess === "error"
+                      ? "ไม่สามารถตรวจสอบสิทธิ์การจองได้ กรุณาโหลดหน้าใหม่"
+                      : "เลือกโซนและที่นั่งที่ต้องการ"}
             </p>
           </div>
         </div>

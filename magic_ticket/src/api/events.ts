@@ -15,6 +15,7 @@ export interface PublicEvent {
   latitude: string;
   longitude: string;
   theme: string | null;
+  whitelist_enabled: boolean | number;
   images?: { id: number; url: string; display_order: number }[];
 }
 
@@ -97,4 +98,15 @@ export async function fetchBookingConfig(): Promise<{ booking_limit: number }> {
 export async function fetchMyTicketCount(eventId: number, token: string): Promise<number> {
   const data = await apiFetch<{ count: number }>(`/events/${eventId}/my-ticket-count`, { token });
   return Number(data.count ?? 0);
+}
+
+export async function fetchEventBookingAccess(
+  eventId: number,
+  token: string,
+): Promise<boolean> {
+  const data = await apiFetch<{ can_book: boolean }>(
+    `/events/${eventId}/booking-access`,
+    { token },
+  );
+  return data.can_book;
 }

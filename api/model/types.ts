@@ -67,6 +67,7 @@ export interface PublicEvent extends RowDataPacket {
   latitude: string;
   longitude: string;
   theme: string | null;
+  whitelist_enabled: boolean;
 }
 
 export interface PublicEventList extends RowDataPacket {

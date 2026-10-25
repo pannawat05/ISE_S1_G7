@@ -18,6 +18,9 @@ router.get("/:id", eventsController.getPublicEvent);
 router.get("/", eventsController.listPublicEvents);
 
 // Auth-required endpoints
+router.get("/:id/booking-access", authenticate, (req, res) =>
+  eventsController.getEventBookingAccess(req, res),
+);
 router.get("/:id/my-ticket-count", authenticate, (req, res) =>
   eventsController.getMyTicketCount(req, res),
 );
