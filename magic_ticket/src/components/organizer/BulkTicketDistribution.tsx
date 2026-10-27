@@ -93,36 +93,7 @@ export default function BulkTicketDistribution({ token, organizerId, eventId }: 
 
   return (
     <section className="space-y-4 mt-surface p-5 rounded-2xl">
-      <div className="flex items-center gap-2">
-        <Users size={17} className="text-violet-400" />
-        <h2 className="font-semibold text-white text-sm">ส่งคำเชิญซื้อบัตรจาก Google Group</h2>
-      </div>
-      <p className="text-gray-400 text-xs leading-relaxed">
-        ดึงอีเมลสมาชิกแต่ละคนจาก Google Workspace แล้วส่งคำเชิญส่วนตัว สมาชิกต้องเข้าสู่ระบบหรือสมัครด้วยอีเมลที่ได้รับคำเชิญและชำระเงินก่อน ระบบจึงออก QR code เฉพาะบุคคล
-      </p>
-      <div className="flex flex-col sm:flex-row gap-2">
-        <input
-          type="email"
-          value={groupEmail}
-          onChange={(event) => {
-            setGroupEmail(event.target.value);
-            setPreview(null);
-            setBatch(null);
-          }}
-          placeholder="event-staff@kmitl.ac.th"
-          className="mt-input flex-1"
-        />
-        <button
-          type="button"
-          onClick={handlePreview}
-          disabled={loadingPreview || sending || !groupEmail.trim()}
-          className="flex justify-center items-center gap-2 bg-white/10 hover:bg-white/15 disabled:opacity-50 px-4 py-2 rounded-xl text-white text-sm"
-        >
-          {loadingPreview ? <Loader2 size={15} className="animate-spin" /> : <Users size={15} />}
-          ดูตัวอย่างสมาชิก
-        </button>
-      </div>
-      {error && <p role="alert" className="text-red-400 text-sm">{error}</p>}
+      
 
       {preview && (
         <div className="space-y-3 bg-white/[0.02] p-4 border border-white/5 rounded-xl">
