@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { CalendarDays, Ticket, ShieldCheck, QrCode } from "lucide-react";
 import Cookies from "js-cookie";
+import { fetchMyStaffAssignments } from "@/api/user";
 
 const BASE_NAV = [
   { to: "/",           label: "ค้นหากิจกรรม", icon: CalendarDays },
@@ -22,19 +23,44 @@ interface NavbarNavProps {
 
 export default function NavbarNav({ onNavigate, mobile = false }: NavbarNavProps) {
   const { pathname } = useLocation();
-  const [loggedIn, setLoggedIn] = useState(!!Cookies.get("authToken"));
+  const [token, setToken] = useState(() => Cookies.get("authToken") ?? null);
+  const [isStaff, setIsStaff] = useState(false);
 
   useEffect(() => {
-    function sync() { setLoggedIn(!!Cookies.get("authToken")); }
+    let active = true;
+    let requestId = 0;
+
+    async function sync() {
+      const currentRequest = ++requestId;
+      const nextToken = Cookies.get("authToken") ?? null;
+      setToken(nextToken);
+      setIsStaff(false);
+
+      if (!nextToken) return;
+
+      try {
+        const assignments = await fetchMyStaffAssignments(nextToken);
+        if (active && currentRequest === requestId) setIsStaff(assignments.length > 0);
+      } catch {
+        if (active && currentRequest === requestId) setIsStaff(false);
+      }
+    }
+
+    void sync();
     window.addEventListener("user-updated", sync);
+    window.addEventListener("staff-assignments-updated", sync);
     window.addEventListener("storage", sync);
     return () => {
+      active = false;
       window.removeEventListener("user-updated", sync);
+      window.removeEventListener("staff-assignments-updated", sync);
       window.removeEventListener("storage", sync);
     };
   }, []);
 
-  const navItems = loggedIn ? [...BASE_NAV, ...AUTH_NAV] : BASE_NAV;
+  const navItems = token
+    ? [...BASE_NAV, ...(isStaff ? AUTH_NAV : [])]
+    : BASE_NAV;
 
   if (mobile) {
     // Sidebar vertical list

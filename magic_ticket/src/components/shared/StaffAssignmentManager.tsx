@@ -41,6 +41,7 @@ export default function StaffAssignmentManager({ organizerId, eventId }: { organ
     setSaving(true);
     try {
       await assignEventStaff(token, organizerId, eventId, selected.id, role);
+      window.dispatchEvent(new Event("staff-assignments-updated"));
       setSelected(null); setQuery(""); setMessage("Assign staff สำเร็จ"); await load();
     } catch (err) { setMessage(err instanceof Error ? err.message : "Assign staff ไม่สำเร็จ"); }
     finally { setSaving(false); }
@@ -49,7 +50,11 @@ export default function StaffAssignmentManager({ organizerId, eventId }: { organ
   async function handleRemove(assignmentId: number) {
     const token = Cookies.get("authToken");
     if (!token || !confirm("นำ staff คนนี้ออกจาก event หรือไม่?")) return;
-    try { await removeEventStaff(token, organizerId, eventId, assignmentId); setMessage("นำ staff ออกจาก event แล้ว"); await load(); }
+    try {
+      await removeEventStaff(token, organizerId, eventId, assignmentId);
+      window.dispatchEvent(new Event("staff-assignments-updated"));
+      setMessage("นำ staff ออกจาก event แล้ว"); await load();
+    }
     catch (err) { setMessage(err instanceof Error ? err.message : "นำ staff ออกไม่สำเร็จ"); }
   }
 
