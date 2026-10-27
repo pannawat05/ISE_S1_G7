@@ -118,13 +118,13 @@ export default function AttendeesPage() {
           </select>
         </div>
 
-        {eventId && (
+        {/* {eventId && (
           <BulkTicketDistribution
             token={token}
             organizerId={organizerId}
             eventId={Number(eventId)}
           />
-        )}
+        )} */}
 
         {showStaffMenu && (eventId ? (
           <StaffAssignmentManager organizerId={organizerId} eventId={Number(eventId)} />
